@@ -1,8 +1,8 @@
-import RestaurantForm from "@/components/forms/restaurants-form"
+import DeliveryManForm from "@/components/forms/deliveryman-form"
 
 const AddRestaurant = () => {
     return (
-        <RestaurantForm />
+        <DeliveryManForm />
     )
 }
 

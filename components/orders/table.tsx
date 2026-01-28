@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Table,
   TableBody,
@@ -8,65 +6,99 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, MoreHorizontal } from "lucide-react";
-import SortableHead from "../shared/sortable-head";
-
+import { Checkbox } from "@/components/ui/checkbox";
 import { orders } from "@/constants/orders";
+import SortableHeader from "@/components/shared/sortable-head";
+import { Eye, MoreHorizontal } from "lucide-react";
+import Pagination from "@/components/pagination";
+import EmptyState from "../shared/EmptyState";
 
-export default function OrdersTable() {
+const OrdersTable = () => {
+  if (!orders || orders.length === 0) {
+    return (
+      <EmptyState
+        title="Looks like there are no orders yet!"
+        description="You haven’t received any orders yet."
+      />
+    );
+  }
+
   return (
-    <div className="bg-white rounded-[14px] overflow-hidden px-2 lg:px-0">
+    <>
       <Table>
         <TableHeader>
           <TableRow className="border-none">
-            <SortableHead label="Order ID" />
-            <SortableHead label="Date" />
-            <SortableHead label="Customer Name" />
-            <SortableHead label="Restaurant Name" />
-            <SortableHead label="Order Status" />
-            <SortableHead label="Amount" />
-            <TableHead className="text-center font-semibold text-dark">
-              Actions
+            <TableHead className="w-[50px]">
+              <Checkbox />
             </TableHead>
+
+            <SortableHeader label="Order ID" />
+            <SortableHeader label="Date" />
+            <SortableHeader label="Customer Name" />
+            <SortableHeader label="Location" />
+            <SortableHeader label="Amount" />
+            <SortableHeader label="Status" />
+
+            <TableHead className="text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
 
         <TableBody>
-          {orders.map((order, index) => (
-            <TableRow
-              key={index}
-              className="border-b text-center border-gray-50 last:border-0 h-[64px] hover:bg-gray-50/50"
-            >
-              <TableCell className="text-[#A3A3A3] text-sm">
+          {orders.map((order, i) => (
+            <TableRow key={i} className="border-none h-[70px]">
+              {/* Checkbox */}
+              <TableCell>
+                <Checkbox />
+              </TableCell>
+
+              {/* Order ID */}
+              <TableCell className="px-4 text-gray-500">
                 {order.id}
               </TableCell>
 
-              <TableCell className="text-[#A3A3A3] text-sm">
+              {/* Date */}
+              <TableCell className="px-4 text-gray-500">
                 {order.date}
               </TableCell>
 
-              <TableCell className="text-[#A3A3A3] text-sm">
+              {/* Customer */}
+              <TableCell className="px-4 text-gray-600">
                 {order.customer}
               </TableCell>
 
-              <TableCell className="text-[#A3A3A3] text-sm">
-                {order.restaurant}
+              {/* Location */}
+              <TableCell className="px-4 text-gray-500">
+                {order.location}
               </TableCell>
 
-              <TableCell className="text-[#A3A3A3] text-sm">
-                {order.status}
-              </TableCell>
-
-              <TableCell className="text-green font-semibold text-sm">
+              {/* Amount */}
+              <TableCell className="px-4 font-medium text-green-600">
                 {order.amount}
               </TableCell>
 
-              <TableCell className="text-center">
-                <div className="flex justify-center items-center gap-4 text-[#A3A3A3]">
-                  <button className="hover:text-dark transition-colors">
+              {/* Status */}
+              <TableCell className="px-4">
+                <span
+                  className={`text-sm font-medium ${
+                    order.status === "Delivered"
+                      ? "text-green-600"
+                      : order.status === "Cancelled" ||
+                        order.status === "Refunded"
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                  }`}
+                >
+                  {order.status}
+                </span>
+              </TableCell>
+
+              {/* Actions */}
+              <TableCell className="px-4">
+                <div className="flex items-center justify-center gap-2 text-gray-500">
+                  <button className="p-2 hover:text-primary">
                     <Eye size={18} />
                   </button>
-                  <button className="hover:text-dark transition-colors">
+                  <button className="p-2 hover:text-primary">
                     <MoreHorizontal size={18} />
                   </button>
                 </div>
@@ -75,7 +107,10 @@ export default function OrdersTable() {
           ))}
         </TableBody>
       </Table>
-    </div>
-  );
-}
 
+      <Pagination />
+    </>
+  );
+};
+
+export default OrdersTable;

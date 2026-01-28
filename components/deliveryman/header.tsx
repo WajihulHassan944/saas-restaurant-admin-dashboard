@@ -4,12 +4,9 @@ import { HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Header from '../header'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import EditCustomerModal from './EditCustomerModal'
 
-export default function EmployeeSettingsHeader({ title, description }: HeaderProps) {
+export default function DeliveryManHeader({ title, description }: HeaderProps) {
     const router = useRouter()
-   const [open, setOpen] = useState(false);
  
     return (
         <>
@@ -24,7 +21,7 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
                 <Button
                     variant="outline"
                     className="w-full sm:w-auto justify-between sm:justify-start flex items-center gap-2"
-                    onClick={()=>router.push("/customer-settings/trash")}
+                    onClick={()=>router.push("/deliveryman/trash")}
                 >
                     <p className='pt-1'>View Trash</p>
                     <HelpCircle size={18} className="text-gray/60" />
@@ -32,18 +29,15 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
 
                 <Button
                     variant="primary"
-                    onClick={() => setOpen(true)}
+                    onClick={() => router.push("/deliveryman/add")}
                     className="w-full sm:w-auto whitespace-nowrap"
                 >
-                    Add New Customer
+                    Add New Delivery Man
                 </Button>
             </div>
         </div>
 
-          <EditCustomerModal
-        open={open}
-        onOpenChange={setOpen}
-      />
+        
       </>
     )
 }

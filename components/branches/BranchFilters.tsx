@@ -2,14 +2,20 @@
 
 import { Search, Download, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function BranchFilters() {
   return (
-    <div className="w-full bg-white p-4 lg:p-[20px]">
+    <div className="w-full bg-white p-4 lg:p-[20px] rounded-lg">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3">
-
-        {/* Search Area */}
-        <div className="relative flex-1">
+        {/* Search Area (MAIN FLEX ITEM) */}
+        <div className="relative flex-1 min-w-[300px]">
           <Search
             size={22}
             className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-400"
@@ -32,7 +38,7 @@ export default function BranchFilters() {
             "
           />
 
-          {/* Search Button (absolute) */}
+          {/* Search Button */}
           <Button
             className="
               absolute right-0 top-1/1 -translate-y-1/1
@@ -50,23 +56,16 @@ export default function BranchFilters() {
           </Button>
         </div>
 
-        {/* Export Button */}
+        {/* Export Button (fixed width) */}
         <Button
           variant="outline"
-          className="h-[48px] px-5 rounded-[14px] border-[#E5E7EB] text-gray-600 flex items-center gap-2"
+          className="h-[48px] px-5 rounded-[14px] border-[#E5E7EB] text-gray-600 flex items-center gap-2 shrink-0"
         >
           <Download size={18} />
           Export
         </Button>
+<Button variant="outline" className="h-[48px] px-5 rounded-[14px] border-[#E5E7EB] text-gray-600 flex items-center gap-2" > <SlidersHorizontal size={18} /> Filter </Button>
 
-        {/* Filter Button */}
-        <Button
-          variant="outline"
-          className="h-[48px] px-5 rounded-[14px] border-[#E5E7EB] text-gray-600 flex items-center gap-2"
-        >
-          <SlidersHorizontal size={18} />
-          Filter
-        </Button>
       </div>
     </div>
   );

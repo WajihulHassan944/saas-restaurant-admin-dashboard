@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import Header from '../header'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import EditCustomerModal from './EditCustomerModal'
+import EditCustomerModal from './AddEmployeeModal'
 
 export default function EmployeeSettingsHeader({ title, description }: HeaderProps) {
     const router = useRouter()
@@ -24,7 +24,7 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
                 <Button
                     variant="outline"
                     className="w-full sm:w-auto justify-between sm:justify-start flex items-center gap-2"
-                    onClick={()=>router.push("/customer-settings/trash")}
+                    onClick={()=>router.push("/employees-settings/trash")}
                 >
                     <p className='pt-1'>View Trash</p>
                     <HelpCircle size={18} className="text-gray/60" />
@@ -35,7 +35,7 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
                     onClick={() => setOpen(true)}
                     className="w-full sm:w-auto whitespace-nowrap"
                 >
-                    Add New Customer
+                    Add New Employee
                 </Button>
             </div>
         </div>

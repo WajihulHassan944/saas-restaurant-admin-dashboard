@@ -1,16 +1,13 @@
 "use client"
 
-import { HelpCircle } from 'lucide-react'
+import { Download, HelpCircle, PlusCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Header from '../header'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import EditCustomerModal from './EditCustomerModal'
 
-export default function EmployeeSettingsHeader({ title, description }: HeaderProps) {
+export default function OrdersHeader({ title, description }: HeaderProps) {
     const router = useRouter()
-   const [open, setOpen] = useState(false);
- 
+   
     return (
         <>
         <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-center lg:justify-between w-full">
@@ -24,26 +21,14 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
                 <Button
                     variant="outline"
                     className="w-full sm:w-auto justify-between sm:justify-start flex items-center gap-2"
-                    onClick={()=>router.push("/customer-settings/trash")}
                 >
-                    <p className='pt-1'>View Trash</p>
-                    <HelpCircle size={18} className="text-gray/60" />
-                </Button>
-
-                <Button
-                    variant="primary"
-                    onClick={() => setOpen(true)}
-                    className="w-full sm:w-auto whitespace-nowrap"
-                >
-                    Add New Customer
+                    <Download size={18} className="text-gray-600" />
+                    <p className='pt-1'>Export</p>
                 </Button>
             </div>
         </div>
 
-          <EditCustomerModal
-        open={open}
-        onOpenChange={setOpen}
-      />
+       
       </>
     )
 }

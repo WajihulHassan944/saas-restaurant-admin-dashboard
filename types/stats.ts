@@ -2,7 +2,11 @@ export type StatIcon =
   | "store"
   | "orders"
   | "revenue"
-  | "users";
+  | "users"
+  | "completed"
+  | "cancelled"
+  | "ongoing";
+
 export type StatItem = {
   _id: string;
   title: string;
