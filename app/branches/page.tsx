@@ -1,5 +1,4 @@
-import Container from "../../components/container";
-import Pagination from "@/components/pagination";
+import Container from "@/components/container";
 import Header from "@/components/branches/header";
 import Table from "@/components/branches/list";
 import BranchFilters from "@/components/branches/BranchFilters";
@@ -22,7 +21,6 @@ export default function BranchesPage() {
                     <BranchesPagination />
                 </div>
             </div>
-
         </Container>
     );
 }

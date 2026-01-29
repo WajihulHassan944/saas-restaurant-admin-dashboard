@@ -13,5 +13,7 @@ export const menuItems: MenuItem[] = [
     { title: "Customer Management", icon: PiUsersThree, href: "/customer-settings" },
     { title: "Deliveryman", icon: Box, href: "/deliveryman" },
     { title: "Employees", icon: Users2, href: "/employees-settings" },
-    { title: "Promotion Management", icon: Bell, href: "/notification-settings" },
+    { title: "Promotion Management", icon: Bell, href: "/promotion" },
+    { title: "Reports & Payouts", icon: Bell, href: "/reports" },
+      { title: "Profile", icon: Bell, href: "/profile" },
 ];

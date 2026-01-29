@@ -1,5 +1,5 @@
-import UserProfile from "@/components/profile/UserProfile";
-import Container from "../../components/container";
+import Container from "@/components/container";
+import EditProfile from "@/components/profile/EditProfile";
 import Header from "@/components/profile/header"
 
 const ProfilePage = () => {
@@ -9,8 +9,7 @@ const ProfilePage = () => {
                 title="Profile Management"
                 description="View and manage your profile"
             />
-<UserProfile />
-          
+          <EditProfile />
         </Container>
     )
 }

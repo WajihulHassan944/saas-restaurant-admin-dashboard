@@ -2,15 +2,12 @@
 
 import { Search, Download, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useState } from "react";
+import FilterModal from "../shared/FilterModal";
 
 export default function BranchFilters() {
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="w-full bg-white p-4 lg:p-[20px] rounded-lg">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3">
@@ -64,9 +61,10 @@ export default function BranchFilters() {
           <Download size={18} />
           Export
         </Button>
-<Button variant="outline" className="h-[48px] px-5 rounded-[14px] border-[#E5E7EB] text-gray-600 flex items-center gap-2" > <SlidersHorizontal size={18} /> Filter </Button>
+<Button onClick={() => setOpen(true)} variant="outline" className="h-[48px] px-5 rounded-[14px] border-[#E5E7EB] text-gray-600 flex items-center gap-2" > <SlidersHorizontal size={18} /> Filter </Button>
 
       </div>
+<FilterModal open={open} onOpenChange={setOpen} />
     </div>
   );
 }

@@ -26,7 +26,7 @@ const ICON_MAP: Record<StatIcon, React.ElementType> = {
 
 const StatsCard = ({ data }: { data: StatItem }) => {
   const pathname = usePathname();
-  const isOrdersPage = pathname === "/orders";
+  const isOrdersPage = pathname === "/orders" || pathname === "/reports";
 
   const isUp = data.trend?.direction === "up";
   const Icon = ICON_MAP[data.icon];
