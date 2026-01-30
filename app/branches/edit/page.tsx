@@ -4,6 +4,7 @@ import Container from "@/components/container";
 import Header from "@/components/branches/header";
 import TabButton from "@/components/ui/TabButton";
 import { useState } from "react";
+import EditBranchStepOne from "@/components/forms/EditBranchForm/edit-branch-step-1";
 
 type editTab = "basicInfo" | "delivery" | "workingHours" | "inventory";
 
@@ -47,6 +48,10 @@ export default function BranchesEditPage() {
             Inventory
           </TabButton>
         </div>
+
+<EditBranchStepOne />
+
+
       </div>
     </Container>
   );
