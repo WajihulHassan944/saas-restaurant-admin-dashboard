@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import ImportModal from "./ImportModal";
 import CreateBranchModal from "./CreateBranchModal";
+import ImportModal from "../shared/ImportModal";
 
 interface HeaderProps {
   title: string;
