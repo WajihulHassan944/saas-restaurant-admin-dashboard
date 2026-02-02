@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Info } from "lucide-react";
+import { Radio } from "../ui/radioBtn";
 
 export default function DeliveryManForm() {
   return (
@@ -109,27 +110,5 @@ function FormField({
         className="h-[44px] border-[#BBBBBB]"
       />
     </div>
-  );
-}
-
-function Radio({
-  label,
-  active = false,
-}: {
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <label className="flex items-center gap-[8px] cursor-pointer">
-      <span
-        className={`size-[18px] rounded-full border flex items-center justify-center
-        ${active ? "border-red-500" : "border-gray-300"}`}
-      >
-        {active && (
-          <span className="size-[10px] rounded-full bg-red-500" />
-        )}
-      </span>
-      <span className="text-sm text-dark">{label}</span>
-    </label>
   );
 }

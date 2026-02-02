@@ -1,135 +1,67 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Info } from "lucide-react";
+import Section from "../Promotions/Section";
+import FormInput from "@/components/register/form/FormInput";
 
 export default function EditBranchStepOne() {
   return (
-    <div className="bg-white rounded-[14px] p-[30px]">
-      <div className="grid grid-cols-12 gap-[48px]">
-        {/* Left Section Titles (OUT OF BOX) */}
-        <div className="col-span-4 space-y-[64px]">
-          <SectionTitle title="Setup Basic Info" />
-        </div>
+    <div className="rounded-[14px]">
+       <div className="mb-12 mt-8">
+        <h2 className="text-md font-semibold text-gray-600">
+          Basic Information
+        </h2>
+        <p className="text-sm text-gray-500">
+          Select the type or types of access that you validate for this team
+        </p>
+      </div>
 
-        {/* Form Content */}
-        <div className="col-span-8 space-y-[40px]">
-          {/* Setup Basic Info */}
-          <section className="space-y-[24px]">
-            <div className="grid grid-cols-2 gap-[24px]">
-              <FormField label="First Name *" />
-              <FormField label="Last Name *" />
-            </div>
+   <Section label="Setup Basic Info" padded={false} withMargin={true}>
+        <FormInput label="Branch Name *" placeholder="eg. John Doe" />
+        <FormInput label="Address Line 1 *" placeholder="eg. 10"/>
+        <FormInput label="Address Line 2 *" placeholder="eg. 10"/>
+          <button className="text-primary text-sm font-medium text-center w-full">
+                + See More
+              </button>
+  </Section>
 
-            <div className="grid grid-cols-2 gap-[24px]">
-              <FormField label="Phone Number *" />
-              <FormField label="Email" />
-            </div>
-
-            <FormField label="Maximum Assign Order*" />
-            <FormField label="Branch*" />
-
-            <button className="text-primary text-sm font-medium">
-              + See More
-            </button>
-          </section>
-
-</div>
- <div className="col-span-4 space-y-[64px]">
-          <SectionTitle title="Identity Information" />
-        </div>
-        <div className="col-span-8 space-y-[40px]">
-        
-          <section className="space-y-[24px]">
-            <div className="flex gap-[24px]">
-              <Radio label="Passport" />
-              <Radio label="National ID" />
-              <Radio label="Driving License" active />
-            </div>
-
-            <FormField
-              label="Identity Number *"
-              placeholder="eg.22"
-            />
-
-            {/* Business Logo Preview (CENTERED) */}
+   <Section label="Contact Person Info" padded={false} withMargin={true}>
+        <FormInput label="Contact Person Name *" placeholder="eg. John Doe" />
+          <FormInput label="Designation" placeholder="eg. 10"/>
+        <FormInput label="Contact Phone Number *" placeholder="eg. 10"/>
+        <FormInput label="Email" placeholder="eg. 10"/>
+  </Section>
+<Section label="Add Branch Logo" padded={false} withMargin={true}>
             <div className="flex flex-col items-center text-center space-y-[12px]">
               <Label>Business Logo</Label>
 
               <div className="w-[180px] rounded-[12px] overflow-hidden border">
                 <img
-                  src="/dummy-user.jpg"
+                  src="/branch_logo.jpg"
                   alt="Business Logo"
                   className="w-full h-[180px] object-cover"
                 />
               </div>
 
-              <p className="text-sm text-gray-500 max-w-[320px]">
+              <p className="text-sm text-gray-500 max-w-[420px]">
                 This is the business logo. It has been uploaded in the business
                 setup
               </p>
 
-              <button className="text-primary text-sm font-medium">
-                + See More
-              </button>
             </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-}
+</Section>
+   <Section label="Add Support Contact Info" padded={false} withMargin={true}>
+             <div className="flex flex-col items-start space-y-[12px]">
+              <Label className="mb-2 text-[16px]">Add Customer Support Contact Info</Label>
+              <p className="text-sm text-gray-500 ">
+                Turn on to set custom support contact info to show in website / POS
+              </p>
 
-/* ---------- Helpers ---------- */
+            </div>
+  </Section>
 
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-[12px]">
-      <Info size={18} className="text-gray-400" />
-      <span className="text-base font-semibold text-[#646982]">
-        {title}
-      </span>
-    </div>
-  );
-}
 
-function FormField({
-  label,
-  placeholder = "eg. jhon doe",
-}: {
-  label: string;
-  placeholder?: string;
-}) {
-  return (
-    <div className="space-y-[6px]">
-      <Label>{label}</Label>
-      <Input
-        placeholder={placeholder}
-        className="h-[44px] border-[#BBBBBB]"
-      />
-    </div>
-  );
-}
 
-function Radio({
-  label,
-  active = false,
-}: {
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <label className="flex items-center gap-[8px] cursor-pointer">
-      <span
-        className={`size-[18px] rounded-full border flex items-center justify-center
-        ${active ? "border-red-500" : "border-gray-300"}`}
-      >
-        {active && (
-          <span className="size-[10px] rounded-full bg-red-500" />
-        )}
-      </span>
-      <span className="text-sm text-dark">{label}</span>
-    </label>
+       </div>
   );
 }
