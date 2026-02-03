@@ -1,22 +1,109 @@
 import {
-    LayoutGrid, Store, Globe, Users, BarChart3, Box, Bell,
-    Users2
-} from 'lucide-react';
+  LayoutGrid,
+  Store,
+  List,
+  ShoppingBag,
+  Monitor,
+  Users,
+  Truck,
+  UserCog,
+  Gift,
+  User,
+  Printer,
+  BarChart3,
+  Bell,
+} from "lucide-react";
 import { PiUsersThree } from "react-icons/pi";
 
+export type SidebarSection = "main" | "account";
+
+export interface MenuItem {
+  title: string;
+  href: string;
+  icon: any;
+  section: SidebarSection;
+}
+
 export const menuItems: MenuItem[] = [
-    { title: "Dashboard", icon: LayoutGrid, href: "/" },
-    { title: "Manage Restaurants", icon: Store, href: "/branches" },
-    { title: "Menu Management", icon: Globe, href: "/menu" },
-    { title: "Order Management", icon: Users, href: "/orders" },
-    { title: "POS Management", icon: BarChart3, href: "/pos" },
-    { title: "Customer Management", icon: PiUsersThree, href: "/customer-settings" },
-    { title: "Deliveryman", icon: Box, href: "/deliveryman" },
-    { title: "Employees", icon: Users2, href: "/employees-settings" },
-    { title: "Promotion Management", icon: Bell, href: "/promotion-management" },
-    { title: "Reports & Payouts", icon: Bell, href: "/reports" },
-    { title: "Auto-Printing / POS", icon: Bell, href: "/auto-printing" },
-    { title: "Notification Settings", icon: Bell, href: "/notification-settings" },
-   
-    { title: "Profile", icon: Bell, href: "/profile" },
+  // MAIN
+  {
+    title: "Dashboard",
+    href: "/",
+    icon: LayoutGrid,
+    section: "main",
+  },
+  {
+    title: "Restaurant Management",
+    href: "/branches",
+    icon: Store,
+    section: "main",
+  },
+  {
+    title: "Menu Management",
+    href: "/menu",
+    icon: List,
+    section: "main",
+  },
+  {
+    title: "Order Management",
+    href: "/orders",
+    icon: ShoppingBag,
+    section: "main",
+  },
+  {
+    title: "POS Management",
+    href: "/pos",
+    icon: Monitor,
+    section: "main",
+  },
+  {
+    title: "Customer Management",
+    href: "/customer-settings",
+    icon: PiUsersThree,
+    section: "main",
+  },
+  {
+    title: "Deliveryman",
+    href: "/deliveryman",
+    icon: Truck,
+    section: "main",
+  },
+  {
+    title: "Employees",
+    href: "/employees-settings",
+    icon: UserCog,
+    section: "main",
+  },
+  {
+    title: "Promotion Management",
+    href: "/promotion-management",
+    icon: Gift,
+    section: "main",
+  },
+
+  // ACCOUNT SETTINGS
+  {
+    title: "Profile",
+    href: "/profile",
+    icon: User,
+    section: "account",
+  },
+  {
+    title: "Auto-Printing / POS",
+    href: "/auto-printing",
+    icon: Printer,
+    section: "account",
+  },
+  {
+    title: "Reports & Payouts",
+    href: "/reports",
+    icon: BarChart3,
+    section: "account",
+  },
+  {
+    title: "Notification Settings",
+    href: "/notification-settings",
+    icon: Bell,
+    section: "account",
+  },
 ];

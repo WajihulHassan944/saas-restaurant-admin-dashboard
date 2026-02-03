@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Star, Plus, Heart, X } from "lucide-react";
 import { MenuItem } from "@/constants/menu";
+import { useState } from "react";
+import AddToCartModal from "../shared/AddToCartModal";
 
 type Props = {
   item: MenuItem;
@@ -10,8 +12,9 @@ type Props = {
 };
 
 export default function MenuItemCard({ item, editing }: Props) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="relative w-full bg-white rounded-[22px]  flex flex-col">
+    <div className="relative w-full bg-white rounded-[22px]  flex flex-col max-w-[280px] mb-5">
       {/* ❌ Delete button (only in editing mode) */}
       {editing && (
         <button
@@ -79,11 +82,13 @@ export default function MenuItemCard({ item, editing }: Props) {
           <Button
             size="icon"
             className="h-11 w-11 rounded-[10px] bg-primary hover:bg-red-600"
+            onClick={() => setOpen(true)}
           >
             <Plus className="text-white" size={20} />
           </Button>
         </div>
       </div>
+      <AddToCartModal open={open} onOpenChange={setOpen} />
     </div>
   );
 }

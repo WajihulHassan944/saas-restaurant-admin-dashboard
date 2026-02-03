@@ -10,7 +10,7 @@ export function Radio({
     <label className="flex items-center gap-[8px] cursor-pointer">
       <span
         className={`size-[18px] rounded-full border flex items-center justify-center
-        ${active ? "border-primary" : "border-gray-300"}`}
+        ${active ? "border-primary" : "border-gray-500"}`}
       >
         {active && (
           <span className="size-[10px] rounded-full bg-primary" />

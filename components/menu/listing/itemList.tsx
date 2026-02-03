@@ -7,36 +7,62 @@ import MenuItemCard from "@/components/cards/MenuItemCard";
 import { useState } from "react";
 import CreateMenuItemModal from "../CreateMenuItemModal/CreateMenuItemModal";
 
-export default function ItemList({ editing }: { editing: boolean }) {
+interface ItemListProps {
+  editing?: boolean;
+  showAddNew?: boolean; // optional, default true
+  headerText?: string;  // optional, default "Item List"
+  addNewText?: string;  // optional, default "Add New Item"
+}
+
+export default function ItemList({
+  editing,
+  showAddNew = true,
+  headerText = "Item List",
+  addNewText = "Add New Item",
+}: ItemListProps) {
   const activeMenu = menus.find((m) => m.isDefault);
-const [createMenuItem, setCreateMenuItem] = useState(false);
-  
+  const [createMenuItem, setCreateMenuItem] = useState(false);
+
   return (
     <div className="w-full py-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-[24px] font-semibold text-gray-900">
-          Item List
+          {headerText}
         </h2>
 
-        <Button
-          variant="link"
-          size="sm"
-          className="inline-flex items-center gap-2 text-primary font-semibold text-[16px]"
-           onClick={() => setCreateMenuItem(true)}
-        >
-          <PlusCircle className="w-4 h-4" />
-          Add New Item
-        </Button>
+       {showAddNew && (
+  <Button
+    variant="link"
+    size="sm"
+    className="inline-flex items-center gap-2 text-primary font-semibold text-[16px]"
+    onClick={() => setCreateMenuItem(true)}
+  >
+    {addNewText !== "Manage Food" && <PlusCircle className="w-4 h-4" />}
+    {addNewText}
+  </Button>
+)}
+
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {activeMenu?.items.map((item) => (
-          <MenuItemCard key={item.id} item={item} editing={editing} />
-        ))}
-      </div>
+   <div className="flex flex-wrap gap-1">
+  {activeMenu?.items.map((item) => (
+    <div
+      key={item.id}
+      className="flex-grow " // <-- ensures min width of 300px
+    >
+      <MenuItemCard item={item} editing={editing} />
+    </div>
+  ))}
+</div>
 
-            <CreateMenuItemModal open={createMenuItem} onOpenChange={setCreateMenuItem}  />
+
+
+
+      <CreateMenuItemModal
+        open={createMenuItem}
+        onOpenChange={setCreateMenuItem}
+      />
     </div>
   );
 }

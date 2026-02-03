@@ -23,10 +23,11 @@ const categories = [
 ];
 
 interface CategoriesProps {
-  editing: boolean;
+  editing?: boolean;
+  showAddNew?: boolean; 
 }
 
-export default function Categories({ editing }: CategoriesProps) {
+export default function Categories({ editing, showAddNew = true }: CategoriesProps) {
   const [active, setActive] = useState<string>("Burger");
 
   return (
@@ -35,16 +36,18 @@ export default function Categories({ editing }: CategoriesProps) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-[24px] font-semibold text-gray-900">Categories</h2>
 
+ {showAddNew && (
         <div className="mt-4 text-center">
           <Button
             variant="link"
             size="sm"
-            className="inline-flex items-center gap-2 text-primary no-underline hover:no-underline font-semibold text-[16px]"
+            className="inline-flex items-center gap-2 text-primary underline hover:no-underline font-semibold text-[16px]"
           >
             <PlusCircle className="w-4 h-4" />
             Add New Category
           </Button>
         </div>
+ )}
       </div>
 
       {/* Category Pills */}

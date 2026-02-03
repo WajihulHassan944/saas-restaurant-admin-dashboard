@@ -1,22 +1,19 @@
-"use client"
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LogOut } from 'lucide-react';
-import { menuItems } from '@/constants/sidebarItems';
-import { Button } from '@/components/ui/button';
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { menuItems, MenuItem } from "@/constants/sidebarItems";
+import { Button } from "@/components/ui/button";
 
 interface SidebarItemProps {
   item: MenuItem;
-  isActive?: boolean;
+  isActive: boolean;
   onLinkClick?: () => void;
 }
 
-const SidebarItem = ({
-  item,
-  isActive = false,
-  onLinkClick
-}: SidebarItemProps) => {
+const SidebarItem = ({ item, isActive, onLinkClick }: SidebarItemProps) => {
   const Icon = item.icon;
   const isDashboard = item.title === "Dashboard";
 
@@ -24,41 +21,69 @@ const SidebarItem = ({
     <Link
       href={item.href}
       onClick={onLinkClick}
-      className={`
-        flex items-center gap-[12px] w-full transition-all pl-[23px] bg-transparent
-        ${isDashboard ? "my-[20px]" : "my-[0]"}
-      `}
+      className={`flex items-center gap-3 px-6 transition-colors mb-2.5 ${
+        isDashboard ? "mb-5 mt-5" : ""
+      }`}
     >
-      <div className={`
-        flex items-center justify-center size-10 shrink-0 rounded-xl transition-colors
-        ${isDashboard ? "bg-primary text-white" : "bg-[#F9FAFB] text-primary"}
-      `}>
-        <Icon size={20} strokeWidth={isDashboard ? 2.5 : 2} />
+      <div
+        className={`
+          flex items-center justify-center size-10 rounded-xl shrink-0
+          ${
+            isDashboard
+              ? "bg-primary text-white"
+              : "bg-[#F9FAFB] text-primary"
+          }
+        `}
+      >
+        <Icon size={20} strokeWidth={2.2} />
       </div>
 
-      <span className={`
-        text-sm truncate transition-colors
-        ${isDashboard ? "text-black" : (isActive ? "text-primary" : "text-gray hover:text-primary")}
-      `}>
+      <span
+        className={`
+          text-sm truncate
+          ${
+            isDashboard
+              ? "text-black"
+              : isActive
+              ? "text-primary"
+              : "text-gray hover:text-primary"
+          }
+        `}
+      >
         {item.title}
       </span>
     </Link>
   );
 };
 
-interface SidebarProps {
-  onLinkClick?: () => void;
-}
-
-export default function Sidebar({ onLinkClick }: SidebarProps) {
+export default function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname();
 
-  return (
-    <aside className="flex flex-col w-72 bg-white h-full">
+  const mainItems = menuItems.filter((i) => i.section === "main");
+  const accountItems = menuItems.filter((i) => i.section === "account");
 
-      <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-        <nav className="flex flex-col gap-[12px]">
-          {menuItems.map((item) => (
+  return (
+    <aside className="flex flex-col w-72 bg-white h-full border-r overflow-y-auto">
+      {/* MENU */}
+      <nav className="flex flex-col px-0">
+        {mainItems.map((item) => (
+          <SidebarItem
+            key={item.title}
+            item={item}
+            isActive={pathname === item.href}
+            onLinkClick={onLinkClick}
+          />
+        ))}
+
+        {/* ACCOUNT SETTINGS */}
+        <div className="mt-5 px-6">
+          <p className="text-xs font-semibold tracking-wide text-[#2D3748] uppercase">
+            Account Settings
+          </p>
+        </div>
+
+        <div className="mt-5">
+          {accountItems.map((item) => (
             <SidebarItem
               key={item.title}
               item={item}
@@ -66,20 +91,56 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
               onLinkClick={onLinkClick}
             />
           ))}
-        </nav>
-      </div>
+        </div>
 
-      <div className="px-[23px] py-6 sticky bottom-0 bg-white">
-        <Button
-          variant="ghost"
-          className="flex items-center justify-start gap-[12px] w-full h-auto p-0 text-primary hover:bg-red-50 hover:text-primary rounded-xl transition-all"
-        >
-          <div className="flex items-center justify-center size-10 bg-[#F9FAFB] rounded-xl text-primary">
-            <LogOut size={20} />
+        {/* HELP CARD */}
+        <div className="px-5 pb-5 mt-29">
+          <div
+            className="relative rounded-2xl px-4 pt-14 pb-4 text-white"
+            style={{
+              backgroundImage: "url('/href_background.png')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            {/* User Icon */}
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+              <Image
+                src="/user_logo.png"
+                alt="Support"
+                width={90}
+                height={90}
+                className="drop-shadow-md"
+              />
+            </div>
+
+            {/* Content */}
+            <div className="text-left mb-4">
+              <p className="text-base font-semibold">Need help?</p>
+              <p className="text-sm opacity-90">Please check our docs</p>
+            </div>
+
+            {/* Button */}
+            <Button
+              size="sm"
+              className="w-full bg-white text-primary hover:bg-white/90 font-semibold"
+            >
+              ADD MENU
+            </Button>
           </div>
-          <span className="font-semibold text-sm">Logout</span>
-        </Button>
-      </div>
+
+          {/* LOGOUT */}
+          <Button
+            variant="ghost"
+            className="mt-4 flex items-center gap-3 text-primary hover:bg-red-50 w-full justify-start"
+          >
+            <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center">
+              <LogOut size={18} />
+            </div>
+            <span className="text-sm font-semibold">Logout</span>
+          </Button>
+        </div>
+      </nav>
     </aside>
   );
 }
