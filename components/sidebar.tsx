@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { menuItems, MenuItem } from "@/constants/sidebarItems";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ const SidebarItem = ({ item, isActive, onLinkClick }: SidebarItemProps) => {
 
 export default function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname();
-
+const router = useRouter();
   const mainItems = menuItems.filter((i) => i.section === "main");
   const accountItems = menuItems.filter((i) => i.section === "account");
 
@@ -124,6 +124,7 @@ export default function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
             <Button
               size="sm"
               className="w-full bg-white text-primary hover:bg-white/90 font-semibold"
+              onClick={() => router.push("/menu?create=true")}
             >
               ADD MENU
             </Button>
@@ -133,8 +134,9 @@ export default function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
           <Button
             variant="ghost"
             className="mt-4 flex items-center gap-3 text-primary hover:bg-red-50 w-full justify-start"
+            onClick={()=> router.push('/login')}
           >
-            <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center">
+            <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center" >
               <LogOut size={18} />
             </div>
             <span className="text-sm font-semibold">Logout</span>

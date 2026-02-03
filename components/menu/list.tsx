@@ -3,18 +3,10 @@ import { useState } from "react";
 import { menus } from "@/constants/menu";
 import BranchCard from "../cards/BranchCard";
 import EmptyState from "../shared/EmptyState";
-import BranchDetailsModal from "./BranchDetails/BranchDetailsModal";
+import { useRouter } from "next/navigation";
 
 export default function MenuList() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
-
-  const openDialog = (branchId: number) => {
-    setSelectedBranchId(branchId); // Set selected branch ID
-    setIsModalOpen(true); // Open modal
-  };
-  const closeDialog = () => setIsModalOpen(false); // Close modal
-
+  const router = useRouter();
   if (!menus || menus.length === 0) {
     return (
       <EmptyState
@@ -31,17 +23,11 @@ export default function MenuList() {
           id={menu.id}
           name={menu.name}
           isDefault={menu.isDefault}
-          itemsCount={menu.itemsCount}
-          openDialog={openDialog} // Pass openDialog function to BranchCard
+          openMenuDetails={()=> router.push('/menu/listing')} 
         />
       ))}
 
-      {/* Branch Details Modal */}
-      <BranchDetailsModal
-        isOpen={isModalOpen}
-        closeDialog={closeDialog}
-        branchId={selectedBranchId} // Pass selected branch ID to modal
-      />
+     
     </div>
   );
 }

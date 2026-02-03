@@ -12,8 +12,10 @@ import SortableHeader from "@/components/shared/sortable-head";
 import { Eye, MoreHorizontal } from "lucide-react";
 import Pagination from "@/components/pagination";
 import EmptyState from "../shared/EmptyState";
+import { useRouter } from "next/navigation";
 
 const OrdersTable = () => {
+  const router = useRouter();
   if (!orders || orders.length === 0) {
     return (
       <EmptyState
@@ -95,7 +97,7 @@ const OrdersTable = () => {
               {/* Actions */}
               <TableCell className="px-4">
                 <div className="flex items-center justify-center gap-2 text-gray-500">
-                  <button className="p-2 hover:text-primary">
+                  <button className="p-2 hover:text-primary" onClick={()=> router.push('/orders/details')}>
                     <Eye size={18} />
                   </button>
                   <button className="p-2 hover:text-primary">

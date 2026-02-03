@@ -6,8 +6,9 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import BorderedSearchBar from "../shared/BorderedSearchBar";
+import PosModalHeader from "../pos/PosModalHeader";
+import ModalActionFooter from "../pos/PosModalActionFooter";
 
 export default function HoldOrdersModal({
   open,
@@ -22,15 +23,12 @@ export default function HoldOrdersModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[720px] rounded-[28px] px-10 py-8 bg-[#F5F5F5]">
         {/* ================= HEADER ================= */}
-        <div className="text-center space-y-2">
-          <h2 className="text-[28px] font-semibold text-[#101828]">
-            Hold Orders
-          </h2>
-          <p className="text-[16px] text-[#667085]">
-            View your hold orders from here
-          </p>
-        </div>
-
+      
+        <PosModalHeader
+        title="Hold Orders"
+        description="View your hold orders from here"
+      />
+      
         {/* ================= SEARCH ================= */}
         <div className="mt-6">
           <BorderedSearchBar
@@ -67,15 +65,17 @@ export default function HoldOrdersModal({
         
 
         {/* ================= ACTIONS ================= */}
-        <div className="mt-8 flex items-center justify-center gap-8">
-          <button className="text-[17.5px] font-semibold text-[#101828] hover:underline">
-            Remove
-          </button>
+       <ModalActionFooter
+  leftLabel="Remove"
+  rightLabel="Resume"
+  onLeftClick={() => {
+    // remove hold order
+  }}
+  onRightClick={() => {
+    // resume order
+  }}
+/>
 
-          <Button className="px-10 h-[44px] rounded-[14px] bg-primary text-white text-[16px] font-medium hover:bg-primary/90">
-            Resume
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );

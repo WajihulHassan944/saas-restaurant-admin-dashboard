@@ -11,15 +11,15 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
-type EditCustomerModalProps = {
+type CustomerDetailModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-export default function EditCustomerModal({
+export default function CustomerDetailModal({
   open,
   onOpenChange,
-}: EditCustomerModalProps) {
+}: CustomerDetailModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent

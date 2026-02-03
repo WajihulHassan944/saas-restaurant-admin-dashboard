@@ -1,3 +1,4 @@
+'use client';
 import {
   Table,
   TableBody,
@@ -13,8 +14,13 @@ import SortableHeader from "@/components/shared/sortable-head";
 import { Eye, MoreHorizontal } from "lucide-react";
 import Pagination from "@/components/pagination";
 import EmptyState from "../shared/EmptyState";
+import { useState } from "react";
+import CustomerDetailModal from "./CustomerDetailModal";
 
 const CustomerTable = () => {
+
+   const [open, setOpen] = useState(false);
+
   if (!customersData || customersData.length === 0) {
     return <EmptyState
   title="Looks like there are no customers yet!"
@@ -82,7 +88,7 @@ const CustomerTable = () => {
 
               <TableCell>
                 <div className="flex items-center justify-center gap-2 text-gray">
-                  <button className="p-2">
+                  <button className="p-2" onClick={() => setOpen(true)}>
                     <Eye size={18} />
                   </button>
                   <button className="p-2">
@@ -96,6 +102,11 @@ const CustomerTable = () => {
       </Table>
 
       <Pagination />
+
+       <CustomerDetailModal
+        open={open}
+        onOpenChange={setOpen}
+      />
     </>
   );
 };

@@ -9,8 +9,8 @@ import {
   HelpCircle,
   PlusCircle,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import ImportModal from "../shared/ImportModal";
 import CreateMenuModal from "./CreateMenuModal";
 
@@ -21,9 +21,18 @@ interface HeaderProps {
 
 export default function BranchesHeader({ title, description }: HeaderProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
    const [open, setOpen] = useState(false); 
   const [createMenu, setCreateMenu] = useState(false);
   
+  useEffect(() => {
+  if (searchParams.get("create") === "true") {
+    setCreateMenu(true);
+  }
+}, [searchParams]);
+
+
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
       

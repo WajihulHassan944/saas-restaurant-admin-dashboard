@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import FormInput from "../register/form/FormInput";
 
 const Login = () => {
+  
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
       {/* ================= LEFT IMAGE ================= */}
@@ -41,10 +42,12 @@ const Login = () => {
               placeholder="Your business name"
             />
 
-            <FormInput
-              label="Password"
-              placeholder="Your business name"
-            />
+           <FormInput
+  label="Password"
+  placeholder="Enter your password"
+  showPasswordToggle
+/>
+
 
             {/* Remember + Forgot */}
             <div className="flex items-center justify-between text-sm">

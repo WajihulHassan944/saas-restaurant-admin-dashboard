@@ -9,7 +9,7 @@ export const managementData: ManagementItem[] = [
     description:
       "Set up your restaurant details to run and manage everything with total control and ease.",
     actionLabel: "Manage Restaurant",
-    actionHref: "/restaurants",
+    actionHref: "/branches",
   },
   {
     id: "menu",
@@ -41,7 +41,7 @@ export const managementData: ManagementItem[] = [
     description:
       "Manage customer profiles, track activity, and build lasting relationships.",
     actionLabel: "Manage Customers",
-    actionHref: "/customers",
+    actionHref: "/customer-settings",
   },
   {
     id: "delivery",
@@ -49,7 +49,7 @@ export const managementData: ManagementItem[] = [
     description:
       "Assign deliveries, monitor status, and manage delivery personnel.",
     actionLabel: "Manage Delivery Man",
-    actionHref: "/delivery-men",
+    actionHref: "/deliveryman",
   },
   {
     id: "employees",
@@ -57,7 +57,7 @@ export const managementData: ManagementItem[] = [
     description:
       "Organize employee details, roles, and work schedules efficiently.",
     actionLabel: "Manage Employees",
-    actionHref: "/employees",
+    actionHref: "/employees-settings",
   },
   {
     id: "reports",
@@ -73,7 +73,7 @@ export const managementData: ManagementItem[] = [
     description:
       "Manage and monitor promotions that boost revenue.",
     actionLabel: "Manage Promotions",
-    actionHref: "/promotions",
+    actionHref: "/promotion-management",
   },
 ];
 

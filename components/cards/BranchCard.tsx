@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BranchProps } from "@/types/branch";
+import ActionDropdown from "../shared/ActionDropdown";
 
 export default function BranchCard({
   id,
@@ -15,6 +16,7 @@ export default function BranchCard({
   isDefault,
   itemsCount,
   openDialog,
+  openMenuDetails
 }: BranchProps) {
   /* ---------- Dynamic Icon Logic ---------- */
 
@@ -70,9 +72,24 @@ export default function BranchCard({
 
       {/* RIGHT ACTIONS */}
       <div className="flex items-center border border-gray-200 rounded-[10px] overflow-hidden h-full">
-        <ActionButton onClick={() => openDialog(id)}>
-          <Eye size={18} />
-        </ActionButton>
+      {openDialog && (
+  <>
+    <ActionButton onClick={() => openDialog(id)}>
+      <Eye size={18} />
+    </ActionButton>
+
+    <Divider />
+  </>
+)}
+{openMenuDetails && (
+  <>
+    <ActionButton onClick={() => openMenuDetails(id)}>
+     <Eye size={18} />
+    </ActionButton>
+
+    <Divider />
+  </>
+)}
 
         <Divider />
 
@@ -82,9 +99,23 @@ export default function BranchCard({
 
         <Divider />
 
-        <ActionButton>
-          <MoreVertical size={18} />
-        </ActionButton>
+     <ActionDropdown
+  items={[
+    openDialog
+      ? {
+          label: "Edit Branch",
+          href: `/branches/edit`,
+          icon: <Store size={16} className="text-gray-500" />,
+        }
+      : {
+          label: "Edit Menu",
+          href: `/menu`,
+          icon: <List size={16} className="text-gray-500" />,
+        },
+  ]}
+/>
+
+
       </div>
     </div>
   );

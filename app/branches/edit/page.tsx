@@ -10,12 +10,13 @@ import EditBranchStepTwo from "@/components/forms/EditBranchForm/edit-branch-ste
 import EditBranchStepThree from "@/components/forms/EditBranchForm/edit-branch-step-3";
 import EditBranchStepFour from "@/components/forms/EditBranchForm/edit-branch-step-4";
 import EditBranchSectionHeader from "@/components/forms/EditBranchForm/EditBranchSectionHeader";
+import { useRouter } from "next/navigation";
 
 type EditTab = "basicInfo" | "delivery" | "workingHours" | "inventory";
 
 export default function BranchesEditPage() {
   const [activeTab, setActiveTab] = useState<EditTab>("basicInfo");
-
+const router = useRouter();
   const steps: {
     key: EditTab;
     tabLabel: string;
@@ -102,7 +103,14 @@ export default function BranchesEditPage() {
           primaryActionLabel={
             currentIndex === steps.length - 1 ? "Save" : "Save & Continue"
           }
-          onPrimaryAction={goNext}
+         onPrimaryAction={() => {
+  if (currentIndex === steps.length - 1) {
+    router.push("/branches");
+  } else {
+    goNext();
+  }
+}}
+
           // onBack={currentIndex > 0 ? goBack : undefined}
         />
 

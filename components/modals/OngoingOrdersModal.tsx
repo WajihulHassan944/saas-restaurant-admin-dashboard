@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import BorderedSearchBar from "../shared/BorderedSearchBar";
+import PosModalHeader from "../pos/PosModalHeader";
 
 const FILTER_TABS = [
   "All",
@@ -51,15 +52,11 @@ export default function OngoingOrdersModal({
      <DialogContent className="w-full sm:max-w-[630px] rounded-[28px] px-10 py-8 bg-[#F5F5F5]">
 
         {/* ================= HEADER ================= */}
-        <div className="text-center space-y-2">
-          <h2 className="text-[28px] font-semibold text-[#101828]">
-            Ongoing Orders
-          </h2>
-          <p className="text-[16px] text-[#667085]">
-            Track your ongoing orders from here
-          </p>
-        </div>
-
+       <PosModalHeader
+              title="Ongoing Orders"
+              description="Track your ongoing orders from here"
+            />
+       
         {/* ================= SEARCH ================= */}
         <div className="mt-6">
           <BorderedSearchBar

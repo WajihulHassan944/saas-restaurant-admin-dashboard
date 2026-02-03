@@ -4,12 +4,10 @@ import { HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Header from '../header'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import EditCustomerModal from './EditCustomerModal'
 
 export default function EmployeeSettingsHeader({ title, description }: HeaderProps) {
     const router = useRouter()
-   const [open, setOpen] = useState(false);
+  
  
     return (
         <>
@@ -32,7 +30,7 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
 
                 <Button
                     variant="primary"
-                    onClick={() => setOpen(true)}
+                    
                     className="w-full sm:w-auto whitespace-nowrap"
                 >
                     Add New Customer
@@ -40,10 +38,7 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
             </div>
         </div>
 
-          <EditCustomerModal
-        open={open}
-        onOpenChange={setOpen}
-      />
+         
       </>
     )
 }

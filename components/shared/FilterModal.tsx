@@ -9,11 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-// Importing the custom radio button
-import CustomRadioButton from "@/components/ui/CustomRadioButton";
+import { Radio } from "@/components/ui/radioBtn";
+import FormInput from "../register/form/FormInput";
 
 type FilterModalProps = {
   open: boolean;
@@ -24,75 +21,78 @@ export default function FilterModal({ open, onOpenChange }: FilterModalProps) {
   const [status, setStatus] = useState("inactive");
   const [sortBy, setSortBy] = useState("updated");
   const [defaultMenu, setDefaultMenu] = useState(true);
+const [creationDate, setCreationDate] = useState("");
+const [modifiedDate, setModifiedDate] = useState("");
 
-  const handleReset = () => {
-    setStatus("all");
-    setSortBy("default");
-    setDefaultMenu(false);
-  };
+const handleReset = () => {
+  setStatus("all");
+  setSortBy("default");
+  setDefaultMenu(false);
+
+  setCreationDate("");
+  setModifiedDate("");
+};
+
 
   const handleApply = () => {
-    // send filters to parent here
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
-        {/* HEADER */}
+        {/* ================= HEADER ================= */}
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Filter</DialogTitle>
-          <p className="text-sm text-gray-500">Filter by Status, Branch, and other fields</p>
+          <p className="text-sm text-gray-500">
+            Filter by Status, Branch, and other fields
+          </p>
         </DialogHeader>
 
-        {/* BODY */}
+        {/* ================= BODY ================= */}
         <div className="mt-4 rounded-[14px] bg-white p-4 space-y-6">
+
           {/* STATUS */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Status</Label>
+            <p className="text-sm font-medium">Status</p>
+
             <div className="flex gap-6">
-              <CustomRadioButton
-                value="all"
-                label="All"
-                active={status === "all"}
-                onClick={setStatus} // Set status on click
-              />
-              <CustomRadioButton
-                value="active"
-                label="Active"
-                active={status === "active"}
-                onClick={setStatus} // Set status on click
-              />
-              <CustomRadioButton
-                value="inactive"
-                label="Inactive"
-                active={status === "inactive"}
-                onClick={setStatus} // Set status on click
-              />
+              <div onClick={() => setStatus("all")}>
+                <Radio label="All" active={status === "all"} />
+              </div>
+
+              <div onClick={() => setStatus("active")}>
+                <Radio label="Active" active={status === "active"} />
+              </div>
+
+              <div onClick={() => setStatus("inactive")}>
+                <Radio label="Inactive" active={status === "inactive"} />
+              </div>
             </div>
           </div>
 
           {/* CREATION DATE */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Creation Date</Label>
-            <Input
-              placeholder="eg. jhon doe"
-              className="border-gray/40 focus:outline-primary focus:ring-2 focus:ring-primary"
-            />
-          </div>
+         <FormInput
+  label="Creation Date"
+  placeholder="Select date"
+  value={creationDate}
+  onChange={setCreationDate}
+/>
+
 
           {/* MODIFIED DATE */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Modified Date</Label>
-            <Input
-              placeholder="eg. jhon doe"
-              className="border-gray/40 focus:outline-primary focus:ring-2 focus:ring-primary"
-            />
-          </div>
+       <FormInput
+  label="Modified Date"
+  placeholder="Select date"
+  value={modifiedDate}
+  onChange={setModifiedDate}
+/>
+
 
           {/* MENU */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Menu</Label>
+            <p className="text-sm font-medium">Menu</p>
+
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={defaultMenu}
@@ -104,31 +104,34 @@ export default function FilterModal({ open, onOpenChange }: FilterModalProps) {
 
           {/* SORT BY */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Sort By</Label>
+            <p className="text-sm font-medium">Sort By</p>
+
             <div className="space-y-3">
-              <CustomRadioButton
-                value="default"
-                label="Default (Newest to Oldest)"
-                active={sortBy === "default"}
-                onClick={setSortBy} // Set sort option on click
-              />
-              <CustomRadioButton
-                value="oldest"
-                label="Oldest to Newest"
-                active={sortBy === "oldest"}
-                onClick={setSortBy} // Set sort option on click
-              />
-              <CustomRadioButton
-                value="updated"
-                label="Last Updated"
-                active={sortBy === "updated"}
-                onClick={setSortBy} // Set sort option on click
-              />
+              <div onClick={() => setSortBy("default")}>
+                <Radio
+                  label="Default (Newest to Oldest)"
+                  active={sortBy === "default"}
+                />
+              </div>
+
+              <div onClick={() => setSortBy("oldest")}>
+                <Radio
+                  label="Oldest to Newest"
+                  active={sortBy === "oldest"}
+                />
+              </div>
+
+              <div onClick={() => setSortBy("updated")}>
+                <Radio
+                  label="Last Updated"
+                  active={sortBy === "updated"}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* FOOTER */}
+        {/* ================= FOOTER ================= */}
         <div className="mt-6 flex items-center justify-center gap-6">
           <button
             onClick={handleReset}
@@ -139,7 +142,7 @@ export default function FilterModal({ open, onOpenChange }: FilterModalProps) {
 
           <Button
             onClick={handleApply}
-            className="px-8 py-2 rounded-[10px] bg-primary hover:bg-red-700"
+            className="px-8 py-2 rounded-[10px] bg-primary hover:bg-primary/90"
           >
             Apply
           </Button>

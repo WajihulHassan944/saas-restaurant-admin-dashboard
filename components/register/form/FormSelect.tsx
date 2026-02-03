@@ -1,5 +1,6 @@
 "use client";
 
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -9,23 +10,37 @@ import {
 } from "@/components/ui/select";
 
 interface FormSelectProps {
+  label?: string; // optional label
   placeholder: string;
   options: string[];
+  value?: string;
+  onChange?: (val: string) => void;
 }
 
-export default function FormSelect({ placeholder, options }: FormSelectProps) {
+export default function FormSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  onChange,
+}: FormSelectProps) {
   return (
-    <Select>
-      <SelectTrigger className="border-[#BBBBBB] placeholder-[#BBBBBB]">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={opt} value={opt.toLowerCase()}>
-            {opt}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="space-y-1">
+      {label && <Label className="text-[16px]">{label}</Label>}
+
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="border-[#BBBBBB] focus:ring-1 focus:ring-primary focus:border-primary h-[53px] rounded-[10px] px-3 text-sm">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt} value={opt.toLowerCase()}>
+              {opt}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

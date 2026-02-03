@@ -4,10 +4,11 @@ import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import BorderedSearchBar from "../shared/BorderedSearchBar";
+import FilterModal from "../shared/FilterModal";
 
 export default function PosSearchFilter() {
   const [query, setQuery] = useState("");
-
+const [open, setOpen] = useState(false);
   return (
     <div className="w-full p-4 lg:p-[20px]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -22,6 +23,7 @@ export default function PosSearchFilter() {
 
         {/* Filter Button */}
         <Button
+        onClick={() => setOpen(true)}
           variant="outline"
           className="
             h-[52px]
@@ -37,6 +39,7 @@ export default function PosSearchFilter() {
           Filter
         </Button>
       </div>
+      <FilterModal open={open} onOpenChange={setOpen} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, XCircle } from "lucide-react";
 
 import {
   Dialog,
@@ -20,6 +20,8 @@ import FormInput from "../register/form/FormInput";
 import FormSelect from "../register/form/FormSelect";
 import { Radio } from "../ui/radioBtn";
 import { Separator } from "../ui/separator";
+import PosModalHeader from "../pos/PosModalHeader";
+import ModalActionFooter from "../pos/PosModalActionFooter";
 
 export default function MakeReservationModal({
   open,
@@ -32,22 +34,18 @@ export default function MakeReservationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[720px] rounded-[28px] px-10 py-8 bg-white max-h-[95vh] overflow-auto">
+      <DialogContent className="w-full sm:max-w-[618px] rounded-[28px] px-10 py-8 bg-white max-h-[95vh] overflow-auto">
         {/* ================= HEADER ================= */}
-        <div className="text-center space-y-2">
-          <h2 className="text-[28px] font-semibold text-[#101828]">
-            Make Reservation
-          </h2>
-          <p className="text-[16px] text-[#667085]">
-            Create a new Reservation by filling necessary info from here
-          </p>
-        </div>
+       <PosModalHeader
+  title="Make Reservation"
+  description="Create a new Reservation by filling necessary info from here"
+/>
 
         {/* ================= RESERVATION INFO ================= */}
         <Collapsible defaultOpen className="mt-6">
           <CollapsibleTrigger
             className="
-              flex items-center justify-between w-full text-[16px] font-medium
+              flex items-center justify-between w-full text-[16px]  text-[#909090]
               [&[data-state=open]>svg]:rotate-180
             "
           >
@@ -55,13 +53,25 @@ export default function MakeReservationModal({
             <ChevronDown className="transition-transform" />
           </CollapsibleTrigger>
          <Separator className="my-3" />
-          <CollapsibleContent className="mt-4 space-y-4 px-[2px]">
+          <CollapsibleContent className="mt-4 space-y-4 px-1">
             <FormInput label="Reservation Date *" placeholder="eg. jhon doe" />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormInput label="Reservation Time *" placeholder="eg. jhon doe" />
-              <FormInput label=" " placeholder="eg. jhon doe" />
-            </div>
+            <div className="space-y-2">
+  <label className="text-[16px]">
+    Reservation Time<span className="text-red-500">*</span>
+  </label>
+
+  <div className="grid grid-cols-2 gap-4 mt-2">
+    <Input
+      type="time"
+      className="border-[#BBBBBB] focus:border-primary focus:ring-1 focus:ring-primary"
+    />
+    <Input
+      type="time"
+      className="border-[#BBBBBB] focus:border-primary focus:ring-1 focus:ring-primary"
+    />
+  </div>
+</div>
 
             <FormInput label="No. of Person *" placeholder="eg. 1" />
 
@@ -100,7 +110,7 @@ export default function MakeReservationModal({
         <Collapsible className="mt-6">
           <CollapsibleTrigger
             className="
-              flex items-center justify-between w-full text-[16px] font-medium
+              flex items-center justify-between w-full text-[16px] text-[#909090]
               [&[data-state=open]>svg]:rotate-180
             "
           >
@@ -119,12 +129,12 @@ export default function MakeReservationModal({
                   className="border-[#BBBBBB] pr-10"
                 />
                 <button className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <X size={16} />
+                  <XCircle size={20} />
                 </button>
               </div>
             </div>
 
-            <button className="text-primary text-sm font-medium">
+            <button className="text-primary text-sm font-medium  text-center w-full">
               +Add Contact Person Info
             </button>
           </CollapsibleContent>
@@ -134,7 +144,7 @@ export default function MakeReservationModal({
         <Collapsible className="mt-6">
           <CollapsibleTrigger
             className="
-              flex items-center justify-between w-full text-[16px] font-medium
+              flex items-center justify-between w-full text-[16px] text-[#909090]
               [&[data-state=open]>svg]:rotate-180
             "
           >
@@ -153,7 +163,7 @@ export default function MakeReservationModal({
                 <span>$0</span>
               </div>
             </div>
-
+<Separator />
             <div className="flex justify-between font-semibold text-[#101828]">
               <span>Total</span>
               <span>$0</span>
@@ -161,12 +171,12 @@ export default function MakeReservationModal({
 
             <div className="flex items-center gap-4 mt-4">
               <span className="text-sm">Payment Method</span>
-              <span className="px-3 py-1 rounded-full bg-green-500 text-white text-sm">
+              <span className="px-3 py-1 rounded-full bg-[#00A63E] text-white text-sm">
                 Cash
               </span>
             </div>
 
-            <div className="border rounded-xl p-4 space-y-2">
+            <div className="border border-[#BBBBBB] rounded-xl p-4 space-y-2">
               <div className="flex justify-between">
                 <span>Paid Amount</span>
                 <span className="text-[#667085]">Enter Paid Amount</span>
@@ -180,18 +190,15 @@ export default function MakeReservationModal({
         </Collapsible>
 
         {/* ================= ACTIONS ================= */}
-        <div className="mt-8 flex justify-center gap-8">
-          <button
-            className="text-[18px] font-semibold"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </button>
+        <ModalActionFooter
+  leftLabel="Cancel"
+  rightLabel="Create"
+  onLeftClick={() => onOpenChange(false)}
+  onRightClick={() => {
+    // submit reservation
+  }}
+/>
 
-          <Button className="px-10 h-[44px] rounded-[14px] bg-primary text-white hover:bg-primary/90">
-            Create
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );
