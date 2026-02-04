@@ -15,7 +15,7 @@ export default function RootLayout({
   const pathname = usePathname();
 
   // routes where layout should be hidden
-  const hideLayout = ["/login", "/register"].includes(pathname);
+  const hideLayout = ["/login", "/register", "/forgot-password"].includes(pathname);
 
   return (
     <html lang="en">
