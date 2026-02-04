@@ -45,29 +45,29 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
         {/* View Trash */}
         <Button
           variant="outline"
-          className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 text-gray-600 border-gray-200"
+          className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[15px] font-[500]"
           onClick={()=>router.push("/menu/trash")}
         >
-          <Trash2 size={18} className="text-gray-400" />
+          <Trash2 size={18} className="text-[#767676]" />
           View Trash
         </Button>
 
         {/* Import */}
         <Button
           variant="outline"
-          className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 text-gray-600 border-gray-200"
-          onClick={() => setOpen(true)}
+       className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[15px] font-[500]"
+             onClick={() => setOpen(true)}
         >
-          <Download size={18} className="text-gray-400" />
+          <Download size={18} className="text-[#767676]" />
           Import
-          <HelpCircle size={16} className="text-gray-400 ml-1" />
+          <HelpCircle size={16} className="text-[#767676] ml-1" />
         </Button>
 
         <Button
-          className="h-[44px] rounded-[12px] px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white"
-          onClick={() => setCreateMenu(true)}
+           className="h-[44px] rounded-[12px] px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[15px] font-[500]"
+         onClick={() => setCreateMenu(true)}
         >
-          <PlusCircle size={18}  />
+          <PlusCircle size={18} color="#fff"  />
           Add Menu
         </Button>
 

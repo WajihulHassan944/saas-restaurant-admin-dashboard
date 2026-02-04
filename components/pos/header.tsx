@@ -31,7 +31,7 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
         <div className="relative">
           <Button
             variant="outline"
-            className="rounded-[14px] px-6 font-medium text-[15px]"
+            className="rounded-[14px] px-6 text-[15px] font-[500] text-[#767676]"
              onClick={() => setOpenOngoingOrders(true)}
           >
             Ongoing Orders
@@ -45,7 +45,7 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
         <div className="relative">
           <Button
             variant="outline"
-            className="rounded-[14px] px-6 font-medium text-[15px]"
+            className="rounded-[14px] px-6 text-[15px] font-[500] text-[#767676]"
             onClick={() => setOpenHoldOrders(true)}
           >
             Hold Orders
@@ -57,7 +57,7 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
 
         {/* Make Reservation */}
         <Button
-          className="rounded-[14px] px-4 py-2.5 bg-primary text-white font-medium hover:bg-primary/90 text-[15px]"
+          className="rounded-[14px] px-4 py-2.5 bg-primary text-white hover:bg-primary/90 text-[15px] font-[500]"
          onClick={() => setOpenMakeReservation(true)}
         >
           Make Reservation

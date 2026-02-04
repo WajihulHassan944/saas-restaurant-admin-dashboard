@@ -10,7 +10,7 @@ export default function PosSearchFilter() {
   const [query, setQuery] = useState("");
 const [open, setOpen] = useState(false);
   return (
-    <div className="w-full p-4 lg:p-[20px]">
+    <div className="w-full py-4 lg:py-[20px]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Search Area */}
         <BorderedSearchBar
@@ -26,9 +26,9 @@ const [open, setOpen] = useState(false);
         onClick={() => setOpen(true)}
           variant="outline"
           className="
-            h-[52px]
+            h-[44px]
             px-6
-            rounded-[16px]
+            rounded-[14px]
             flex items-center gap-2
             text-gray-600
             border-gray-200
