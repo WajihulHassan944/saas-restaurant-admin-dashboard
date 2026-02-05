@@ -21,14 +21,14 @@ export default function AddDeliveryManHeader({ title, description }: HeaderProps
   variant="ghost"
   className="w-full sm:w-auto flex items-center gap-2 justify-between sm:justify-start
              bg-transparent border-none shadow-none
-             text-black hover:bg-transparent hover:text-black text-sm mr-2"
+             text-black hover:bg-transparent hover:text-black text-sm mr-2 text-[15px]"
 >
   Cancel
 </Button>
 
                 <Button
                     variant="primary"
-                    className="w-full sm:w-auto whitespace-nowrap"
+                    className="w-full sm:w-auto whitespace-nowrap text-[15px]"
                 >
                     Confirm
                 </Button>

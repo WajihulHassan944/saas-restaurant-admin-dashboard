@@ -25,7 +25,7 @@ export default function AutoPrintingSettings() {
 
           <Button
             size="sm"
-            className="mt-5 bg-primary hover:bg-red-800 px-15 rounded-[12px]"
+            className="mt-5 bg-primary hover:bg-red-800 px-15 rounded-[12px] h-[40px]"
           >
             Test Print
           </Button>
@@ -64,7 +64,7 @@ export default function AutoPrintingSettings() {
         </div>
 
         <div className="flex justify-end">
-          <Button className="bg-primary hover:bg-red-800 px-16 rounded-[12px] py-1.5">
+          <Button className="bg-primary hover:bg-red-800 px-16 rounded-[12px] py-1.5 h-[40px]">
             Connect
           </Button>
         </div>
