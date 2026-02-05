@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, X } from "lucide-react";
+import CreateCategoryModal from "./CreateCategoryModal";
 
 const categories = [
   "Burger",
@@ -29,7 +30,7 @@ interface CategoriesProps {
 
 export default function Categories({ editing, showAddNew = true }: CategoriesProps) {
   const [active, setActive] = useState<string>("Burger");
-
+const [createCategory, setCreateCategory] = useState(false);
   return (
     <div className="w-full">
       {/* Header */}
@@ -42,7 +43,8 @@ export default function Categories({ editing, showAddNew = true }: CategoriesPro
             variant="link"
             size="sm"
             className="inline-flex items-center gap-2 text-primary underline hover:no-underline font-semibold text-[16px]"
-          >
+          onClick={() => setCreateCategory(true)}
+         >
             <PlusCircle className="w-4 h-4" />
             Add New Category
           </Button>
@@ -100,6 +102,8 @@ export default function Categories({ editing, showAddNew = true }: CategoriesPro
           );
         })}
       </div>
+
+        <CreateCategoryModal open={createCategory} onOpenChange={setCreateCategory} />
     </div>
   );
 }
