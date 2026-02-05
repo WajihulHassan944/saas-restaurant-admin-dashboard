@@ -12,7 +12,7 @@ export default function StatsSection({
   return (
     <div
       className={cn(
-        "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-[24px]",
+        "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-[16px] sm:gap-[10px] md:gap-[24px]",
         className
       )}
     >

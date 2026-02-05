@@ -26,12 +26,12 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
       <Header title={title} description={description} />
 
       {/* RIGHT SIDE (matched with design) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-        {/* Ongoing Orders */}
+       <div className="flex flex-wrap gap-3 sm:gap-4 justify-start">
+       {/* Ongoing Orders */}
         <div className="relative">
           <Button
             variant="outline"
-            className="rounded-[14px] px-6 text-[15px] font-[500] text-[#767676]"
+          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
              onClick={() => setOpenOngoingOrders(true)}
           >
             Ongoing Orders
@@ -45,7 +45,7 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
         <div className="relative">
           <Button
             variant="outline"
-            className="rounded-[14px] px-6 text-[15px] font-[500] text-[#767676]"
+          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
             onClick={() => setOpenHoldOrders(true)}
           >
             Hold Orders
@@ -57,8 +57,8 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
 
         {/* Make Reservation */}
         <Button
-          className="rounded-[14px] px-4 py-2.5 bg-primary text-white hover:bg-primary/90 text-[15px] font-[500]"
-         onClick={() => setOpenMakeReservation(true)}
+           className="h-[38px] sm:h-[44px] rounded-[12px] px-4 sm:px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[13px] sm:text-[15px] font-[500]"
+        onClick={() => setOpenMakeReservation(true)}
         >
           Make Reservation
         </Button>

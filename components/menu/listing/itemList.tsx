@@ -45,11 +45,13 @@ export default function ItemList({
 
       </div>
 
-   <div className="flex flex-wrap gap-1">
+<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
+
   {activeMenu?.items.map((item) => (
     <div
       key={item.id}
-      className="flex-grow " // <-- ensures min width of 300px
+   className="w-full sm:w-auto"
+
     >
       <MenuItemCard item={item} editing={editing} />
     </div>

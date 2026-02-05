@@ -35,17 +35,16 @@ const StatsCard = ({ data }: { data: StatItem }) => {
   return (
     <Card
       className={`
-        rounded-[18px] bg-white p-[24px] shadow-none
+        rounded-[18px] bg-white p-[16px] shadow-none
         ${isOrdersPage ? "border border-[#EDEFF2]" : "border-none"}
+        sm:p-[20px] md:p-[24px]
       `}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex  sm:flex-row items-start sm:items-center gap-4">
         {/* Icon */}
         <div
-          className={`flex items-center justify-center size-[44px] rounded-full ${
-            isDanger
-              ? "bg-primary/10"
-              : "bg-gray-100 text-gray-500"
+          className={`flex items-center justify-center size-[44px] rounded-full p-2 ${
+            isDanger ? "bg-primary/10" : "bg-gray-100 text-gray-500"
           }`}
         >
           <Icon size={20} className="text-primary" />
@@ -53,16 +52,16 @@ const StatsCard = ({ data }: { data: StatItem }) => {
 
         {/* Right content */}
         <div className="flex flex-col">
-          <div className="text-[32px] font-semibold text-black leading-none">
+          <div className="text-[24px] sm:text-[32px] font-semibold text-black leading-none">
             {data.value}
           </div>
 
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-xs sm:text-[15px] text-gray-400">
             {data.title}
           </p>
 
           <div
-            className={`mt-2 flex items-center gap-1 text-sm font-medium ${
+            className={`mt-2 flex items-center gap-1 text-xs sm:text-sm font-medium ${
               isUp ? "text-green-600" : "text-red-600"
             }`}
           >

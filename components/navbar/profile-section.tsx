@@ -42,8 +42,9 @@ export default function ProfileSection() {
           className="flex justify-between items-center lg:pl-[25px] gap-[24px] py-2 rounded-lg h-auto"
         >
           <div className="flex flex-col items-start justify-center">
-            <span className="lg:text-base text-muted-foreground">Hello,</span>
-            <span className="lg:text-base font-semibold text-foreground">
+            {/* Hide 'Hello' and 'User Name' on mobile */}
+            <span className="lg:text-base text-muted-foreground hidden lg:block">Hello,</span>
+            <span className="lg:text-base font-semibold text-foreground hidden lg:block">
               {USER_DATA.name}
             </span>
           </div>

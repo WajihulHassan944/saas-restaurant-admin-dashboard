@@ -139,3 +139,20 @@
 button{
   cursor: pointer;
 }
+
+/* Trigger button (SelectTrigger) */
+button[role="combobox"] {
+  cursor: pointer;
+}
+
+/* Dropdown options (SelectItem) */
+div[role="option"] {
+  cursor: pointer;
+}
+
+/* Disabled option */
+div[role="option"][aria-disabled="true"],
+div[role="option"][data-disabled] {
+  cursor: not-allowed;
+}
+

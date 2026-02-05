@@ -1,15 +1,14 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Menu, X } from "lucide-react"
-import Sidebar from "@/components/sidebar"
-import SearchBar from "./search-bar"
-import NotificationBell from "./notification"
-import ProfileSection from "./profile-section"
-import Logo from "./logo"
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
+import Sidebar from "@/components/sidebar";
+import SearchBar from "./search-bar";
+import NotificationBell from "./notification";
+import ProfileSection from "./profile-section";
 
 export default function Navbar() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <>
@@ -18,19 +17,19 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="inline-flex items-center justify-center size-10 rounded-xl bg-[#F9FAFB] text-primary xl:hidden"
+              className="inline-flex items-center justify-center size-10 rounded-[10px] bg-[#F5F5F5] text-primary xl:hidden ml-4"
               onClick={() => setIsSidebarOpen(true)}
             >
               <Menu size={20} />
             </button>
-           
           </div>
 
           <SearchBar />
 
-          <div className="flex items-center gap-2 lg:gap-2">
+          <div className="flex items-center gap-0 lg:gap-2">
             <NotificationBell />
-            <div className="w-px h-12 bg-primary" />
+            {/* Hide the divider on mobile screens */}
+            <div className="w-px h-12 bg-primary hidden lg:block" />
             <ProfileSection />
           </div>
         </div>
@@ -60,5 +59,5 @@ export default function Navbar() {
         </div>
       )}
     </>
-  )
+  );
 }

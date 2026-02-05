@@ -13,8 +13,8 @@ const CustomerSettingsPage = () => {
             />
             <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm space-y-6">
                 <StatsSection />
-
-                <BranchFilters />
+<BranchFilters />
+                
 
 
                 <Table />

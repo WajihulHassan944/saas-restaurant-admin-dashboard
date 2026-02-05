@@ -21,23 +21,23 @@ interface HeaderProps {
 
 export default function BranchesHeader({ title, description }: HeaderProps) {
   const router = useRouter();
-   const [open, setOpen] = useState(false); 
+  const [open, setOpen] = useState(false); 
   const [createBranch, setCreateBranch] = useState(false);
   
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between w-full">
       
       {/* Left: Title */}
       <Header title={title} description={description} />
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap gap-3 sm:gap-4 justify-start">
         
         {/* View Trash */}
         <Button
           variant="outline"
-          className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[15px] font-[500]"
-          onClick={()=>router.push("/branches/trash")}
+          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
+          onClick={() => router.push("/branches/trash")}
         >
           <Trash2 size={18} className="text-[#767676]" />
           View Trash
@@ -46,7 +46,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
         {/* Import */}
         <Button
           variant="outline"
-          className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 border-[#E6E7EC] text-[15px] font-[500] text-[#767676]"
+          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500] text-[#767676]"
           onClick={() => setOpen(true)}
         >
           <Download size={18} className="text-[#767676]" />
@@ -56,7 +56,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
 
         {/* Create Branch */}
         <Button
-          className="h-[44px] rounded-[12px] px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[15px] font-[500]"
+          className="h-[38px] sm:h-[44px] rounded-[12px] px-4 sm:px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[13px] sm:text-[15px] font-[500]"
           onClick={() => setCreateBranch(true)}
         >
           <PlusCircle size={18} color="#fff" />
@@ -67,7 +67,6 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
 
       <ImportModal open={open} onOpenChange={setOpen} />
       <CreateBranchModal open={createBranch} onOpenChange={setCreateBranch} />
-
     </div>
   );
 }

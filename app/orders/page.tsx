@@ -50,7 +50,8 @@ export default function Orders() {
         <StatsSection stats={statsData} className="xl:grid-cols-4" />
 
         {/* Tabs */}
-        <div className="flex items-center gap-6">
+       <div className="flex items-center gap-0 sm:gap-0 text-sm lg:text-base flex-wrap">
+
           <TabButton
             active={activeTab === "delivery"}
             onClick={() => setActiveTab("delivery")}
@@ -99,8 +100,8 @@ function TabButton({
       variant={active ? "default" : "ghost"}
       className={
         active
-          ? "rounded-[14px] px-6 py-2.5 bg-primary hover:bg-primary text-white text-sm font-medium"
-          : "rounded-full px-6 py-2 text-gray-500 text-sm font-medium hover:text-black hover:bg-transparent"
+          ? "rounded-[14px] px-3 sm:px-6 py-2.5 bg-primary hover:bg-primary text-white text-[12px] sm:text-[15px] font-medium"
+          : "rounded-full px-3 sm:px-6 py-2 text-gray-500 text-[12px] sm:text-[15px] font-medium hover:text-black hover:bg-transparent"
       }
     >
       {children}

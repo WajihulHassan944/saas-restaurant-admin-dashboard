@@ -6,7 +6,12 @@ import { cn } from "@/lib/utils";
 
 const StatsSection = () => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+     <div
+      className={cn(
+        "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-[16px] sm:gap-[10px] md:gap-[24px]",
+       
+      )}
+    >
       {statsData.map((stat, index) => {
         const Icon = stat.icon;
         const isDanger = stat.variant === "danger";
@@ -15,7 +20,7 @@ const StatsSection = () => {
         return (
           <div
             key={index}
-            className="bg-white p-6 rounded-[14px] border border-[#EDEFF2] flex items-center gap-[24px]"
+            className=" rounded-[18px] bg-white p-[16px] shadow-none sm:p-[20px] md:p-[24px] border border-[#EDEFF2] flex gap-3"
           >
             {/* Icon */}
             <div
@@ -31,11 +36,11 @@ const StatsSection = () => {
 
             {/* Content */}
             <div className="space-y-1">
-              <p className="text-[32px] font-semibold text-dark leading-none">
+              <p className="text-[24px] sm:text-[32px] font-semibold text-black leading-none">
                 {stat.value}
               </p>
 
-              <p className="text-base text-gray">
+             <p className="mt-1 text-xs sm:text-[15px] text-gray-400">
                 {stat.title}
               </p>
 

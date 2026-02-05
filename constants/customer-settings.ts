@@ -10,6 +10,7 @@ export type StatTrend = "up" | "down";
 export type StatVariant = "default" | "danger";
 
 export type StatItem = {
+    _id:string,
   title: string;
   value: number;
   icon: any;
@@ -22,24 +23,28 @@ export type StatItem = {
 
 export const statsData: StatItem[] = [
   {
+    _id:"1",
     title: "All Customers",
     value: 24,
     icon: Users,
     trend: { direction: "up", percentage: "+3%" },
   },
   {
+    _id:"2",
     title: "New Customers",
     value: 24,
     icon: UserPlus,
     trend: { direction: "up", percentage: "+3%" },
   },
   {
+    _id:"3",
     title: "Active Customers",
     value: 24,
     icon: UserCheck,
     trend: { direction: "up", percentage: "+3%" },
   },
   {
+    _id:"4",
     title: "Blocked Customers",
     value: 24,
     icon: UserX,

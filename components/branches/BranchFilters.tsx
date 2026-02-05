@@ -17,7 +17,7 @@ export default function BranchFilters() {
         <div className="relative flex-1 min-w-[300px]">
           <Search
             size={22}
-            className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
           />
 
           <Input

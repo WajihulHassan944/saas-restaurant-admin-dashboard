@@ -14,7 +14,7 @@ type Props = {
 export default function MenuItemCard({ item, editing }: Props) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative w-full bg-white rounded-[22px]  flex flex-col max-w-[280px] mb-5">
+    <div className="relative w-full bg-white rounded-[22px]  flex flex-col sm:max-w-[280px] mb-5">
       {/* ❌ Delete button (only in editing mode) */}
       {editing && (
         <button

@@ -10,11 +10,15 @@ import {
 } from "@/components/ui/select";
 
 interface FormSelectProps {
-  label?: string; // optional label
+  label?: string;
   placeholder: string;
   options: string[];
   value?: string;
   onChange?: (val: string) => void;
+
+  /* ✅ NEW (optional, backward-safe) */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export default function FormSelect({
@@ -23,12 +27,19 @@ export default function FormSelect({
   options,
   value,
   onChange,
+  open,
+  onOpenChange,
 }: FormSelectProps) {
   return (
     <div className="space-y-1">
       {label && <Label className="text-[16px]">{label}</Label>}
 
-      <Select value={value} onValueChange={onChange}>
+      <Select
+        value={value}
+        onValueChange={onChange}
+        open={open}
+        onOpenChange={onOpenChange}
+      >
         <SelectTrigger className="border-[#BBBBBB] focus:ring-1 focus:ring-primary focus:border-primary h-[53px] rounded-[10px] px-3 text-sm">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>

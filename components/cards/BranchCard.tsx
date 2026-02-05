@@ -16,10 +16,8 @@ export default function BranchCard({
   isDefault,
   itemsCount,
   openDialog,
-  openMenuDetails
+  openMenuDetails,
 }: BranchProps) {
-  /* ---------- Dynamic Icon Logic ---------- */
-
   const iconMap = [
     { key: "menu", icon: List },
     { key: "branch", icon: Store },
@@ -30,66 +28,73 @@ export default function BranchCard({
       name?.toLowerCase().includes(key)
     )?.icon || Store;
 
-
   return (
-    <div
-      key={id}
-      className="flex items-center justify-between bg-white rounded-[14px] border border-gray-200 px-4 py-4"
-    >
+   <div
+  key={id}
+  className="
+    flex flex-col gap-4 items-start
+    bg-white rounded-[14px] border border-gray-200
+    px-4 py-4
+    overflow-x-auto
+
+    lg:flex-row lg:items-center lg:justify-between lg:gap-0
+  "
+>
+
       {/* LEFT */}
-      <div className="flex items-center gap-4">
-        {/* Checkbox */}
+      <div className="flex items-center gap-4 min-w-0">
         <Checkbox
           defaultChecked
           className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
         />
 
-        {/* Dynamic Icon */}
         <div className="size-10 rounded-lg bg-[#F4F6FA] flex items-center justify-center">
           <Icon size={20} className="text-gray-500" />
         </div>
 
-        {/* Info */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h4 className="text-base font-semibold text-dark">{name}</h4>
+        <div className="space-y-1 min-w-0">
+       <div className="flex flex-col items-start gap-2 lg:flex-row lg:items-center">
 
-            {isDefault && (
-              <>
-                <span className="size-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full">
-                  {name}
-                </span>
-              </>
-            )}
+            <h4 className="text-base font-semibold text-dark truncate">
+              {name}
+            </h4>
+
+           {isDefault && (
+  <div className="flex items-center ">
+    <span className="size-2 rounded-full bg-green-500" />
+    <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full whitespace-nowrap">
+      {name}
+    </span>
+  </div>
+)}
+
           </div>
 
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-400 truncate">
             ID: #{id} | {itemsCount} Items
           </p>
         </div>
       </div>
 
-      {/* RIGHT ACTIONS */}
-      <div className="flex items-center border border-gray-200 rounded-[10px] overflow-hidden h-full">
-      {openDialog && (
-  <>
-    <ActionButton onClick={() => openDialog(id)}>
-      <Eye size={18} />
-    </ActionButton>
+      {/* RIGHT ACTIONS (UNCHANGED) */}
+      <div className="flex items-center border border-gray-200 rounded-[10px] overflow-hidden h-full flex-shrink-0">
+        {openDialog && (
+          <>
+            <ActionButton onClick={() => openDialog(id)}>
+              <Eye size={18} />
+            </ActionButton>
+            <Divider />
+          </>
+        )}
 
-    <Divider />
-  </>
-)}
-{openMenuDetails && (
-  <>
-    <ActionButton onClick={() => openMenuDetails(id)}>
-     <Eye size={18} />
-    </ActionButton>
-
-    <Divider />
-  </>
-)}
+        {openMenuDetails && (
+          <>
+            <ActionButton onClick={() => openMenuDetails(id)}>
+              <Eye size={18} />
+            </ActionButton>
+            <Divider />
+          </>
+        )}
 
         <Divider />
 
@@ -99,23 +104,21 @@ export default function BranchCard({
 
         <Divider />
 
-     <ActionDropdown
-  items={[
-    openDialog
-      ? {
-          label: "Edit Branch",
-          href: `/branches/edit`,
-          icon: <Store size={16} className="text-gray-500" />,
-        }
-      : {
-          label: "Edit Menu",
-          href: `/menu`,
-          icon: <List size={16} className="text-gray-500" />,
-        },
-  ]}
-/>
-
-
+        <ActionDropdown
+          items={[
+            openDialog
+              ? {
+                  label: "Edit Branch",
+                  href: `/branches/edit`,
+                  icon: <Store size={16} className="text-gray-500" />,
+                }
+              : {
+                  label: "Edit Menu",
+                  href: `/menu`,
+                  icon: <List size={16} className="text-gray-500" />,
+                },
+          ]}
+        />
       </div>
     </div>
   );

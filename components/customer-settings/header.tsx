@@ -16,10 +16,10 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
             />
 
             {/* 2. Buttons stack on tiny mobile, become row on sm (640px) */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:gap-4">
-                <Button
+            <div className="flex flex-wrap gap-3 sm:gap-4 justify-start">
+          <Button
                     variant="outline"
-                 className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 border-[#E6E7EC] text-[15px] font-[500] text-[#767676]"
+          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
              onClick={()=>router.push("/customer-settings/trash")}
                 >
                     <p>View Trash</p>
@@ -29,8 +29,8 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
                 <Button
                     variant="primary"
                     
-              className="h-[44px] rounded-[12px] px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[15px] font-[500]"
-            >
+             className="h-[38px] sm:h-[44px] rounded-[12px] px-4 sm:px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[13px] sm:text-[15px] font-[500]"
+         >
                     Add New Customer
                 </Button>
             </div>
