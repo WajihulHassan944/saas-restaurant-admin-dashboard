@@ -34,7 +34,7 @@ export default function PromotionsOverview() {
       {/* ================= HAPPY HOURS ================= */}
       <PromotionSectionHeader title="Happy Hours" />
 
-      <div className="grid grid-cols-1 md:grid-cols-[65%_35%] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-[63%_35%] gap-6">
         <HappyHourInfoCard />
 
         <PromotionStatCard

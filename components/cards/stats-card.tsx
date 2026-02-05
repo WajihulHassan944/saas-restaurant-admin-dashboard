@@ -52,11 +52,11 @@ const StatsCard = ({ data }: { data: StatItem }) => {
 
         {/* Right content */}
         <div className="flex flex-col">
-          <div className="text-[24px] sm:text-[32px] font-semibold text-black leading-none">
+          <div className="text-[16px] sm:text-[32px] font-semibold text-black leading-none">
             {data.value}
           </div>
 
-          <p className="mt-1 text-xs sm:text-[15px] text-gray-400">
+          <p className="mt-1 text-[11px] sm:text-[15px] text-gray-400">
             {data.title}
           </p>
 

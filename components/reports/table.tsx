@@ -25,69 +25,107 @@ const OrdersTable = () => {
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow className="border-none">
-           
-            <TableHead className="w-[50px]">
-              <Checkbox />
-            </TableHead>
- <TableHead className="w-[50px] font-semibold">SL</TableHead>
-
-            <SortableHeader label="Order ID" />
-            <SortableHeader label="Total Order Amount" />
-            <SortableHeader label="Total Discount Amount" />
-            <SortableHeader label="Total Tax Amount" />
-            <TableHead className="text-center">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          {ordersReport.map((order, i) => (
-            <TableRow key={i} className="border-none h-[70px]">
-             
-              {/* Checkbox */}
-              <TableCell>
+      {/* ================= MOBILE CARDS ================= */}
+      <div className="space-y-4 md:hidden">
+        {ordersReport.map((order, i) => (
+          <div
+            key={i}
+            className="bg-white rounded-2xl border p-4 space-y-3 shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Checkbox checked />
-              </TableCell>
+                <span className="text-sm text-gray-500">#{i + 1}</span>
+              </div>
 
- <TableCell className="px-4 text-gray-500">{i + 1}</TableCell>
+              <div className="flex gap-1">
+                <button className="p-2 hover:text-primary">
+                  <Eye size={18} />
+                </button>
+                <button className="p-2 hover:text-primary">
+                  <MoreHorizontal size={18} />
+                </button>
+              </div>
+            </div>
 
-              {/* Order ID */}
-              <TableCell className="px-4 text-gray-500">
-                {order.id}
-              </TableCell>
+            <div className="grid grid-cols-2 gap-y-2 text-sm">
+              <div className="text-gray-500">Order ID</div>
+              <div className="text-right font-medium">{order.id}</div>
 
-              {/* Total Order Amount */}
-              <TableCell className="px-4 font-medium text-green-600">
+              <div className="text-gray-500">Order Amount</div>
+              <div className="text-right font-semibold text-green-600">
                 {order.orderAmount}
-              </TableCell>
+              </div>
 
-              {/* Total Discount Amount */}
-              <TableCell className="px-4 text-gray-500">
-                {order.discountAmount}
-              </TableCell>
+              <div className="text-gray-500">Discount</div>
+              <div className="text-right">{order.discountAmount}</div>
 
-              {/* Total Tax Amount */}
-              <TableCell className="px-4 text-gray-500">
-                {order.taxAmount}
-              </TableCell>
+              <div className="text-gray-500">Tax</div>
+              <div className="text-right">{order.taxAmount}</div>
+            </div>
+          </div>
+        ))}
+      </div>
 
-              {/* Actions */}
-              <TableCell className="px-4">
-                <div className="flex items-center justify-center gap-2 text-gray-500">
-                  <button className="p-2 hover:text-primary">
-                    <Eye size={18} />
-                  </button>
-                  <button className="p-2 hover:text-primary">
-                    <MoreHorizontal size={18} />
-                  </button>
-                </div>
-              </TableCell>
+      {/* ================= DESKTOP TABLE ================= */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-none">
+              <TableHead className="w-[50px]">
+                <Checkbox />
+              </TableHead>
+              <TableHead className="w-[50px] font-semibold">SL</TableHead>
+              <SortableHeader label="Order ID" />
+              <SortableHeader label="Total Order Amount" />
+              <SortableHeader label="Total Discount Amount" />
+              <SortableHeader label="Total Tax Amount" />
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+
+          <TableBody>
+            {ordersReport.map((order, i) => (
+              <TableRow key={i} className="border-none h-[70px]">
+                <TableCell>
+                  <Checkbox checked />
+                </TableCell>
+
+                <TableCell className="px-4 text-gray-500">
+                  {i + 1}
+                </TableCell>
+
+                <TableCell className="px-4 text-gray-500">
+                  {order.id}
+                </TableCell>
+
+                <TableCell className="px-4 font-medium text-green-600">
+                  {order.orderAmount}
+                </TableCell>
+
+                <TableCell className="px-4 text-gray-500">
+                  {order.discountAmount}
+                </TableCell>
+
+                <TableCell className="px-4 text-gray-500">
+                  {order.taxAmount}
+                </TableCell>
+
+                <TableCell className="px-4">
+                  <div className="flex items-center justify-center gap-2 text-gray-500">
+                    <button className="p-2 hover:text-primary">
+                      <Eye size={18} />
+                    </button>
+                    <button className="p-2 hover:text-primary">
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
       <Pagination />
     </>
