@@ -15,8 +15,11 @@ import SortableHeader from "@/components/shared/sortable-head";
 import { Eye, MoreHorizontal } from "lucide-react";
 import Pagination from "@/components/pagination";
 import EmptyState from "../shared/EmptyState";
+import DeliveryManDetails from "./DeliveryManDetails";
+import { useState } from "react";
 
 const DeliveryManTable = () => {
+  const [openDetails, setOpenDetails] = useState(false);
   if (!deliveryManData || deliveryManData.length === 0) {
     return (
       <EmptyState
@@ -89,7 +92,7 @@ const DeliveryManTable = () => {
 
                 <TableCell className="px-4">
                   <div className="flex items-center justify-center gap-2 text-gray">
-                    <button className="p-2">
+                    <button className="p-2" onClick={() => setOpenDetails(true)}>
                       <Eye size={18} />
                     </button>
                     <button className="p-2">
@@ -144,7 +147,7 @@ const DeliveryManTable = () => {
             {/* Actions */}
             <div className="flex justify-end gap-2 text-gray">
               <button className="p-2">
-                <Eye size={18} />
+                <Eye size={18} onClick={() => setOpenDetails(true)} />
               </button>
               <button className="p-2">
                 <MoreHorizontal size={18} />
@@ -152,6 +155,10 @@ const DeliveryManTable = () => {
             </div>
           </div>
         ))}
+        <DeliveryManDetails
+  open={openDetails}
+  onOpenChange={setOpenDetails}
+/>
       </div>
     </>
   );

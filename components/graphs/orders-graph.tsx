@@ -45,12 +45,23 @@ const OrdersGraph = () => {
       <div className="h-[260px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
-            <defs>
-              <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366F1" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+           <defs>
+  <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stopColor="#6366F1" stopOpacity={0.35} />
+    <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
+  </linearGradient>
+
+  {/* line shadow */}
+  <filter id="lineShadow" height="200%">
+    <feDropShadow
+      dx="0"
+      dy="6"
+      stdDeviation="8"
+      floodColor="#6366F1"
+      floodOpacity="0.25"
+    />
+  </filter>
+</defs>
 
             <XAxis
               dataKey="day"
@@ -74,14 +85,15 @@ const OrdersGraph = () => {
               fill="url(#lineGradient)"
             />
 
-            <Line
-              type="monotone"
-              dataKey="orders"
-              stroke="#6366F1"
-              strokeWidth={3}
-              dot={{ r: 5, fill: "#6366F1", stroke: "#fff", strokeWidth: 2 }}
-              activeDot={{ r: 7 }}
-            />
+           <Line
+  type="monotone"
+  dataKey="orders"
+  stroke="#6366F1"
+  strokeWidth={3}
+  dot={{ r: 5, fill: "#6366F1", stroke: "#fff", strokeWidth: 2 }}
+  activeDot={{ r: 7 }}
+  style={{ filter: "url(#lineShadow)" }}
+/>
           </LineChart>
         </ResponsiveContainer>
       </div>

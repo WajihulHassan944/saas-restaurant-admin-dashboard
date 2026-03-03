@@ -11,15 +11,15 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
-type CustomerDetailModalProps = {
+type DeliveryManDetails = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-export default function CustomerDetailModal({
+export default function DeliveryManDetails({
   open,
   onOpenChange,
-}: CustomerDetailModalProps) {
+}: DeliveryManDetails) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -28,11 +28,11 @@ export default function CustomerDetailModal({
            max-h-[85vh]
     overflow-y-auto
           rounded-[18px]
-          px-6 py-8 
+          px-6 py-8
         "
       >
         {/* Header */}
-        <DialogHeader>
+        <DialogHeader className="text-center">
           <DialogTitle className="text-xl font-semibold text-center">
             Customer #10003
           </DialogTitle>
@@ -45,10 +45,10 @@ export default function CustomerDetailModal({
         <div className="flex justify-center mt-4">
           <div className="relative">
             <Image
-              src="/dialog-profile.jpg" // replace with real image
+              src="/deliveryboy.png" // replace with real image
               alt="Customer"
-              width={120}
-              height={120}
+              width={180}
+              height={180}
               className="rounded-[16px] object-cover"
             />
 
@@ -89,12 +89,8 @@ export default function CustomerDetailModal({
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          <StatCard value="12%" label="Completion Rate" />
-          <StatCard value="3%" label="Ongoing Rate" />
-          <StatCard value="2%" label="Cancellation Rate" />
-          <StatCard value="14%" label="Refund Rate" />
-          <StatCard value="34%" label="Failed Rate" full />
+        <div className="grid grid-cols-1 gap-3 mt-6">
+          <StatCard value="35" label="Total Orders" />
         </div>
 
         {/* Footer */}
@@ -144,7 +140,7 @@ function InfoRow({
 
       {/* Right: Value */}
       {link ? (
-        <button className="text-primary text-sm font-medium justify-self-end">
+        <button className="text-primary underline text-sm font-medium justify-self-end">
           {value}
         </button>
       ) : (
@@ -185,10 +181,10 @@ function StatCard({
         ${full ? "col-span-2" : ""}
       `}
     >
-      <p className="text-lg font-semibold text-dark">
+      <p className="text-lg font-semibold text-dark mb-1">
         {value}
       </p>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-600">
         {label}
       </p>
     </div>

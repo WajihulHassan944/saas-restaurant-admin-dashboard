@@ -25,7 +25,7 @@ export default function NotificationsHeader({ title, description }: HeaderProps)
                     onClick={() => setOpen(true)}
               className="h-[44px] rounded-[12px] px-5 flex items-center gap-2 bg-primary hover:bg-red-800 text-white text-[15px] font-[500]"
             >
-                    Marl all as read
+                    Mark all as read
                 </Button>
             </div>
         

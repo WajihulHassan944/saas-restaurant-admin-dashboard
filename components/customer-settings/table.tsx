@@ -19,8 +19,7 @@ import { useState } from "react";
 import CustomerDetailModal from "./CustomerDetailModal";
 
 const CustomerTable = () => {
-  const [open, setOpen] = useState(false);
-
+const [openDetails, setOpenDetails] = useState(false);
   if (!customersData || customersData.length === 0) {
     return (
       <EmptyState
@@ -30,68 +29,60 @@ const CustomerTable = () => {
     );
   }
 
+
   return (
     <>
       {/* Desktop Table */}
       <div className="hidden md:block">
-        <Table>
+        <Table className="my-10">
           <TableHeader>
             <TableRow className="border-none">
               <TableHead className="w-[50px]">
                 <Checkbox />
               </TableHead>
               <SortableHeader label="SL" />
-              <SortableHeader label="Customer" />
-              <SortableHeader label="Customer Details" />
-              <SortableHeader label="Role" />
-              <SortableHeader label="Branch" />
-              <SortableHeader label="Status" />
-              <TableHead className="text-center">Actions</TableHead>
+              <SortableHeader label="Customer Name" />
+              <SortableHeader label="Customer Info" />
+              <TableHead className="text-center px-4 font-semibold">
+                Total Order
+              </TableHead>
+              <SortableHeader label="Joining Date" />
+              <SortableHeader label="Unblock/Block" />
+              <TableHead className="text-center font-semibold">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {customersData.map((customer, i) => (
+            {customersData.map((dm, i) => (
               <TableRow key={i} className="border-none h-[70px]">
                 <TableCell>
                   <Checkbox defaultChecked />
                 </TableCell>
 
-                <TableCell>{customer.sl}</TableCell>
+                <TableCell className="px-4">{dm.sl}</TableCell>
 
-                <TableCell>{customer.customerName}</TableCell>
+                <TableCell className="px-4">{dm.deliveryManName}</TableCell>
 
-                <TableCell>
+                <TableCell className="px-4">
                   <div>
-                    <p>{customer.phone}</p>
-                    <p className="text-gray">{customer.email}</p>
+                    <p>{dm.phone}</p>
+                    <p className="text-gray">{dm.email}</p>
                   </div>
                 </TableCell>
 
-                <TableCell>{customer.role}</TableCell>
+                <TableCell className="px-4 text-center">{dm.orderLimit}</TableCell>
 
-                <TableCell>
-                  <div className="flex items-start gap-2 text-xs">
-                    <div>
-                      <p>{customer.branch.currentlyAssign}</p>
-                      <p>{customer.branch.outForDelivery}</p>
-                      <p>{customer.branch.ongoingOrder}</p>
-                    </div>
-                    <div className="text-gray">
-                      <p>Currently Assign</p>
-                      <p>Out for Delivery</p>
-                      <p>Ongoing Order</p>
-                    </div>
-                  </div>
+                <TableCell className="px-4">
+                 {dm.joiningDate}
                 </TableCell>
 
-                <TableCell>
-                  <Switch defaultChecked={customer.status} />
+                <TableCell className=" text-center pr-14">
+                  <Switch defaultChecked={dm.status} />
                 </TableCell>
 
-                <TableCell>
+                <TableCell className="px-4">
                   <div className="flex items-center justify-center gap-2 text-gray">
-                    <button className="p-2" onClick={() => setOpen(true)}>
+                    <button className="p-2" onClick={() => setOpenDetails(true)}>
                       <Eye size={18} />
                     </button>
                     <button className="p-2">
@@ -109,41 +100,41 @@ const CustomerTable = () => {
 
       {/* Mobile Cards */}
       <div className="flex flex-col gap-4 md:hidden">
-        {customersData.map((customer, i) => (
+        {customersData.map((dm, i) => (
           <div
             key={i}
             className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-200"
           >
+            {/* Header: Name + Checkbox + Status */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Checkbox defaultChecked />
-                <p className="font-medium">{customer.customerName}</p>
+                <p className="font-medium">{dm.deliveryManName}</p>
               </div>
-              <Switch defaultChecked={customer.status} />
+              <Switch defaultChecked={dm.status} />
             </div>
 
+            {/* SL & Order Limit */}
             <div className="text-sm text-gray mb-1">
-              <p>SL: {customer.sl}</p>
-              <p>Role: {customer.role}</p>
+              <p>SL: {dm.sl}</p>
+              <p>Assign Order Limit: {dm.orderLimit}</p>
             </div>
 
+            {/* Contact Info */}
             <div className="text-sm text-gray mb-2">
-              <p>Phone: {customer.phone}</p>
-              <p>Email: {customer.email}</p>
+              <p>Phone: {dm.phone}</p>
+              <p>Email: {dm.email}</p>
             </div>
 
+            {/* Branch Info */}
             <div className="text-xs text-gray mb-2">
-              <p>Branch:</p>
-              <p>Currently Assign: {customer.branch.currentlyAssign}</p>
-              <p>Out for Delivery: {customer.branch.outForDelivery}</p>
-              <p>Ongoing Order: {customer.branch.ongoingOrder}</p>
+              <p>Joining Date:</p>
+              <p>Currently Assign: {dm.joiningDate}</p>
             </div>
 
+            {/* Actions */}
             <div className="flex justify-end gap-2 text-gray">
-              <button
-                className="p-2"
-                onClick={() => setOpen(true)}
-              >
+              <button className="p-2" onClick={() => setOpenDetails(true)}>
                 <Eye size={18} />
               </button>
               <button className="p-2">
@@ -152,11 +143,13 @@ const CustomerTable = () => {
             </div>
           </div>
         ))}
-      </div>
 
-      <CustomerDetailModal open={open} onOpenChange={setOpen} />
+        <CustomerDetailModal open={openDetails}
+  onOpenChange={setOpenDetails} />
+      </div>
     </>
   );
+
 };
 
 export default CustomerTable;

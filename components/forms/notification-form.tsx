@@ -68,14 +68,14 @@ export default function NotificationForm() {
       </div>
 
       {/* Footer Buttons */}
-      <div className="flex flex-col md:flex-row  justify-end gap-[24px]">
+      {/* <div className="flex flex-col md:flex-row  justify-end gap-[24px]">
         <Button variant="outline" className="h-[52px] px-8 rounded-[10px] text-dark border-gray-200">
           Cancel
         </Button>
         <Button variant="primary" className="h-[52px] px-8 rounded-[10px]">
           Save & Activate
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 }

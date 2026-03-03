@@ -16,16 +16,16 @@ export default function EditBranchStepOne() {
         </p>
       </div>
 
-   <Section label="Setup Basic Info" padded={false} withMargin={true}>
+   <Section label="Add branch Info" padded={false} withMargin={true}>
         <FormInput label="Branch Name *" placeholder="eg. John Doe" />
         <FormInput label="Address Line 1 *" placeholder="eg. 10"/>
         <FormInput label="Address Line 2 *" placeholder="eg. 10"/>
-          <button className="text-primary text-sm font-medium text-center w-full">
+          <button className="text-[#6C63EB] text-sm font-medium text-center w-full">
                 + See More
               </button>
   </Section>
 
-   <Section label="Contact Person Info" padded={false} withMargin={true}>
+   <Section label="Add Branch Contact Person Info" padded={false} withMargin={true}>
         <FormInput label="Contact Person Name *" placeholder="eg. John Doe" />
           <FormInput label="Designation" placeholder="eg. 10"/>
         <FormInput label="Contact Phone Number *" placeholder="eg. 10"/>

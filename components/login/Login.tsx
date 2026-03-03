@@ -4,11 +4,12 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FormInput from "../register/form/FormInput";
+import Link from "next/link";
 
 const Login = () => {
   
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-white">
       {/* ================= LEFT IMAGE ================= */}
       <div className="hidden lg:block relative">
         <Image
@@ -56,9 +57,9 @@ const Login = () => {
                 Remember me
               </label>
 
-              <button className="text-primary hover:underline">
+              <Link href="/forgot-password" className="text-primary hover:underline">
                 Forgot Password?
-              </button>
+              </Link>
             </div>
 
             {/* Sign In */}
