@@ -4,7 +4,13 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 
-export default function StorePublished() {
+interface Props {
+  formData: any;
+}
+
+export default function StorePublished({ formData }: Props) {
+  console.log("Published Store Data:", formData);
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-6">
       <div className="w-full max-w-5xl bg-white rounded-xl p-12 text-center">
@@ -19,8 +25,8 @@ export default function StorePublished() {
 
         {/* QR Card */}
         <div className="mx-auto bg-[#F8F8F8] rounded-2xl px-20 py-8 w-fit">
-      <div className="bg-white p-4 rounded-lg shadow-[3px_4px_4px_0px_#00000040]">
-      <Image
+          <div className="bg-white p-4 rounded-lg shadow-[3px_4px_4px_0px_#00000040]">
+            <Image
               src="/publish.png"
               alt="Store QR Code"
               width={140}

@@ -18,6 +18,8 @@ import {
   LogOut,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const USER_DATA = {
   name: "Arnold Smith",
@@ -28,11 +30,20 @@ const USER_DATA = {
 
 export default function ProfileSection() {
   const router = useRouter();
+const { user, loading } = useAuth();
 
   const navigate = (path: string) => {
     router.push(path);
   };
+const handleLogout = () => {
+  localStorage.removeItem("auth");
 
+  toast.success("Logged out successfully");
+
+  setTimeout(() => {
+    router.push("/login");
+  }, 500);
+};
   return (
     <DropdownMenu>
       <div className="relative">
@@ -45,7 +56,7 @@ export default function ProfileSection() {
             {/* Hide 'Hello' and 'User Name' on mobile */}
             <span className="lg:text-base text-muted-foreground hidden lg:block">Hello,</span>
             <span className="lg:text-base font-semibold text-foreground hidden lg:block">
-              {USER_DATA.name}
+              {user?.profile.firstName} {user?.profile.lastName}
             </span>
           </div>
 
@@ -87,10 +98,10 @@ export default function ProfileSection() {
 
             <div className="flex flex-col">
               <span className="font-semibold text-sm">
-                {USER_DATA.name}
+                {user?.profile.firstName} {user?.profile.lastName}
               </span>
               <span className="text-xs text-gray-500">
-                {USER_DATA.email}
+                {user?.email}
               </span>
             </div>
           </div>
@@ -118,7 +129,7 @@ export default function ProfileSection() {
 
           {/* Logout */}
           <DropdownMenuItem
-            onClick={() => navigate("/logout")}
+            onClick={handleLogout}
             className="mx-2 my-2 flex items-center gap-3 px-3 py-3 text-sm text-red-600 rounded-xl focus:bg-red-50 cursor-pointer"
           >
             <LogOut size={18} color="rgba(255, 0, 0, 0.8)" />

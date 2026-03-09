@@ -5,8 +5,48 @@ import { Button } from "@/components/ui/button";
 import FormInput from "../register/form/FormInput";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
+import { API_BASE_URL } from "@/lib/constants";
 
 const ForgotPassword = () => {
+  const [email, setEmail] = useState("");
+const [isLoading, setIsLoading] = useState(false);
+
+// ✅ Forgot Password Function
+const handleForgotPassword = async () => {
+  if (!email) {
+    toast.error("Please enter your email");
+    return;
+  }
+
+  try {
+    setIsLoading(true);
+
+    const res = await fetch(
+      `${API_BASE_URL}/v1/auth/forgot-password`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Failed to send reset link");
+    }
+
+    toast.success("Reset link sent! Check your email.");
+  } catch (error: any) {
+    toast.error(error.message || "Something went wrong");
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-white">
       {/* ================= LEFT IMAGE ================= */}
@@ -47,12 +87,18 @@ const ForgotPassword = () => {
             <FormInput
               label="Email"
               placeholder="Enter Your Email"
+               value={email}
+  onChange={(val) => setEmail(val)}
             />
 
             {/* Send Reset Link */}
-            <Button className="w-full h-[52px] rounded-[14px] text-base bg-primary hover:bg-red-800">
-              Send Reset Link
-            </Button>
+         <Button
+  onClick={handleForgotPassword}
+  className="w-full h-[52px] rounded-[14px] text-base bg-primary hover:bg-red-800"
+  disabled={isLoading}
+>
+  {isLoading ? "Sending..." : "Send Reset Link"}
+</Button>
 
             {/* OR */}
             <div className="flex items-center gap-4">
