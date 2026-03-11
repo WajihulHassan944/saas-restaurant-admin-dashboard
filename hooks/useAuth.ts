@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/constants";
 
@@ -22,9 +22,21 @@ interface User {
 
 export const useAuth = () => {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const publicRoutes = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+  ];
+
+  const isPublicRoute = publicRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
 
   const getStoredAuth = () => {
     const stored = localStorage.getItem("auth");
@@ -58,7 +70,6 @@ export const useAuth = () => {
       if (!res.ok) return false;
 
       const data = await res.json();
-
       saveAuth(data.data);
 
       return data.data.accessToken;
@@ -78,11 +89,16 @@ export const useAuth = () => {
     if (!res.ok) throw new Error("Unauthorized");
 
     const data = await res.json();
-
     return data.data;
   };
 
   const checkAuth = async () => {
+    // ✅ Skip auth for public routes
+    if (isPublicRoute) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const stored = getStoredAuth();
 
@@ -95,7 +111,6 @@ export const useAuth = () => {
         const me = await fetchMe(stored.accessToken);
         setUser(me);
       } catch {
-        // Access token expired → refresh
         const newAccessToken = await refreshToken();
 
         if (!newAccessToken) {
@@ -117,7 +132,7 @@ export const useAuth = () => {
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [pathname]);
 
   return {
     user,

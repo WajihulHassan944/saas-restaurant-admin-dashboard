@@ -16,10 +16,11 @@ export default function ClientLayout({
 
   const { user, loading } = useAuth();
 
-  const hideLayout = ["/login", "/register", "/forgot-password"].includes(
-    pathname
-  );
-
+const hideLayout =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/reset-password");
   if (loading && !hideLayout) {
     return (
       <div className="h-screen flex items-center justify-center">

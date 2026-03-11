@@ -8,6 +8,7 @@ import TenantInfoStep from "./TenantInfoStep";
 import BranchStep from "./BranchStep";
 import SettingsStep from "./SettingsStep";
 import { API_BASE_URL } from "@/lib/constants";
+import { useRouter } from "next/navigation";
 
 const steps = [
   { id: 1, label: "Account" },
@@ -19,7 +20,7 @@ const steps = [
 
 export default function BusinessOnboarding() {
   const [activeStep, setActiveStep] = useState<number>(1);
-
+const router = useRouter();
   /* ================= GLOBAL FORM DATA ================= */
 
   const [formData, setFormData] = useState({
@@ -186,6 +187,7 @@ export default function BusinessOnboarding() {
     console.log("📥 Backend JSON Response:", data);
       if (response.ok) {
         setActiveStep(5); // Move to "Published" step on success
+        router.push("/login");
       } else {
         const errorData = await response.json();
         alert(`Error: ${errorData.message || "Failed to register"}`);

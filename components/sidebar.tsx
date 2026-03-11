@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { menuItems, MenuItem } from "@/constants/sidebarItems";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface SidebarItemProps {
   item: MenuItem;
@@ -61,7 +62,15 @@ export default function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
 const router = useRouter();
   const mainItems = menuItems.filter((i) => i.section === "main");
   const accountItems = menuItems.filter((i) => i.section === "account");
+const handleLogout = () => {
+  localStorage.removeItem("auth");
 
+  toast.success("Logged out successfully");
+
+  setTimeout(() => {
+    router.push("/login");
+  }, 500);
+};
   return (
     <aside className="flex flex-col w-72 bg-white h-full border-r overflow-y-auto">
       {/* MENU */}
@@ -134,7 +143,7 @@ const router = useRouter();
           <Button
             variant="ghost"
             className="mt-4 flex items-center gap-3 text-primary hover:bg-red-50 w-full justify-start"
-            onClick={()=> router.push('/login')}
+            onClick={handleLogout}
           >
             <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center" >
               <LogOut size={18} />

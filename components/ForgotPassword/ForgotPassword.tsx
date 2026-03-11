@@ -11,8 +11,9 @@ import { API_BASE_URL } from "@/lib/constants";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
+  const [restaurantId, setRestaurantId] = useState("");
 const [isLoading, setIsLoading] = useState(false);
-
+const [resetUrl, setResetUrl] = useState("");
 // ✅ Forgot Password Function
 const handleForgotPassword = async () => {
   if (!email) {
@@ -30,17 +31,26 @@ const handleForgotPassword = async () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email , restaurantId}),
       }
     );
+const data = await res.json();
 
-    const data = await res.json();
+if (!res.ok) {
+  throw new Error(data?.message || "Failed to send reset link");
+}
 
-    if (!res.ok) {
-      throw new Error(data?.message || "Failed to send reset link");
-    }
+const resetToken = data?.data?.resetToken;
 
-    toast.success("Reset link sent! Check your email.");
+if (resetToken) {
+  const generatedUrl = `${window.location.origin}/reset-password/${resetToken}?email=${encodeURIComponent(email)}&restaurantId=${restaurantId}`;
+
+  setResetUrl(generatedUrl);
+
+  toast.success("Reset link generated (Dev Mode)");
+} else {
+  toast.success("If account exists, reset instructions are sent");
+}
   } catch (error: any) {
     toast.error(error.message || "Something went wrong");
   } finally {
@@ -90,6 +100,12 @@ const handleForgotPassword = async () => {
                value={email}
   onChange={(val) => setEmail(val)}
             />
+             <FormInput
+              label="Restaurant ID"
+              placeholder="Enter Your restaurant id"
+               value={restaurantId}
+  onChange={(val) => setRestaurantId(val)}
+            />
 
             {/* Send Reset Link */}
          <Button
@@ -99,6 +115,20 @@ const handleForgotPassword = async () => {
 >
   {isLoading ? "Sending..." : "Send Reset Link"}
 </Button>
+{resetUrl && (
+  <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+    <p className="text-xs text-yellow-700 font-medium mb-2">
+      Dev Mode: Reset link generated (email service not configured)
+    </p>
+
+    <a
+      href={resetUrl}
+      className="text-sm text-blue-600 break-all hover:underline"
+    >
+      {resetUrl}
+    </a>
+  </div>
+)}
 
             {/* OR */}
             <div className="flex items-center gap-4">

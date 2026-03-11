@@ -33,7 +33,7 @@ export const menuItems: MenuItem[] = [
     section: "main",
   },
   {
-    title: "Restaurant Management",
+    title: "Branch Management",
     href: "/branches",
     icon: Store,
     section: "main",

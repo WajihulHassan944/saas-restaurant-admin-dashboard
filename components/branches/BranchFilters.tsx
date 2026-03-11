@@ -6,14 +6,24 @@ import { useState } from "react";
 import FilterModal from "../shared/FilterModal";
 import { Input } from "../ui/input";
 
-export default function BranchFilters() {
+interface Props {
+  branches?: any[];
+}
+
+export default function BranchFilters({ branches }: Props) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredBranches =
+    branches?.filter((b) =>
+      b?.name?.toLowerCase().includes(search.toLowerCase())
+    ) || [];
 
   return (
-    <div className="w-full bg-white  rounded-lg">
-<div className="w-full flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3">
-
-        {/* Search Area (MAIN FLEX ITEM) */}
+    <div className="w-full bg-white rounded-lg">
+      <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3">
+        
+        {/* Search */}
         <div className="relative flex-1 min-w-[300px]">
           <Search
             size={22}
@@ -23,6 +33,8 @@ export default function BranchFilters() {
           <Input
             type="text"
             placeholder="Search by name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="
               w-full h-[44px]
               pl-10 pr-[160px]
@@ -37,7 +49,6 @@ export default function BranchFilters() {
             "
           />
 
-          {/* Search Button */}
           <Button
             className="
               absolute right-0 top-1/1 -translate-y-1/1
@@ -47,7 +58,6 @@ export default function BranchFilters() {
               bg-primary
               text-white
               text-[16px]
-
               font-[600]
               hover:bg-primary/90
             "
@@ -56,7 +66,7 @@ export default function BranchFilters() {
           </Button>
         </div>
 
-        {/* Export Button (fixed width) */}
+        {/* Export */}
         <Button
           variant="outline"
           className="h-[44px] px-5 rounded-[14px] border-[#E5E7EB] flex items-center gap-2 shrink-0 text-[#767676] text-[15px] font-[600]"
@@ -64,10 +74,26 @@ export default function BranchFilters() {
           <Download size={18} color="#767676" />
           Export
         </Button>
-<Button onClick={() => setOpen(true)} variant="outline" className="h-[44px] px-5 rounded-[14px] border-[#E5E7EB] text-[#767676] flex items-center gap-2 text-[15px] font-[600]" > <SlidersHorizontal size={18} color="#767676" /> Filter </Button>
 
+        {/* Filter */}
+        <Button
+          onClick={() => setOpen(true)}
+          variant="outline"
+          className="h-[44px] px-5 rounded-[14px] border-[#E5E7EB] text-[#767676] flex items-center gap-2 text-[15px] font-[600]"
+        >
+          <SlidersHorizontal size={18} color="#767676" />
+          Filter
+        </Button>
       </div>
-<FilterModal open={open} onOpenChange={setOpen} />
+
+      <FilterModal open={open} onOpenChange={setOpen} />
+
+      {/* Optional info if used dynamically */}
+      {branches && (
+        <p className="text-sm text-gray-400 mt-3">
+          Showing {filteredBranches.length} of {branches.length} branches
+        </p>
+      )}
     </div>
   );
 }

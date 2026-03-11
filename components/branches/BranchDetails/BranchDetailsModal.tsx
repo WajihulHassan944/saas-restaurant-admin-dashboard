@@ -10,33 +10,27 @@ import { Store } from "lucide-react";
 export default function BranchDetailsModal({
   isOpen,
   closeDialog,
-  branchId,
+  branch,
 }: {
   isOpen: boolean;
   closeDialog: () => void;
-  branchId: number | null;
-}) {
+  branch: any | null;
+}){  
   const branchInfo = [
-    { label: "Contact Person", value: "N/A" },
-    { label: "Designation", value: "N/A" },
-    { label: "Phone Number", value: "N/A" },
-    { label: "Email", value: "N/A" }
-  ];
-
-  const supportInfo = [
-    { label: "Number Type", value: "N/A" },
-    { label: "Designation", value: "N/A" },
-    { label: "Phone Number", value: "N/A" }
-  ];
-
+  { label: "Branch Name", value: branch?.name || "N/A" },
+  { label: "Phone Number", value: branch?.settings?.contact?.phone || "N/A" },
+  { label: "Whatsapp", value: branch?.settings?.contact?.whatsapp || "N/A" },
+];
+  
+const supportInfo = [
+  { label: "Auto Accept Orders", value: branch?.settings?.automation?.autoAcceptOrders ? "Yes" : "No" },
+  { label: "Prep Time", value: branch?.settings?.automation?.estimatedPrepTime || "N/A" },
+];
   const addressInfo = [
-    { label: "Address", value: "N/A" },
-    { label: "State", value: "N/A" },
-    { label: "Zipcode", value: "N/A" },
-    { label: "Country", value: "N/A" },
-    { label: "City", value: "N/A" }
-  ];
-
+  { label: "Delivery Radius", value: branch?.settings?.deliveryConfig?.radiusKm + " km" || "N/A" },
+  { label: "Delivery Fee", value: branch?.settings?.deliveryConfig?.deliveryFee || "N/A" },
+  { label: "Free Delivery", value: branch?.settings?.deliveryConfig?.isFreeDelivery ? "Yes" : "No" },
+];
   return (
     <Dialog open={isOpen} onOpenChange={closeDialog}>
       <DialogContent className="max-w-md p-0 overflow-hidden rounded-[18px] max-h-[95vh] overflow-auto">
@@ -55,7 +49,7 @@ export default function BranchDetailsModal({
 
         {/* CONTENT */}
         <div className="px-6 pt-10 pb-6 space-y-5">
-          <DialogHeaderComponent title="Branch Details" badgeText="Default Branch" branchId={branchId!} />
+          <DialogHeaderComponent title="Branch Details" badgeText="Default Branch" branchId={branch?.id} />
 
           {/* Branch Contact Info Card */}
           <BranchInfoCard title="Branch Contact Info" info={branchInfo} />

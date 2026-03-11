@@ -17,9 +17,10 @@ import ImportModal from "../shared/ImportModal";
 interface HeaderProps {
   title: string;
   description?: string;
+  onBranchCreated?: () => void;
 }
 
-export default function BranchesHeader({ title, description }: HeaderProps) {
+export default function BranchesHeader({ title, description , onBranchCreated}: HeaderProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false); 
   const [createBranch, setCreateBranch] = useState(false);
@@ -66,7 +67,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
       </div>
 
       <ImportModal open={open} onOpenChange={setOpen} />
-      <CreateBranchModal open={createBranch} onOpenChange={setCreateBranch} />
+      <CreateBranchModal open={createBranch} onOpenChange={setCreateBranch} onSuccess={onBranchCreated}  />
     </div>
   );
 }

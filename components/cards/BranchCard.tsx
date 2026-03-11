@@ -63,7 +63,7 @@ export default function BranchCard({
   <div className="flex items-center ">
     <span className="size-2 rounded-full bg-green-500" />
     <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full whitespace-nowrap">
-      {name}
+      main
     </span>
   </div>
 )}

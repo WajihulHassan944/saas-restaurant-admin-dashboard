@@ -1,7 +1,7 @@
 import { DialogHeader } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
-export default function DialogHeaderComponent({ title, badgeText, branchId }: { title: string, badgeText: string, branchId: number }) {
+export default function DialogHeaderComponent({ title, badgeText, branchId }: { title: string, badgeText: string, branchId: string }) {
   return (
     <DialogHeader className="space-y-2 text-center">
       <h2 className="text-xl font-semibold text-center mt-3">{title}</h2>

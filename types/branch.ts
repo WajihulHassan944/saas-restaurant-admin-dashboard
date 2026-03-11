@@ -1,8 +1,8 @@
-export type BranchProps = {
-  id: number;
+export interface BranchProps {
+  id: string;
   name: string;
-  isDefault: boolean;
+  isDefault?: boolean;
   itemsCount?: number;
-  openDialog?: (branchId: number) => void;      // Branch usage
-  openMenuDetails?: (menuId: number) => void;  // Menu usage
-};
+  openDialog?: (branchId: string) => void;
+  openMenuDetails?: (branchId: string) => void;
+}
