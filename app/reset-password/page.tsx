@@ -8,47 +8,63 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/lib/constants";
 import FormInput from "@/components/register/form/FormInput";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const ResetPassword = () => {
-  const params = useParams();
   const router = useRouter();
-const searchParams = useSearchParams();
-  const token = params?.token as string;
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [restaurantId, setRestaurantId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
-useEffect(() => {
-  const emailFromUrl = searchParams.get("email");
-  const restaurantIdFromUrl = searchParams.get("restaurantId");
+  const [isResending, setIsResending] = useState(false);
+  const [countdown, setCountdown] = useState(60);
 
-  if (emailFromUrl) {
-    setEmail(emailFromUrl);
-  }
+  /* ================= GET EMAIL + RESTAURANT FROM URL ================= */
 
-  if (restaurantIdFromUrl) {
-    setRestaurantId(restaurantIdFromUrl);
-  }
-}, [searchParams]);
+  useEffect(() => {
+    const emailFromUrl = searchParams.get("email");
+    const restaurantIdFromUrl = searchParams.get("restaurantId");
+
+    if (emailFromUrl) setEmail(emailFromUrl);
+    if (restaurantIdFromUrl) setRestaurantId(restaurantIdFromUrl);
+  }, [searchParams]);
+
+  /* ================= COUNTDOWN TIMER ================= */
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  /* ================= RESET PASSWORD ================= */
+
   const handleResetPassword = async () => {
     if (!email) {
       toast.error("Please enter your email");
       return;
     }
 
-    if (!newPassword) {
-      toast.error("Please enter a new password");
+    if (!restaurantId) {
+      toast.error("Invalid restaurant ID");
       return;
     }
 
-    if (!token) {
-      toast.error("Invalid or missing reset token");
+    if (!otp) {
+      toast.error("Please enter the 5 digit OTP");
       return;
     }
-    if (!restaurantId) {
-      toast.error("Invalid or missing restauranrId");
+
+    if (!newPassword) {
+      toast.error("Please enter a new password");
       return;
     }
 
@@ -62,9 +78,9 @@ useEffect(() => {
         },
         body: JSON.stringify({
           email,
-          token,
+          otp,
           newPassword,
-          restaurantId
+          restaurantId,
         }),
       });
 
@@ -83,6 +99,44 @@ useEffect(() => {
       toast.error(error.message || "Something went wrong");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /* ================= RESEND OTP ================= */
+
+  const handleResendOtp = async () => {
+    if (!email || !restaurantId) {
+      toast.error("Missing email or restaurant id");
+      return;
+    }
+
+    try {
+      setIsResending(true);
+
+      const res = await fetch(`${API_BASE_URL}/v1/auth/resend-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          restaurantId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to resend OTP");
+      }
+
+      toast.success("OTP resent successfully");
+
+      setCountdown(60);
+    } catch (error: any) {
+      toast.error(error.message || "Something went wrong");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -107,7 +161,6 @@ useEffect(() => {
           {/* ICON */}
           <div className="flex justify-center mb-6">
             <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center">
-              {/* lock icon */}
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none">
                 <path d="M12 1C9 1 7 3 7 6V8H6C4.9 8 4 8.9 4 10V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V10C20 8.9 19.1 8 18 8H17V6C17 3 15 1 12 1Z" fill="#ECF0F4"/>
               </svg>
@@ -120,7 +173,7 @@ useEffect(() => {
           </h1>
 
           <p className="text-center text-sm text-gray-500 mt-3 leading-relaxed">
-            Enter your email and choose a new password to reset your account.
+            Enter the OTP sent to your email and choose a new password.
           </p>
 
           {/* FORM */}
@@ -134,16 +187,42 @@ useEffect(() => {
             />
 
             <FormInput
+              label="OTP"
+              placeholder="Enter 5 digit OTP"
+              value={otp}
+              onChange={(val) => setOtp(val)}
+            />
+
+            {/* RESEND OTP */}
+            <div className="flex justify-between items-center text-sm">
+              {countdown > 0 ? (
+                <span className="text-gray-500">
+                  Resend OTP in {countdown}s
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isResending}
+                  className="text-blue-600 hover:underline"
+                >
+                  {isResending ? "Sending..." : "Resend OTP"}
+                </button>
+              )}
+            </div>
+
+            <FormInput
               label="New Password"
               placeholder="Enter new password"
               value={newPassword}
               onChange={(val) => setNewPassword(val)}
             />
- <FormInput
+
+            <FormInput
               label="Restaurant ID"
               placeholder="Enter Your restaurant id"
-               value={restaurantId}
-  onChange={(val) => setRestaurantId(val)}
+              value={restaurantId}
+              onChange={(val) => setRestaurantId(val)}
             />
 
             <Button
