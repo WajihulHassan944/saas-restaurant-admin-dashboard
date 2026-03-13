@@ -8,11 +8,61 @@ import { Input } from "../ui/input";
 
 interface Props {
   branches?: any[];
+  filters: any;
+  onFilterChange: (filters: any) => void;
 }
 
-export default function BranchFilters({ branches }: Props) {
+export default function BranchFilters({
+  branches,
+  filters,
+  onFilterChange,
+}: Props) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(filters?.search || "");
+
+  const handleSearch = () => {
+    onFilterChange({ search, page: 1 });
+  };
+
+  /* ================= EXPORT CSV ================= */
+
+  const exportCSV = () => {
+    if (!branches || branches.length === 0) return;
+
+    const headers = [
+      "Name",
+      "City",
+      "Address",
+      "Phone",
+      "Status",
+      "CreatedAt",
+    ];
+
+    const rows = branches.map((b) => [
+      b.name || "",
+      b.city || "",
+      b.address || "",
+      b.phone || "",
+      b.isActive ? "Active" : "Inactive",
+      b.createdAt || "",
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers, ...rows]
+        .map((row) => row.map((i) => `"${i}"`).join(","))
+        .join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "branches.csv");
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const filteredBranches =
     branches?.filter((b) =>
@@ -22,8 +72,8 @@ export default function BranchFilters({ branches }: Props) {
   return (
     <div className="w-full bg-white rounded-lg">
       <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3">
-        
-        {/* Search */}
+
+        {/* SEARCH */}
         <div className="relative flex-1 min-w-[300px]">
           <Search
             size={22}
@@ -50,6 +100,7 @@ export default function BranchFilters({ branches }: Props) {
           />
 
           <Button
+            onClick={handleSearch}
             className="
               absolute right-0 top-1/1 -translate-y-1/1
               h-[44px]
@@ -66,8 +117,9 @@ export default function BranchFilters({ branches }: Props) {
           </Button>
         </div>
 
-        {/* Export */}
+        {/* EXPORT */}
         <Button
+          onClick={exportCSV}
           variant="outline"
           className="h-[44px] px-5 rounded-[14px] border-[#E5E7EB] flex items-center gap-2 shrink-0 text-[#767676] text-[15px] font-[600]"
         >
@@ -75,7 +127,7 @@ export default function BranchFilters({ branches }: Props) {
           Export
         </Button>
 
-        {/* Filter */}
+        {/* FILTER MODAL */}
         <Button
           onClick={() => setOpen(true)}
           variant="outline"
@@ -86,9 +138,13 @@ export default function BranchFilters({ branches }: Props) {
         </Button>
       </div>
 
-      <FilterModal open={open} onOpenChange={setOpen} />
+      <FilterModal
+        open={open}
+        onOpenChange={setOpen}
+        filters={filters}
+        onApply={(f: any) => onFilterChange({ ...f, page: 1 })}
+      />
 
-      {/* Optional info if used dynamically */}
       {branches && (
         <p className="text-sm text-gray-400 mt-3">
           Showing {filteredBranches.length} of {branches.length} branches

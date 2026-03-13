@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import BranchFilters from "./BranchFilters";
 import Table from "./list";
 import BranchesPagination from "./BranchesPagination";
@@ -8,7 +9,7 @@ interface Props {
   branches: any[];
   meta: any;
   loading: boolean;
-  fetchBranches?: () => void; // optional, if needed for refresh inside
+  fetchBranches: (params?: any) => void;
 }
 
 export default function BranchesClient({
@@ -17,13 +18,39 @@ export default function BranchesClient({
   loading,
   fetchBranches,
 }: Props) {
+  const [filters, setFilters] = useState({
+    search: "",
+    sortOrder: "ASC",
+    includeInactive: false,
+    withDeleted: false,
+    page: 1,
+  });
+
+  const handleFilterChange = (newFilters: any) => {
+    const updated = { ...filters, ...newFilters };
+
+    setFilters(updated);
+
+    fetchBranches(updated);
+  };
+
   return (
     <>
-      <BranchFilters branches={branches} />
+      <BranchFilters
+        branches={branches}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+      />
 
       <div className="px-2 lg:px-0">
         <Table branches={branches} loading={loading} />
-        <BranchesPagination meta={meta} />
+
+        {/* <BranchesPagination
+          meta={meta}
+          onPageChange={(page: number) =>
+            handleFilterChange({ page })
+          }
+        /> */}
       </div>
     </>
   );

@@ -29,8 +29,9 @@ export default function MenusPage() {
                         </div>
                     }
                 >
-                    <BranchFilters />
+                   <BranchFilters
 
+/>
                     <div className="px-2 lg:px-0">
                         <Table />
                         <BranchesPagination />

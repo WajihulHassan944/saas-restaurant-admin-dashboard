@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 import FormInput from "../register/form/FormInput";
-import FormSelect from "../register/form/FormSelect";
 import { toast } from "sonner";
 
 interface CreateMenuModalProps {
@@ -20,7 +19,7 @@ interface CreateMenuModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface Category {
+interface MenuItem {
   id: string;
   name: string;
 }
@@ -29,11 +28,10 @@ export default function CreateMenuModal({
   open,
   onOpenChange,
 }: CreateMenuModalProps) {
-  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   const [token, setToken] = useState("");
   const [restaurantId, setRestaurantId] = useState("");
@@ -41,19 +39,12 @@ export default function CreateMenuModal({
   const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
-    categoryId: "",
     name: "",
     slug: "",
-    basePrice: "",
     description: "",
-    imageUrl: "",
-    sku: "",
-    prepTimeMinutes: "",
-    dietaryFlags: "",
-    allergenFlags: "",
+    sortOrder: "",
+    menuItemsIds: [] as string[],
   });
-
-  const [selectOpen, setSelectOpen] = useState(false);
 
   /* ================= LOAD AUTH ================= */
 
@@ -66,42 +57,48 @@ export default function CreateMenuModal({
       const auth = JSON.parse(authRaw);
 
       setToken(auth?.accessToken || "");
-      setRestaurantId(auth?.user?.restaurant?.id || "");
+      setRestaurantId(auth?.user?.restaurantId || "");
     } catch {
       console.error("Invalid auth");
     }
   }, []);
 
-  /* ================= FETCH CATEGORIES ================= */
+  /* ================= FETCH MENU ITEMS ================= */
 
-  const fetchCategories = async () => {
+  const fetchMenuItems = async () => {
+    if (!restaurantId) return;
+
     try {
-      setLoadingCategories(true);
+      setLoadingItems(true);
 
-      const res = await fetch(`${API_BASE_URL}/v1/menu/categories`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/v1/menu/items?restaurantId=${restaurantId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await res.json();
 
       if (data.success) {
-        setCategories(data.data);
-        setCategoryOptions(data.data.map((c: Category) => c.name));
+        setMenuItems(data.data || []);
       }
     } catch {
-      toast.error("Failed to load categories");
+      toast.error("Failed to load menu items");
     } finally {
-      setLoadingCategories(false);
+      setLoadingItems(false);
     }
   };
-
+console.log("menu items", menuItems);
   useEffect(() => {
-    if (open && token) fetchCategories();
-  }, [open, token]);
+    if (open && token && restaurantId) {
+      fetchMenuItems();
+    }
+  }, [open, token, restaurantId]);
 
-  /* ================= INPUT HANDLER ================= */
+  /* ================= FORM UPDATE ================= */
 
   const updateForm = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -120,26 +117,28 @@ export default function CreateMenuModal({
     }
   };
 
-  /* ================= CATEGORY SELECT ================= */
-const handleCategoryChange = (val: string) => {
-  const cat = categories.find(
-    (c) => c.name.toLowerCase() === val.toLowerCase()
-  );
+  /* ================= SELECT MENU ITEMS ================= */
 
-  if (cat) {
-    setForm((prev) => ({
-      ...prev,
-      categoryId: cat.id,
-    }));
-  }
-};
-  /* ================= CREATE MENU ITEM ================= */
+  const toggleMenuItem = (id: string) => {
+    setForm((prev) => {
+      const exists = prev.menuItemsIds.includes(id);
+
+      return {
+        ...prev,
+        menuItemsIds: exists
+          ? prev.menuItemsIds.filter((i) => i !== id)
+          : [...prev.menuItemsIds, id],
+      };
+    });
+  };
+
+  /* ================= CREATE MENU ================= */
 
   const handleCreate = async () => {
     setSubmitted(true);
-console.log(form);
-    if (!form.name || !form.categoryId) {
-      toast.error("Name and Category required");
+
+    if (!form.name) {
+      toast.error("Menu name required");
       return;
     }
 
@@ -147,25 +146,16 @@ console.log(form);
       setCreating(true);
 
       const payload = {
-        categoryId: form.categoryId,
         name: form.name,
         slug: form.slug,
-        basePrice: Number(form.basePrice),
         restaurantId,
         description: form.description,
-        imageUrl: form.imageUrl,
-        sku: form.sku,
-        prepTimeMinutes: Number(form.prepTimeMinutes),
-        dietaryFlags: form.dietaryFlags
-          ? form.dietaryFlags.split(",").map((i) => i.trim())
-          : [],
-        allergenFlags: form.allergenFlags
-          ? form.allergenFlags.split(",").map((i) => i.trim())
-          : [],
+        sortOrder: Number(form.sortOrder) || 0,
+        // menuItemsIds: form.menuItemsIds,
         isActive: true,
       };
 
-      const res = await fetch(`${API_BASE_URL}/v1/menu/items`, {
+      const res = await fetch(`${API_BASE_URL}/v1/menus`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -178,12 +168,12 @@ console.log(form);
 
       if (!res.ok) throw new Error(data.message);
 
-      toast.success("Menu item created");
-
+      toast.success("Menu created successfully");
+window.location.reload();
       handleReset();
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.message || "Failed to create menu item");
+      toast.error(err.message || "Failed to create menu");
     } finally {
       setCreating(false);
     }
@@ -193,36 +183,30 @@ console.log(form);
 
   const handleReset = () => {
     setForm({
-      categoryId: "",
       name: "",
       slug: "",
-      basePrice: "",
       description: "",
-      imageUrl: "",
-      sku: "",
-      prepTimeMinutes: "",
-      dietaryFlags: "",
-      allergenFlags: "",
+      sortOrder: "",
+      menuItemsIds: [],
     });
+
     setSubmitted(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
-
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
-            Create Menu Item
+            Create Menu
           </DialogTitle>
         </DialogHeader>
 
         <div className="mt-5 rounded-[16px] bg-white p-5 space-y-4">
-
           {/* NAME */}
           <FormInput
             label="Menu Name"
-            placeholder="e.g Chicken Burger"
+            placeholder="e.g Lunch Menu"
             value={form.name}
             onChange={(v) => updateForm("name", v)}
             required
@@ -230,55 +214,12 @@ console.log(form);
             errorText="Menu name required"
           />
 
-          {/* CATEGORY */}
-          {loadingCategories ? (
-            <div className="flex justify-center py-3">
-              <Loader2 className="animate-spin text-primary" />
-            </div>
-          ) : (
-            <FormSelect
-              label="Category"
-              placeholder="Select category"
-              options={categoryOptions}
-              value={
-  categories.find((c) => c.id === form.categoryId)?.name.toLowerCase() || ""
-}
-              open={selectOpen}
-              onOpenChange={setSelectOpen}
-              onChange={(val) => handleCategoryChange(val)}
-            />
-          )}
-
-          {/* PRICE */}
+          {/* SLUG */}
           <FormInput
-            label="Base Price"
-            placeholder="e.g 12.99"
-            value={form.basePrice}
-            onChange={(v) => updateForm("basePrice", v)}
-          />
-
-          {/* PREP TIME */}
-          <FormInput
-            label="Prep Time (minutes)"
-            placeholder="e.g 15"
-            value={form.prepTimeMinutes}
-            onChange={(v) => updateForm("prepTimeMinutes", v)}
-          />
-
-          {/* SKU */}
-          <FormInput
-            label="SKU"
-            placeholder="e.g BRG-001"
-            value={form.sku}
-            onChange={(v) => updateForm("sku", v)}
-          />
-
-          {/* IMAGE */}
-          <FormInput
-            label="Image URL"
-            placeholder="https://image.jpg"
-            value={form.imageUrl}
-            onChange={(v) => updateForm("imageUrl", v)}
+            label="Slug"
+            placeholder="auto-generated"
+            value={form.slug}
+            onChange={(v) => updateForm("slug", v)}
           />
 
           {/* DESCRIPTION */}
@@ -289,33 +230,63 @@ console.log(form);
             onChange={(v) => updateForm("description", v)}
           />
 
-          {/* DIETARY */}
+          {/* SORT ORDER */}
           <FormInput
-            label="Dietary Flags"
-            placeholder="vegan, halal"
-            value={form.dietaryFlags}
-            onChange={(v) => updateForm("dietaryFlags", v)}
+            label="Sort Order"
+            placeholder="e.g 1"
+            value={form.sortOrder}
+            onChange={(v) => updateForm("sortOrder", v)}
           />
 
-          {/* ALLERGEN */}
-          <FormInput
-            label="Allergen Flags"
-            placeholder="nuts, dairy"
-            value={form.allergenFlags}
-            onChange={(v) => updateForm("allergenFlags", v)}
-          />
+          {/* MENU ITEMS */}
 
+          <div>
+            <p className="text-[16px] mb-2 font-medium">Menu Items</p>
+
+            {loadingItems ? (
+              <div className="flex justify-center py-3">
+                <Loader2 className="animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="max-h-[200px] overflow-auto border rounded-lg p-2 space-y-2">
+                {menuItems.map((item) => {
+                  const selected = form.menuItemsIds.includes(item.id);
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => toggleMenuItem(item.id)}
+                      className={`cursor-pointer px-3 py-2 rounded-md text-sm ${
+                        selected
+                          ? "bg-primary text-white"
+                          : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {item.name}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* FOOTER */}
 
         <div className="mt-5 flex justify-center gap-4">
-
-          <Button variant="ghost" onClick={handleReset} className="text-gray-700 text-[17px]">
+          <Button
+            variant="ghost"
+            onClick={handleReset}
+            className="text-gray-700 text-[17px]"
+          >
             Reset
           </Button>
 
-          <Button variant="ghost" onClick={handleCreate} disabled={creating} className="px-8 py-0 rounded-[10px] bg-primary hover:bg-primary/90 text-[17px] text-white">
+          <Button
+            onClick={handleCreate}
+            disabled={creating}
+            className="px-8 py-0 rounded-[10px] bg-primary hover:bg-primary/90 text-[17px] text-white"
+          >
             {creating ? (
               <>
                 <Loader2 className="animate-spin mr-2" size={16} />
@@ -325,9 +296,7 @@ console.log(form);
               "Create"
             )}
           </Button>
-
         </div>
-
       </DialogContent>
     </Dialog>
   );

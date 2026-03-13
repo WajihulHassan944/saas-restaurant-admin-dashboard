@@ -11,22 +11,34 @@ export default function BranchesPage() {
   const [meta, setMeta] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchBranches = useCallback(async () => {
+  const fetchBranches = useCallback(async (filters: any = {}) => {
     setLoading(true);
+
     try {
       const authRaw = localStorage.getItem("auth");
       if (!authRaw) return;
 
       const auth = JSON.parse(authRaw);
-      const accessToken = auth?.accessToken;
+
+      const token = auth?.accessToken;
       const restaurantId = auth?.user?.restaurantId;
-      if (!accessToken || !restaurantId) return;
+
+      if (!token || !restaurantId) return;
+
+      const params = new URLSearchParams({
+        restaurantId,
+        search: filters.search || "",
+        sortOrder: filters.sortOrder || "ASC",
+        includeInactive: String(filters.includeInactive || false),
+        withDeleted: String(filters.withDeleted || false),
+        page: String(filters.page || 1),
+      });
 
       const res = await fetch(
-        `${API_BASE_URL}/v1/branches?restaurantId=${restaurantId}`,
+        `${API_BASE_URL}/v1/branches?${params.toString()}`,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         }
@@ -54,7 +66,7 @@ export default function BranchesPage() {
       <Header
         title="Branch List"
         description="View and manage all branches from here"
-        onBranchCreated={fetchBranches} // NOW IT WORKS
+        onBranchCreated={() => fetchBranches()}
       />
 
       <div className="space-y-[32px] bg-white lg:p-[30px] rounded-[14px] shadow-sm">
@@ -62,7 +74,7 @@ export default function BranchesPage() {
           branches={branches}
           meta={meta}
           loading={loading}
-          fetchBranches={fetchBranches} // optional, if needed inside client
+          fetchBranches={fetchBranches}
         />
       </div>
     </Container>

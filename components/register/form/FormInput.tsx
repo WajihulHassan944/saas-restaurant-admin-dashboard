@@ -7,8 +7,9 @@ import { useState, forwardRef } from "react";
 
 interface FormInputProps {
   label: string;
-  placeholder: string;
+  placeholder?: string;
   value?: string;
+  type?: string; // NEW
   onChange?: (val: string) => void;
   onBlur?: () => void;
   required?: boolean;
@@ -23,6 +24,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
       label,
       placeholder,
       value,
+      type = "text",
       onChange,
       onBlur,
       required,
@@ -34,6 +36,13 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
   ) => {
     const [showPassword, setShowPassword] = useState(false);
 
+    const inputType =
+      showPasswordToggle && type === "password"
+        ? showPassword
+          ? "text"
+          : "password"
+        : type;
+
     return (
       <div>
         <Label className="mb-2 text-[16px]">
@@ -44,7 +53,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
         <div className="relative">
           <Input
             ref={ref}
-            type={showPasswordToggle ? (showPassword ? "text" : "password") : "text"}
+            type={inputType}
             value={value}
             onChange={(e) => onChange?.(e.target.value)}
             onBlur={onBlur}
@@ -60,7 +69,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
             `}
           />
 
-          {showPasswordToggle && (
+          {showPasswordToggle && type === "password" && (
             <button
               type="button"
               onClick={() => setShowPassword((p) => !p)}
