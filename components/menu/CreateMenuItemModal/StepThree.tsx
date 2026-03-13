@@ -1,61 +1,69 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { PlusCircle } from "lucide-react";
 
-export default function StepThree() {
+export default function StepThree({ form, setForm }: any) {
+  const addAddon = () => {
+    setForm({
+      ...form,
+      addons: [...form.addons, { name: "", price: "", max: 1 }],
+    });
+  };
+
+  const updateAddon = (index: number, field: string, value: any) => {
+    const updated = [...form.addons];
+    updated[index][field] = value;
+
+    setForm({ ...form, addons: updated });
+  };
+
   return (
     <div className="mt-4 space-y-4">
-      {/* ---------- Add On Name ---------- */}
-      <div className="space-y-1">
-        <Label className="text-sm font-medium">
-          Add On Name <span className="text-primary">*</span>
-        </Label>
-        <Input
-          placeholder="eg. Extra Cheese"
-          className="h-[44px] rounded-[12px] text-sm"
-        />
-        <p className="text-xs text-primary">Add on name is required</p>
+      {form.addons?.map((addon: any, index: number) => (
+        <div key={index} className="space-y-2">
+          <Label>Add On Name</Label>
+
+          <Input
+            value={addon.name}
+            onChange={(e) =>
+              updateAddon(index, "name", e.target.value)
+            }
+          />
+
+          <Label>Max Quantity</Label>
+
+          <Input
+            type="number"
+            value={addon.max}
+            onChange={(e) =>
+              updateAddon(index, "max", e.target.value)
+            }
+          />
+
+          <Label>Price</Label>
+
+          <Input
+            type="number"
+            value={addon.price}
+            onChange={(e) =>
+              updateAddon(index, "price", e.target.value)
+            }
+          />
+        </div>
+      ))}
+
+      <div className="mt-4 text-center">
+        <Button
+          type="button"
+          variant="link"
+          onClick={addAddon}
+          className="inline-flex items-center gap-2 text-primary"
+        >
+          <PlusCircle className="w-4 h-4" />
+          Add Another Add On
+        </Button>
       </div>
-
-      {/* ---------- Max Quantity ---------- */}
-      <div className="space-y-1">
-        <Label className="text-sm font-medium">Max Quantity</Label>
-        <Select>
-          <SelectTrigger className="h-[44px] rounded-[12px] text-sm border-[#BBBBBB]">
-            <SelectValue placeholder="Select quantity" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">1</SelectItem>
-            <SelectItem value="2">2</SelectItem>
-            <SelectItem value="3">3</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* ---------- Price ---------- */}
-      <div className="space-y-1">
-        <Label className="text-sm font-medium">Price</Label>
-        <Input
-          placeholder="eg. 2.99"
-          type="number"
-          className="h-[44px] rounded-[12px] text-sm border-[#BBBBBB]"
-        />
-      </div>
-
-
-<div className="mt-4 text-center">
-  <Button
-    variant="link"
-    size="sm"
-    className="inline-flex items-center gap-2 text-primary no-underline hover:no-underline"
-  >
-    <PlusCircle className="w-4 h-4" />
-    Add Another Add On
-  </Button>
-</div>
-
     </div>
   );
 }

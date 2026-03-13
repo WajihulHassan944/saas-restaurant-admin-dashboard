@@ -13,8 +13,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import ImportModal from "../shared/ImportModal";
 import CreateMenuModal from "./CreateMenuModal";
-import CreateCategoryModal from "./listing/CreateCategoryModal";
 import CreateCategoryModalParent from "./listing/CreateCategoryModalParent";
+import CreateMenuItemModal from "./CreateMenuItemModal/CreateMenuItemModal";
 
 interface HeaderProps {
   title: string;
@@ -27,6 +27,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
 
    const [open, setOpen] = useState(false); 
   const [createMenu, setCreateMenu] = useState(false);
+  const [createMenuItem, setCreateMenuItem] = useState(false);
   const [createCategory, setCreateCategory] = useState(false);
 
   useEffect(() => {
@@ -73,6 +74,18 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
           <PlusCircle size={18} className="text-[#767676]"  />
           Add Category
         </Button>
+     
+     
+         <Button
+  variant="outline"
+        className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
+               onClick={() => setCreateMenuItem(true)}
+        >
+          <PlusCircle size={18} className="text-[#767676]"  />
+          Add Item
+        </Button>
+
+
         <Button
        className="h-[38px] sm:h-[44px] rounded-[12px] px-4 sm:px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[13px] sm:text-[15px] font-[500]"
             onClick={() => setCreateMenu(true)}
@@ -86,7 +99,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
       <ImportModal open={open} onOpenChange={setOpen}  title="Import Menu List"
   subtitle="Upload menu items for this restaurant" />
       <CreateMenuModal open={createMenu} onOpenChange={setCreateMenu} />
-      
+      <CreateMenuItemModal open={createMenuItem} onOpenChange={setCreateMenuItem} />
               <CreateCategoryModalParent open={createCategory} onOpenChange={setCreateCategory} />
 
     </div>

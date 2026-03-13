@@ -7,10 +7,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import StepOne from "./StepOne";
 import StepTwo from "./StepTwo";
 import StepThree from "./StepThree";
+import { API_BASE_URL } from "@/lib/constants";
 
 interface CreateMenuItemModalProps {
   open: boolean;
@@ -22,15 +24,107 @@ export default function CreateMenuItemModal({
   onOpenChange,
 }: CreateMenuItemModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
+const [token, setToken] = useState("");
+  const [restaurantId, setRestaurantId] = useState("");
+const stepRef = useRef<any>(null);
+  const [form, setForm] = useState<any>({
+    name: "",
+    categoryId: "",
+    description: "",
+    basePrice: "",
+    imageUrl: "",
+    slug: "",
+    sizes: [],
+    addons: [],
+  });
 
-  const nextStep = () => currentStep < 3 && setCurrentStep((p) => p + 1);
+  const nextStep = () => {
+  if (stepRef.current?.validateStep) {
+    const valid = stepRef.current.validateStep();
+
+    if (!valid) return;
+  }
+
+  if (currentStep < 3) {
+    setCurrentStep((p) => p + 1);
+  }
+};
   const prevStep = () => currentStep > 1 && setCurrentStep((p) => p - 1);
+
+  useEffect(() => {
+    const authRaw = localStorage.getItem("auth");
+
+    if (!authRaw) return;
+
+    try {
+      const auth = JSON.parse(authRaw);
+
+      setToken(auth?.accessToken || "");
+      setRestaurantId(auth?.user?.restaurant?.id || "");
+    } catch {
+      console.error("Invalid auth");
+    }
+  }, []);
+
+
+  /* ================= CREATE MENU ITEM ================= */
+
+  const handleCreate = async () => {
+    if (!form.name || !form.categoryId) {
+      toast.error("Name and Category required");
+      return;
+    }
+
+    try {
+      const payload = {
+        categoryId: form.categoryId,
+        name: form.name,
+        slug: form.slug || form.name.toLowerCase().replace(/\s+/g, "-"),
+        basePrice: Number(form.basePrice),
+        restaurantId,
+        description: form.description,
+        imageUrl: form.imageUrl,
+       prepTimeMinutes: Number(form.prepTimeMinutes || 10),
+sku: form.sku || "",
+      dietaryFlags: form.dietaryFlags
+  ? form.dietaryFlags.split(",").map((i: string) => i.trim())
+  : [],
+
+allergenFlags: form.allergenFlags
+  ? form.allergenFlags.split(",").map((i: string) => i.trim())
+  : [],
+        isActive: true,
+        // variations: form.sizes,
+        // addons: form.addons,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/v1/menu/items`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message);
+
+      toast.success("Menu item created");
+
+      setForm({});
+      setCurrentStep(1);
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create menu item");
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[560px] rounded-[24px] p-8 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
-        {/* ---------- HEADER ---------- */}
-        <DialogHeader >
+        <DialogHeader>
           <DialogTitle className="text-[26px] font-semibold">
             Create Item
           </DialogTitle>
@@ -39,18 +133,20 @@ export default function CreateMenuItemModal({
             Manage your menu data from here
           </p>
 
-          {/* Step Progress */}
           <StepProgress currentStep={currentStep} />
         </DialogHeader>
 
-        {/* ---------- BODY ---------- */}
         <div className="mt-6 bg-white rounded-[20px] p-6">
-          {currentStep === 1 && <StepOne />}
-          {currentStep === 2 && <StepTwo />}
-          {currentStep === 3 && <StepThree />}
+        {currentStep === 1 && (
+  <StepOne ref={stepRef} form={form} setForm={setForm} token={token} />
+)}
+
+         {currentStep === 2 && (
+  <StepTwo ref={stepRef} form={form} setForm={setForm} />
+)}
+          {currentStep === 3 && <StepThree form={form} setForm={setForm} />}
         </div>
 
-        {/* ---------- FOOTER ---------- */}
         <div className="mt-6 flex items-center justify-between">
           <Button
             variant="ghost"
@@ -69,7 +165,7 @@ export default function CreateMenuItemModal({
 
             <Button
               className="px-10 h-[44px] rounded-[12px] bg-primary hover:bg-primary/90 text-white"
-              onClick={currentStep < 3 ? nextStep : () => {}}
+              onClick={currentStep < 3 ? nextStep : handleCreate}
             >
               {currentStep < 3 ? "Next" : "Save"}
             </Button>
@@ -80,45 +176,39 @@ export default function CreateMenuItemModal({
   );
 }
 
-/* ---------- Step Progress Component ---------- */
+/* ---------- Step Progress ---------- */
+
 function StepProgress({ currentStep }: { currentStep: number }) {
   const steps = ["Step 1", "Step 2", "Step 3"];
-
   const totalSteps = steps.length;
 
-  // Active line width (always show first segment for step 1)
   const activeWidth =
     currentStep === 1
-      ? 100 / (totalSteps - 0) / 2 // half the distance to next dot
+      ? 100 / (totalSteps - 0) / 2
       : ((currentStep - 1) / (totalSteps - 1)) * 100;
 
   return (
     <div className="mt-6 w-full relative">
-      {/* Full line background */}
       <div className="absolute top-2 left-0 w-full h-[2px] bg-gray-300 z-0" />
 
-      {/* Active line */}
       <div
         className="absolute top-2 left-0 h-[2px] bg-primary z-0 transition-all duration-300"
         style={{ width: `${activeWidth}%` }}
       />
 
-      {/* Dots */}
-      <div className="flex justify-between relative z-10 px-14"> {/* add px-4 to push edges */}
+      <div className="flex justify-between relative z-10 px-14">
         {steps.map((label, index) => {
           const step = index + 1;
           const isActive = currentStep >= step;
 
           return (
             <div key={label} className="flex flex-col items-center">
-              {/* Dot */}
               <div
-                className={`h-4 w-4 rounded-full transition-colors duration-300 ${
+                className={`h-4 w-4 rounded-full ${
                   isActive ? "bg-primary" : "bg-gray-300"
                 }`}
               />
 
-              {/* Label */}
               <span
                 className={`mt-2 text-sm font-medium ${
                   currentStep === step ? "text-primary" : "text-gray-400"
