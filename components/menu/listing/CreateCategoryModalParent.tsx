@@ -1,5 +1,6 @@
 "use client";
-
+import useCategories from "@/hooks/useCategories"
+import { useAuth } from "@/hooks/useAuth"
 import {
   Dialog,
   DialogContent,
@@ -19,26 +20,15 @@ interface CreateMenuModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface Category {
-  id?: string;
-  name: string;
-  slug: string;
-  description: string;
-  imageUrl: string;
-  sortOrder: number;
-  isActive: boolean;
-}
 
 export default function CreateCategoryModalParent({
   open,
   onOpenChange,
 }: CreateMenuModalProps) {
+const { categories, loading, refetch } = useCategories()
 
-  const [categories, setCategories] = useState<Category[]>([])
-
-  const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
-
+const { token, restaurantId } = useAuth()
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -48,59 +38,6 @@ export default function CreateCategoryModalParent({
     isActive: true,
   })
 
-  const [restaurantId, setRestaurantId] = useState("")
-  const [token, setToken] = useState("")
-
-  /* ================= LOAD AUTH ================= */
-
-  useEffect(() => {
-    const authRaw = localStorage.getItem("auth")
-
-    if (!authRaw) return
-
-    try {
-      const auth = JSON.parse(authRaw)
-
-      setToken(auth?.accessToken || "")
-      setRestaurantId(auth?.user?.restaurant?.id || "")
-    } catch (err) {
-      console.error("Invalid auth", err)
-    }
-  }, [])
-
-  /* ================= FETCH CATEGORIES ================= */
-
-  const fetchCategories = async () => {
-    try {
-      setLoading(true)
-
-      const res = await fetch(`${API_BASE_URL}/v1/menu/categories`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const data = await res.json()
-
-      if (data.success) {
-        setCategories(data.data)
-      }
-
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to fetch categories")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  /* fetch when modal opens */
-
-  useEffect(() => {
-    if (open && token) {
-      fetchCategories()
-    }
-  }, [open, token])
 
   /* ================= HANDLE INPUT ================= */
 
@@ -125,7 +62,11 @@ export default function CreateCategoryModalParent({
       }))
     }
   }
-
+useEffect(() => {
+  if (open) {
+    refetch()
+  }
+}, [open])
   /* ================= CREATE CATEGORY ================= */
 
   const handleCreate = async () => {
@@ -163,8 +104,7 @@ export default function CreateCategoryModalParent({
 
       /* refresh list */
 
-      fetchCategories()
-
+     refetch()
       /* reset form */
 
       setForm({

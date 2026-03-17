@@ -5,4 +5,5 @@ export interface BranchProps {
   itemsCount?: number;
   openDialog?: (branchId: string) => void;
   openMenuDetails?: (branchId: string) => void;
+   editMenu?: (id: string) => void;
 }

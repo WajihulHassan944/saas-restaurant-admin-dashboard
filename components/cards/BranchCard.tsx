@@ -5,11 +5,14 @@ import {
   MoreVertical,
   Store,
   List,
+  Trash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BranchProps } from "@/types/branch";
 import ActionDropdown from "../shared/ActionDropdown";
-
+import { API_BASE_URL } from "@/lib/constants";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 export default function BranchCard({
   id,
   name,
@@ -17,6 +20,7 @@ export default function BranchCard({
   itemsCount,
   openDialog,
   openMenuDetails,
+  editMenu,
 }: BranchProps) {
   const iconMap = [
     { key: "menu", icon: List },
@@ -27,6 +31,44 @@ export default function BranchCard({
     iconMap.find(({ key }) =>
       name?.toLowerCase().includes(key)
     )?.icon || Store;
+const [token, setToken] = useState("");
+useEffect(() => {
+  const authRaw = localStorage.getItem("auth");
+
+  if (!authRaw) return;
+
+  try {
+    const auth = JSON.parse(authRaw);
+    setToken(auth?.accessToken || "");
+  } catch {
+    console.error("Invalid auth");
+  }
+}, []);
+
+const handleDelete = async () => {
+  try {
+    const endpoint = openDialog
+      ? `${API_BASE_URL}/v1/branches/${id}`
+      : `${API_BASE_URL}/v1/menus/${id}`;
+
+    const res = await fetch(endpoint, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message);
+
+    toast.success("Deleted successfully");
+
+    window.location.reload();
+  } catch (err: any) {
+    toast.error(err.message || "Delete failed");
+  }
+};
 
   return (
    <div
@@ -105,19 +147,24 @@ export default function BranchCard({
         <Divider />
 
         <ActionDropdown
-          items={[
-            openDialog
-              ? {
-                  label: "Edit Branch",
-                  href: `/branches/edit`,
-                  icon: <Store size={16} className="text-gray-500" />,
-                }
-              : {
-                  label: "Edit Menu",
-                  href: `/menu`,
-                  icon: <List size={16} className="text-gray-500" />,
-                },
-          ]}
+         items={[
+  openDialog
+    ? {
+        label: "Edit Branch",
+        href: `/branches/edit`,
+        icon: <Store size={16} className="text-gray-500" />,
+      }
+    : {
+  label: "Edit Menu",
+ onClick: () => editMenu?.(id),
+  icon: <List size={16} className="text-gray-500" />,
+},
+  {
+    label: "Delete",
+    onClick: handleDelete,
+    icon: <Trash size={16} className="text-red-500" />,
+  },
+]}
         />
       </div>
     </div>

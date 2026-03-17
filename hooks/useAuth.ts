@@ -26,7 +26,7 @@ export const useAuth = () => {
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
+const [token, setToken] = useState<string | null>(null)
   const publicRoutes = [
     "/login",
     "/register",
@@ -110,6 +110,7 @@ export const useAuth = () => {
       try {
         const me = await fetchMe(stored.accessToken);
         setUser(me);
+setToken(stored.accessToken)
       } catch {
         const newAccessToken = await refreshToken();
 
@@ -121,6 +122,7 @@ export const useAuth = () => {
 
         const me = await fetchMe(newAccessToken);
         setUser(me);
+        setToken(newAccessToken)
       }
     } catch (err) {
       console.error("Auth check failed", err);
@@ -136,6 +138,8 @@ export const useAuth = () => {
 
   return {
     user,
+     token,
+  restaurantId: user?.restaurantId,
     loading,
   };
 };

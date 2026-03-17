@@ -1,27 +1,84 @@
-'use client';
+"use client";
+
 import Container from "@/components/container";
 import Categories from "@/components/menu/listing/categories";
 import Header from "@/components/menu/listing/header";
 import ItemList from "@/components/menu/listing/itemList";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import useApi from "@/hooks/useApi";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function MenusListingPage() {
-    const [editing, setEditing] = useState(false);
-const handleManageClick = () => {
-  setEditing((prev) => !prev);
-};
-    return (
-        <Container>
-            <Header
-                title="Menu Listing"
-                description="Menu List"
-                editing={editing}
-                onManageClick={handleManageClick}
-            />
-            <Categories editing={editing} />
+  const [editing, setEditing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-            <ItemList editing={editing} />
-           
-        </Container>
-    );
+  const [items, setItems] = useState<any[]>([]);
+
+  const { token } = useAuth();
+  const { get, loading } = useApi(token);
+
+  const searchParams = useSearchParams();
+  const menuId = searchParams.get("id");
+
+  const getStoredAuth = () => {
+    const stored = localStorage.getItem("auth");
+    if (!stored) return null;
+    return JSON.parse(stored);
+  };
+
+  const handleManageClick = () => {
+    setEditing((prev) => !prev);
+  };
+  /* ================= FETCH ITEMS ================= */
+const fetchItems = async () => {
+  const stored = getStoredAuth();
+  const restaurantId = stored?.user?.restaurantId;
+
+  if (!restaurantId || !menuId) return;
+
+  /* ✅ build query dynamically */
+  let url = `/v1/menu/items?restaurantId=${restaurantId}&menuId=${menuId}`;
+
+  if (selectedCategory) {
+    url += `&categoryId=${selectedCategory}`;
+  }
+
+  const res = await get(url);
+
+  if (!res) return;
+
+  /* ✅ correct handling */
+  const data = Array.isArray(res) ? res : [];
+
+  setItems(data);
+};
+  
+  useEffect(() => {
+     if (!token) return; 
+    fetchItems();
+  }, [token, menuId, selectedCategory]);
+
+  return (
+    <Container>
+      <Header
+        title="Menu Listing"
+        description="Menu List"
+        editing={editing}
+        onManageClick={handleManageClick}
+      />
+
+      <Categories
+        editing={editing}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
+
+      <ItemList
+        editing={editing}
+        items={items}
+        loading={loading}
+      />
+    </Container>
+  );
 }

@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 
 export interface ActionDropdownItem {
   label: string;
-  href: string;
+  href?: string;
+  onClick?: () => void;
   icon?: React.ReactNode;
 }
 
@@ -33,17 +34,26 @@ export default function ActionDropdown({ items }: ActionDropdownProps) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-48">
-        {items.map((item) => (
-          <DropdownMenuItem key={item.label} asChild>
-            <Link
-              href={item.href}
-              className="flex items-center gap-3 cursor-pointer"
-            >
-              {item.icon}
-              <span className="text-sm">{item.label}</span>
-            </Link>
-          </DropdownMenuItem>
-        ))}
+       {items.map((item) => (
+  <DropdownMenuItem
+    key={item.label}
+    onClick={item.onClick}
+    className="flex items-center gap-3 cursor-pointer"
+    asChild={!item.onClick}
+  >
+    {item.href ? (
+      <Link href={item.href} className="flex items-center gap-3 w-full">
+        {item.icon}
+        <span className="text-sm">{item.label}</span>
+      </Link>
+    ) : (
+      <div className="flex items-center gap-3 w-full">
+        {item.icon}
+        <span className="text-sm">{item.label}</span>
+      </div>
+    )}
+  </DropdownMenuItem>
+))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

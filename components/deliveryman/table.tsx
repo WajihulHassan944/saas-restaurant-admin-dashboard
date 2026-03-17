@@ -10,28 +10,131 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { deliveryManData } from "@/constants/deliveryman";
 import SortableHeader from "@/components/shared/sortable-head";
-import { Eye, MoreHorizontal } from "lucide-react";
-import Pagination from "@/components/pagination";
+import { Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import EmptyState from "../shared/EmptyState";
 import DeliveryManDetails from "./DeliveryManDetails";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import useApi from "@/hooks/useApi";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import PaginationSection from "../pagination";
+import { useRouter } from "next/navigation";
 
-const DeliveryManTable = () => {
+interface Props {
+  data: any[];
+  meta: any;
+  onPageChange: (page: number) => void;
+  refresh: () => void;
+}
+
+const DeliveryManTable = ({
+  data,
+  meta,
+  onPageChange,
+  refresh,
+}: Props) => {
   const [openDetails, setOpenDetails] = useState(false);
-  if (!deliveryManData || deliveryManData.length === 0) {
+  const [selected, setSelected] = useState<any>(null);
+
+  const [menu, setMenu] = useState<{
+    id: string | null;
+    x: number;
+    y: number;
+  }>({ id: null, x: 0, y: 0 });
+
+  const router = useRouter();
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const { token } = useAuth();
+  const { patch, del } = useApi(token);
+
+  /* ================= CLOSE ON OUTSIDE CLICK ================= */
+  useEffect(() => {
+    const handleClick = (e: any) => {
+      if (
+        menuRef.current?.contains(e.target) ||
+        triggerRef.current?.contains(e.target)
+      ) {
+        return;
+      }
+
+      setMenu({ id: null, x: 0, y: 0 });
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  /* ================= TOGGLE STATUS ================= */
+
+  const toggleStatus = async (dm: any) => {
+    const newStatus =
+      dm.status === "AVAILABLE" ? "OFFLINE" : "AVAILABLE";
+
+    const res = await patch(`/v1/deliverymen/${dm.id}/status`, {
+      status: newStatus,
+    });
+
+    if (res) {
+      toast.success("Status updated");
+      refresh();
+    }
+  };
+
+  /* ================= DELETE ================= */
+
+  const handleDelete = async (id: string) => {
+    const confirm = window.confirm("Are you sure you want to delete?");
+    if (!confirm) return;
+
+    const res = await del(`/v1/deliverymen/${id}`);
+
+    if (res !== null) {
+      toast.success("Deleted successfully");
+      refresh();
+    }
+  };
+
+  /* ================= EDIT ================= */
+
+  const handleEdit = (id: string) => {
+    router.push(`/deliveryman/add?editId=${id}`);
+  };
+
+  /* ================= OPEN DROPDOWN ================= */
+
+  const openDropdown = (e: any, id: string) => {
+    e.stopPropagation();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    setMenu({
+      id,
+      x: rect.right - 140,
+      y: rect.bottom + 8,
+    });
+
+    triggerRef.current = e.currentTarget;
+  };
+
+  if (!data || data.length === 0) {
     return (
       <EmptyState
         title="Looks like there are no Delivery Man yet!"
-        description="You haven’t added any deliveryman yet. Start by creating a new."
+        description="You haven’t added any deliveryman yet."
       />
     );
   }
 
+  const currentPage = Number(meta?.page) || 1;
+  const limit = Number(meta?.limit) || 10;
+
   return (
     <>
-      {/* Desktop Table */}
+      {/* Desktop */}
       <div className="hidden md:block">
         <Table>
           <TableHeader>
@@ -42,60 +145,59 @@ const DeliveryManTable = () => {
               <SortableHeader label="SL" />
               <SortableHeader label="Delivery Man" />
               <SortableHeader label="Delivery Man Info" />
-              <TableHead className="text-center px-4 font-semibold">
-                Assign Order Limit
-              </TableHead>
-              <SortableHeader label="Current Order Info" />
+              <TableHead className="text-center">Assign Limit</TableHead>
+              <TableHead>Order Info</TableHead>
               <SortableHeader label="Status" />
               <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {deliveryManData.map((dm, i) => (
-              <TableRow key={i} className="border-none h-[70px]">
+            {data.map((dm, i) => (
+              <TableRow key={dm.id} className="border-none h-[70px]">
                 <TableCell>
-                  <Checkbox defaultChecked />
+                  <Checkbox />
                 </TableCell>
 
-                <TableCell className="px-4">{dm.sl}</TableCell>
-
-                <TableCell className="px-4">{dm.deliveryManName}</TableCell>
-
-                <TableCell className="px-4">
-                  <div>
-                    <p>{dm.phone}</p>
-                    <p className="text-gray">{dm.email}</p>
-                  </div>
+                <TableCell>
+                  {(currentPage - 1) * limit + i + 1}
                 </TableCell>
 
-                <TableCell className="px-4 text-center">{dm.orderLimit}</TableCell>
-
-                <TableCell className="px-4">
-                  <div className="flex items-start gap-2 text-xs">
-                    <div>
-                      <p>{dm.branch.currentlyAssign}</p>
-                      <p>{dm.branch.outForDelivery}</p>
-                      <p>{dm.branch.ongoingOrder}</p>
-                    </div>
-                    <div className="text-gray">
-                      <p>Currently Assign</p>
-                      <p>Out for Delivery</p>
-                      <p>Ongoing Order</p>
-                    </div>
-                  </div>
+                <TableCell>
+                  {dm.firstName} {dm.lastName}
                 </TableCell>
 
-                <TableCell className="px-4">
-                  <Switch defaultChecked={dm.status} />
+                <TableCell>
+                  <p>{dm.phone}</p>
+                  <p className="text-gray-500 text-sm">{dm.email}</p>
                 </TableCell>
 
-                <TableCell className="px-4">
-                  <div className="flex items-center justify-center gap-2 text-gray">
-                    <button className="p-2" onClick={() => setOpenDetails(true)}>
-                      <Eye size={18} />
-                    </button>
-                    <button className="p-2">
+                <TableCell className="text-center">
+                  Not Set
+                </TableCell>
+
+                <TableCell>
+                  <p>Total Orders: {dm._count?.orders || 0}</p>
+                </TableCell>
+
+                <TableCell>
+                  <Switch
+                    checked={dm.status === "AVAILABLE"}
+                    onCheckedChange={() => toggleStatus(dm)}
+                  />
+                </TableCell>
+
+                <TableCell>
+                  <div className="flex justify-center gap-2">
+                    <Eye
+                      size={18}
+                      onClick={() => {
+                        setSelected(dm);
+                        setOpenDetails(true);
+                      }}
+                    />
+
+                    <button onClick={(e) => openDropdown(e, dm.id)}>
                       <MoreHorizontal size={18} />
                     </button>
                   </div>
@@ -105,60 +207,111 @@ const DeliveryManTable = () => {
           </TableBody>
         </Table>
 
-        <Pagination />
+        <PaginationSection meta={meta} onPageChange={onPageChange} />
       </div>
 
-      {/* Mobile Cards */}
+      {/* DROPDOWN */}
+     {menu.id &&
+  createPortal(
+    <div
+      ref={menuRef}
+      style={{
+        position: "fixed",
+        top: menu.y,
+        left: menu.x,
+        zIndex: 99999,
+      }}
+      className="
+        w-44
+        bg-white
+        border border-gray-200
+        rounded-xl
+        shadow-lg
+        py-2
+        animate-in fade-in zoom-in-95
+      "
+    >
+      {/* Edit */}
+      <button
+        onClick={() => {
+          handleEdit(menu.id!);
+          setMenu({ id: null, x: 0, y: 0 });
+        }}
+        className="
+          flex items-center gap-2
+          w-full
+          px-4 py-2.5
+          text-sm text-gray-700
+          hover:bg-gray-100
+          transition
+        "
+      >
+        <Pencil size={16} />
+        Edit
+      </button>
+
+      {/* Divider */}
+      <div className="h-px bg-gray-200 my-1" />
+
+      {/* Delete */}
+      <button
+        onClick={() => {
+          handleDelete(menu.id!);
+          setMenu({ id: null, x: 0, y: 0 });
+        }}
+        className="
+          flex items-center gap-2
+          w-full
+          px-4 py-2.5
+          text-sm text-red-600
+          hover:bg-red-50
+          transition
+        "
+      >
+        <Trash2 size={16} />
+        Delete
+      </button>
+    </div>,
+    document.body
+  )}
+
+      {/* Mobile remains same */}
       <div className="flex flex-col gap-4 md:hidden">
-        {deliveryManData.map((dm, i) => (
-          <div
-            key={i}
-            className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-200"
-          >
-            {/* Header: Name + Checkbox + Status */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Checkbox defaultChecked />
-                <p className="font-medium">{dm.deliveryManName}</p>
-              </div>
-              <Switch defaultChecked={dm.status} />
+        {data.map((dm) => (
+          <div key={dm.id} className="bg-white p-4 rounded-lg border">
+            <div className="flex justify-between">
+              <p>{dm.firstName} {dm.lastName}</p>
+              <Switch
+                checked={dm.status === "AVAILABLE"}
+                onCheckedChange={() => toggleStatus(dm)}
+              />
             </div>
 
-            {/* SL & Order Limit */}
-            <div className="text-sm text-gray mb-1">
-              <p>SL: {dm.sl}</p>
-              <p>Assign Order Limit: {dm.orderLimit}</p>
-            </div>
+            <p>{dm.phone}</p>
+            <p>{dm.email}</p>
 
-            {/* Contact Info */}
-            <div className="text-sm text-gray mb-2">
-              <p>Phone: {dm.phone}</p>
-              <p>Email: {dm.email}</p>
-            </div>
-
-            {/* Branch Info */}
-            <div className="text-xs text-gray mb-2">
-              <p>Branch:</p>
-              <p>Currently Assign: {dm.branch.currentlyAssign}</p>
-              <p>Out for Delivery: {dm.branch.outForDelivery}</p>
-              <p>Ongoing Order: {dm.branch.ongoingOrder}</p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2 text-gray">
-              <button className="p-2">
-                <Eye size={18} onClick={() => setOpenDetails(true)} />
-              </button>
-              <button className="p-2">
+            <div className="flex justify-end gap-2 mt-2">
+              <Eye
+                size={18}
+                onClick={() => {
+                  setSelected(dm);
+                  setOpenDetails(true);
+                }}
+              />
+              <button onClick={(e) => openDropdown(e, dm.id)}>
                 <MoreHorizontal size={18} />
               </button>
             </div>
           </div>
         ))}
+
+        <PaginationSection meta={meta} onPageChange={onPageChange} />
+
         <DeliveryManDetails
-  open={openDetails}
-  onOpenChange={setOpenDetails}
-/>
+          open={openDetails}
+          onOpenChange={setOpenDetails}
+          data={selected}
+        />
       </div>
     </>
   );

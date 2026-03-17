@@ -36,6 +36,7 @@ export default function BranchFilters({
       "Phone",
       "Status",
       "CreatedAt",
+      "Items"
     ];
 
     const rows = branches.map((b) => [
@@ -45,6 +46,7 @@ export default function BranchFilters({
       b.phone || "",
       b.isActive ? "Active" : "Inactive",
       b.createdAt || "",
+      b._count?.items ?? "",
     ]);
 
     const csvContent =
@@ -57,7 +59,7 @@ export default function BranchFilters({
 
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "branches.csv");
+link.setAttribute("download", "data.csv");
 
     document.body.appendChild(link);
     link.click();
@@ -147,7 +149,7 @@ export default function BranchFilters({
 
       {branches && (
         <p className="text-sm text-gray-400 mt-3">
-          Showing {filteredBranches.length} of {branches.length} branches
+          Showing {filteredBranches.length} of {branches.length} results
         </p>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 import {
   Dialog,
@@ -12,46 +12,101 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Radio } from "../ui/radioBtn";
+import { toast } from "sonner";
 
 interface AddToCartModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  item: any;
 }
 
 export default function AddToCartModal({
   open,
   onOpenChange,
+  item,
 }: AddToCartModalProps) {
-  const [quantity, setQuantity] = useState(0);
-  const [size, setSize] = useState<"small" | "medium" | "large">("large");
+  const [quantity, setQuantity] = useState(1);
 
-  const price = 5.59;
-  const total = (quantity || 1) * price;
+  /* ✅ Build options (base + variations) */
+  const options = useMemo(() => {
+    const baseOption = {
+      id: "base",
+      name: "Base",
+      price: Number(item?.basePrice || 0),
+    };
+
+    const variations =
+      item?.variations?.map((v: any) => ({
+        id: v.id,
+        name: v.name,
+        price: Number(v.price),
+      })) || [];
+
+    return [baseOption, ...variations];
+  }, [item]);
+
+  const [selectedOptionId, setSelectedOptionId] = useState(
+    options[0]?.id
+  );
+
+  /* ✅ Selected option */
+  const selectedOption = options.find(
+    (opt) => opt.id === selectedOptionId
+  );
+
+  /* ✅ Price */
+  const price = selectedOption?.price || 0;
+
+  /* ✅ Total */
+  const total = price * quantity;
+
+  /* ✅ Image fallback */
+  const image =
+    item?.imageUrl && item.imageUrl.startsWith("http")
+      ? item.imageUrl
+      : "/burgerTwo.jpg";
+
+  /* ✅ Handle Add To Cart */
+  const handleAddToCart = () => {
+    const payload = {
+      itemId: item.id,
+      name: item.name,
+      quantity,
+      selectedOption,
+      total,
+    };
+
+    console.log("Add to cart:", payload);
+
+    toast.success("Added to cart");
+
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md rounded-2xl p-8">
         {/* Header */}
         <DialogHeader className="text-center">
-          <DialogTitle className="text-2xl font-semibold font-onest text-[#101828] text-center">
-            Burger
+          <DialogTitle className="text-2xl font-semibold text-[#101828]">
+            {item?.name}
           </DialogTitle>
         </DialogHeader>
 
         {/* Image */}
         <div className="flex justify-center mt-4">
           <Image
-            src="/burgerTwo.jpg"
-            alt="Burger"
+            src={image}
+            alt={item?.name}
             width={200}
             height={200}
-            priority
+            className="object-contain"
           />
         </div>
 
         {/* Price */}
         <p className="text-center text-primary font-semibold mt-2">
-          $5.59
+          ${price}
         </p>
 
         {/* Quantity */}
@@ -60,7 +115,9 @@ export default function AddToCartModal({
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setQuantity((q) => Math.max(0, q - 1))}
+              onClick={() =>
+                setQuantity((q) => Math.max(1, q - 1))
+              }
               className="text-xl text-gray-600"
             >
               –
@@ -79,22 +136,27 @@ export default function AddToCartModal({
           </div>
         </div>
 
-        {/* Size */}
+        {/* Variations / Size */}
         <div className="mt-6">
-          <p className="text-sm font-medium mb-3">Size</p>
+          <p className="text-sm font-medium mb-3">
+            {item?.variations?.length > 0
+              ? "Choose Option"
+              : "Price"}
+          </p>
 
           <div className="space-y-4">
-            <div onClick={() => setSize("small")}>
-              <Radio label="Small" active={size === "small"} />
-            </div>
-
-            <div onClick={() => setSize("medium")}>
-              <Radio label="Medium" active={size === "medium"} />
-            </div>
-
-            <div onClick={() => setSize("large")}>
-              <Radio label="Large" active={size === "large"} />
-            </div>
+            {options.map((opt: any) => (
+              <div
+                key={opt.id}
+                onClick={() => setSelectedOptionId(opt.id)}
+                className="cursor-pointer"
+              >
+                <Radio
+                  label={`${opt.name} ($${opt.price})`}
+                  active={selectedOptionId === opt.id}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -107,7 +169,10 @@ export default function AddToCartModal({
         </div>
 
         {/* Add to Cart */}
-        <Button className="w-full mt-6 h-11 rounded-xl bg-primary hover:bg-primary/90">
+        <Button
+          className="w-full mt-6 h-11 rounded-xl bg-primary hover:bg-primary/90"
+          onClick={handleAddToCart}
+        >
           Add to Cart
         </Button>
       </DialogContent>

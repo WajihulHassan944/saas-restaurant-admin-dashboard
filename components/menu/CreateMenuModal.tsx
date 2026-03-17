@@ -17,6 +17,7 @@ import { toast } from "sonner";
 interface CreateMenuModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  menuId?: string;
 }
 
 interface MenuItem {
@@ -27,6 +28,7 @@ interface MenuItem {
 export default function CreateMenuModal({
   open,
   onOpenChange,
+  menuId,
 }: CreateMenuModalProps) {
   const [loadingItems, setLoadingItems] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -37,7 +39,7 @@ export default function CreateMenuModal({
   const [restaurantId, setRestaurantId] = useState("");
 
   const [submitted, setSubmitted] = useState(false);
-
+const isEdit = Boolean(menuId);
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -62,7 +64,33 @@ export default function CreateMenuModal({
       console.error("Invalid auth");
     }
   }, []);
+const fetchMenuDetails = async () => {
+  if (!menuId || !token) return;
 
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/menus/${menuId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message);
+
+    const menu = data.data;
+
+    setForm({
+      name: menu.name || "",
+      slug: menu.slug || "",
+      description: menu.description || "",
+      sortOrder: String(menu.sortOrder || ""),
+      menuItemsIds: menu.itemIds || [],
+    });
+  } catch (err: any) {
+    toast.error(err.message || "Failed to load menu");
+  }
+};
   /* ================= FETCH MENU ITEMS ================= */
 
   const fetchMenuItems = async () => {
@@ -92,11 +120,18 @@ export default function CreateMenuModal({
     }
   };
 console.log("menu items", menuItems);
-  useEffect(() => {
-    if (open && token && restaurantId) {
-      fetchMenuItems();
+ 
+
+useEffect(() => {
+  if (open && token && restaurantId) {
+    fetchMenuItems();
+
+    if (menuId) {
+      fetchMenuDetails();
     }
-  }, [open, token, restaurantId]);
+  }
+}, [open, token, restaurantId, menuId]);
+
 
   /* ================= FORM UPDATE ================= */
 
@@ -131,53 +166,63 @@ console.log("menu items", menuItems);
       };
     });
   };
-
   /* ================= CREATE MENU ================= */
+ const handleSubmit = async () => {
+  setSubmitted(true);
 
-  const handleCreate = async () => {
-    setSubmitted(true);
+  if (!form.name) {
+    toast.error("Menu name required");
+    return;
+  }
 
-    if (!form.name) {
-      toast.error("Menu name required");
-      return;
+  try {
+    setCreating(true);
+
+     const payload: any = {
+      name: form.name,
+      slug: form.slug,
+      description: form.description,
+      sortOrder: Number(form.sortOrder) || 0,
+      itemIds: form.menuItemsIds,
+      isActive: true,
+    };
+
+    // Only include restaurantId when creating
+    if (!isEdit) {
+      payload.restaurantId = restaurantId;
     }
 
-    try {
-      setCreating(true);
+    const url = isEdit
+      ? `${API_BASE_URL}/v1/menus/${menuId}`
+      : `${API_BASE_URL}/v1/menus`;
 
-      const payload = {
-        name: form.name,
-        slug: form.slug,
-        restaurantId,
-        description: form.description,
-        sortOrder: Number(form.sortOrder) || 0,
-        // menuItemsIds: form.menuItemsIds,
-        isActive: true,
-      };
+    const method = isEdit ? "PATCH" : "POST";
 
-      const res = await fetch(`${API_BASE_URL}/v1/menus`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message);
+    if (!res.ok) throw new Error(data.message);
 
-      toast.success("Menu created successfully");
-window.location.reload();
-      handleReset();
-      onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create menu");
-    } finally {
-      setCreating(false);
-    }
-  };
+    toast.success(isEdit ? "Menu updated" : "Menu created");
+
+    window.location.reload();
+
+    handleReset();
+    onOpenChange(false);
+  } catch (err: any) {
+    toast.error(err.message || "Request failed");
+  } finally {
+    setCreating(false);
+  }
+};
 
   /* ================= RESET ================= */
 
@@ -197,9 +242,9 @@ window.location.reload();
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">
-            Create Menu
-          </DialogTitle>
+         <DialogTitle className="text-2xl font-semibold">
+  {isEdit ? "Edit Menu" : "Create Menu"}
+</DialogTitle>
         </DialogHeader>
 
         <div className="mt-5 rounded-[16px] bg-white p-5 space-y-4">
@@ -283,18 +328,20 @@ window.location.reload();
           </Button>
 
           <Button
-            onClick={handleCreate}
+           onClick={handleSubmit}
             disabled={creating}
             className="px-8 py-0 rounded-[10px] bg-primary hover:bg-primary/90 text-[17px] text-white"
           >
-            {creating ? (
-              <>
-                <Loader2 className="animate-spin mr-2" size={16} />
-                Creating...
-              </>
-            ) : (
-              "Create"
-            )}
+           {creating ? (
+  <>
+    <Loader2 className="animate-spin mr-2" size={16} />
+    {isEdit ? "Updating..." : "Creating..."}
+  </>
+) : isEdit ? (
+  "Update"
+) : (
+  "Create"
+)}
           </Button>
         </div>
       </DialogContent>

@@ -8,12 +8,13 @@ import Container from "@/components/container";
 import Table from "@/components/orders/table";
 import { Button } from "@/components/ui/button";
 import OrdersFilters from "@/components/orders/OrdersFilters";
+import useOrders from "@/hooks/useOrders";
 
 type OrderTab = "delivery" | "pickup" | "reservations";
 
 export default function Orders() {
   const [activeTab, setActiveTab] = useState<OrderTab>("delivery");
-
+const { orders, loading } = useOrders();
   const getHeaderContent = (tab: OrderTab) => {
     switch (tab) {
       case "delivery":
@@ -77,8 +78,7 @@ export default function Orders() {
         {/* Filters (can also be conditional if needed) */}
         <OrdersFilters />
 
-        {/* Dynamic Content */}
-        <Table  />
+       <Table orders={orders} loading={loading} />
       </div>
     </Container>
   );
