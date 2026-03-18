@@ -18,14 +18,26 @@ interface Menu {
 
 interface Props {
   menus: Menu[];
-  
+  loading?: boolean;
 }
 
-export default function MenuList({ menus }: Props) {
+export default function MenuList({ menus, loading }: Props) {
   const router = useRouter();
 const [editingMenuId, setEditingMenuId] = useState<string | null>(null);
 const [openModal, setOpenModal] = useState(false);
-  if (!menus || menus.length === 0) {
+if (loading) {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className="h-[70px] rounded-xl bg-gray-100 border border-gray-200"
+        />
+      ))}
+    </div>
+  );
+} 
+if (!menus || menus.length === 0) {
     return <EmptyState />;
   }
 

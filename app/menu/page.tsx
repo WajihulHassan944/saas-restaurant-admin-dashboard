@@ -25,7 +25,7 @@ export default function MenusPage() {
 
   const [token, setToken] = useState("");
   const [restaurantId, setRestaurantId] = useState("");
-
+const [loading, setLoading] = useState(true);
   /* ================= LOAD AUTH ================= */
 
   useEffect(() => {
@@ -49,6 +49,7 @@ export default function MenusPage() {
     if (!restaurantId || !token) return;
 
     try {
+       setLoading(true);
       const res = await fetch(
         `${API_BASE_URL}/v1/menus?restaurantId=${restaurantId}`,
         {
@@ -66,7 +67,9 @@ export default function MenusPage() {
       setFilteredMenus(data.data || []);
     } catch (err: any) {
       toast.error(err.message || "Failed to load menus");
-    }
+    }   finally {
+    setLoading(false);
+  }
   };
 
   useEffect(() => {
@@ -104,7 +107,7 @@ export default function MenusPage() {
         />
 
         <div className="px-2 lg:px-0">
-          <Table menus={filteredMenus} />
+          <Table menus={filteredMenus} loading={loading} />
           <BranchesPagination />
         </div>
       </div>
