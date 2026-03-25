@@ -140,6 +140,7 @@ setToken(stored.accessToken)
     user,
      token,
   restaurantId: user?.restaurantId,
+  branchId: user?.branchId,
     loading,
   };
 };

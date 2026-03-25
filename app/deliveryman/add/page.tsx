@@ -53,15 +53,15 @@ const AddDeliveryMan = () => {
 
       const res = await get(`/v1/deliverymen/${editId}`);
 
-      if (res) {
+      if (res.data) {
         setFormData({
-          firstName: res.firstName || "",
-          lastName: res.lastName || "",
-          phone: res.phone || "",
-          email: res.email || "",
-          vehicleType: res.vehicleType || "",
-          vehicleNumber: res.vehicleNumber || "",
-          status: res.status || "OFFLINE",
+          firstName: res.data.firstName || "",
+          lastName: res.data.lastName || "",
+          phone: res.data.phone || "",
+          email: res.data.email || "",
+          vehicleType: res.data.vehicleType || "",
+          vehicleNumber: res.data.vehicleNumber || "",
+          status: res.data.status || "OFFLINE",
         });
       }
     } catch (err) {

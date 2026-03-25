@@ -47,7 +47,7 @@ export default function useApi(token: string | null) {
         throw new Error(data?.message || "Request failed")
       }
 
-      return data.data
+      return data
     } catch (err: any) {
       console.error("API Error:", err)
       toast.error(err.message)

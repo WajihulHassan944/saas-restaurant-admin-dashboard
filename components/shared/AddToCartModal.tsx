@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { Plus } from "lucide-react";
-import { useState, useMemo } from "react";
-
+import { useState, useMemo, useEffect } from "react";
+import useApi from "@/hooks/useApi";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Radio } from "../ui/radioBtn";
+import { Input } from "../ui/input";
 import { toast } from "sonner";
 
 interface AddToCartModalProps {
@@ -25,9 +27,65 @@ export default function AddToCartModal({
   onOpenChange,
   item,
 }: AddToCartModalProps) {
+  const { token, restaurantId, branchId } = useAuth();
+  const { post, get } = useApi(token);
+
   const [quantity, setQuantity] = useState(1);
 
-  /* ✅ Build options (base + variations) */
+  /* ================= CUSTOMER STATE ================= */
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [hasNext, setHasNext] = useState(false);
+
+  /* ================= FETCH CUSTOMERS ================= */
+  useEffect(() => {
+    if (!restaurantId || !token) return;
+
+    const delay = setTimeout(() => {
+      fetchCustomers(1, true);
+    }, 400);
+
+    return () => clearTimeout(delay);
+  }, [search, restaurantId]);
+
+  const fetchCustomers = async (pageNumber = 1, reset = false) => {
+    try {
+      setLoadingCustomers(true);
+
+      let url = `/v1/auth/customers?restaurantId=${restaurantId}&page=${pageNumber}`;
+
+      if (search) {
+        url += `&search=${search}`;
+      }
+
+      const res = await get(url);
+      if (!res) return;
+
+      const data = res.data || [];
+      const meta = res.meta || {};
+
+      setCustomers((prev) =>
+        reset ? data : [...prev, ...data]
+      );
+
+      setHasNext(meta.hasNext);
+      setPage(pageNumber);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (!hasNext) return;
+    fetchCustomers(page + 1);
+  };
+
+  /* ================= OPTIONS ================= */
   const options = useMemo(() => {
     const baseOption = {
       id: "base",
@@ -45,63 +103,58 @@ export default function AddToCartModal({
     return [baseOption, ...variations];
   }, [item]);
 
-  const [selectedOptionId, setSelectedOptionId] = useState(
-    options[0]?.id
-  );
+  const [selectedOptionId, setSelectedOptionId] = useState(options[0]?.id);
 
-  /* ✅ Selected option */
-  const selectedOption = options.find(
-    (opt) => opt.id === selectedOptionId
-  );
-
-  /* ✅ Price */
+  const selectedOption = options.find((opt) => opt.id === selectedOptionId);
   const price = selectedOption?.price || 0;
-
-  /* ✅ Total */
   const total = price * quantity;
 
-  /* ✅ Image fallback */
   const image =
     item?.imageUrl && item.imageUrl.startsWith("http")
       ? item.imageUrl
       : "/burgerTwo.jpg";
 
-  /* ✅ Handle Add To Cart */
-  const handleAddToCart = () => {
-    const payload = {
-      itemId: item.id,
-      name: item.name,
-      quantity,
-      selectedOption,
-      total,
-    };
+  /* ================= ADD TO CART ================= */
+  const handleAddToCart = async () => {
+    try {
+      if (!selectedCustomerId) {
+        toast.error("Please select customer");
+        return;
+      }
 
-    console.log("Add to cart:", payload);
+      const payload: any = {
+        menuItemId: item.id,
+        quantity,
+        branchId, // ✅ added
+        note: "",
+      };
 
-    toast.success("Added to cart");
+      if (selectedOptionId !== "base") {
+        payload.variationId = selectedOptionId;
+      }
 
-    onOpenChange(false);
+      await post(`/v1/cart/items?customerId=${selectedCustomerId}`, payload);
+
+      toast.success("Added to cart");
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to add to cart");
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md rounded-2xl p-8">
-        {/* Header */}
         <DialogHeader className="text-center">
-          <DialogTitle className="text-2xl font-semibold text-[#101828]">
+          <DialogTitle className="text-2xl font-semibold">
             {item?.name}
           </DialogTitle>
         </DialogHeader>
 
         {/* Image */}
         <div className="flex justify-center mt-4">
-          <Image
-            src={image}
-            alt={item?.name}
-            width={200}
-            height={200}
-            className="object-contain"
-          />
+          <Image src={image} alt={item?.name} width={200} height={200} />
         </div>
 
         {/* Price */}
@@ -109,70 +162,87 @@ export default function AddToCartModal({
           ${price}
         </p>
 
+        {/* ================= CUSTOMER SELECT ================= */}
+        <div className="mt-6 space-y-3">
+          <p className="text-sm font-medium">Select Customer</p>
+
+          <Input
+            placeholder="Search customer..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <div className="max-h-[150px] overflow-y-auto border rounded-lg">
+            {loadingCustomers && customers.length === 0 ? (
+              <p className="p-3 text-sm text-gray-400">Loading...</p>
+            ) : customers.length === 0 ? (
+              <p className="p-3 text-sm text-gray-400">
+                No customers found
+              </p>
+            ) : (
+              customers.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => setSelectedCustomerId(c.id)}
+                  className={`p-3 cursor-pointer hover:bg-gray-100 ${
+                    selectedCustomerId === c.id ? "bg-gray-100" : ""
+                  }`}
+                >
+                  <p className="text-sm font-medium">
+                    {c.profile?.firstName} {c.profile?.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500">{c.email}</p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {hasNext && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMore}
+              disabled={loadingCustomers}
+            >
+              {loadingCustomers ? "Loading..." : "Load More"}
+            </Button>
+          )}
+        </div>
+
         {/* Quantity */}
-        <div className="flex items-center justify-between mt-6">
-          <span className="text-sm font-medium">Quantity</span>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() =>
-                setQuantity((q) => Math.max(1, q - 1))
-              }
-              className="text-xl text-gray-600"
-            >
-              –
+        <div className="flex justify-between mt-6">
+          <span>Quantity</span>
+          <div className="flex gap-2">
+            <button onClick={() => setQuantity((q) => Math.max(1, q - 1))}>
+              -
             </button>
-
-            <span className="min-w-[20px] text-center">
-              {quantity}
-            </span>
-
-            <button
-              onClick={() => setQuantity((q) => q + 1)}
-              className="size-7 rounded bg-primary text-white flex items-center justify-center"
-            >
+            <span>{quantity}</span>
+            <button onClick={() => setQuantity((q) => q + 1)}>
               <Plus size={14} />
             </button>
           </div>
         </div>
 
-        {/* Variations / Size */}
-        <div className="mt-6">
-          <p className="text-sm font-medium mb-3">
-            {item?.variations?.length > 0
-              ? "Choose Option"
-              : "Price"}
-          </p>
-
-          <div className="space-y-4">
-            {options.map((opt: any) => (
-              <div
-                key={opt.id}
-                onClick={() => setSelectedOptionId(opt.id)}
-                className="cursor-pointer"
-              >
-                <Radio
-                  label={`${opt.name} ($${opt.price})`}
-                  active={selectedOptionId === opt.id}
-                />
-              </div>
-            ))}
-          </div>
+        {/* Variations */}
+        <div className="mt-6 space-y-3">
+          {options.map((opt: any) => (
+            <div key={opt.id} onClick={() => setSelectedOptionId(opt.id)}>
+              <Radio
+                label={`${opt.name} ($${opt.price})`}
+                active={selectedOptionId === opt.id}
+              />
+            </div>
+          ))}
         </div>
 
         {/* Total */}
-        <div className="flex justify-between items-center mt-6">
-          <span className="text-sm font-medium">Total</span>
-          <span className="text-primary font-semibold">
-            ${total.toFixed(2)}
-          </span>
+        <div className="flex justify-between mt-6">
+          <span>Total</span>
+          <span>${total.toFixed(2)}</span>
         </div>
 
-        {/* Add to Cart */}
-        <Button
-          className="w-full mt-6 h-11 rounded-xl bg-primary hover:bg-primary/90"
-          onClick={handleAddToCart}
-        >
+        {/* Add */}
+        <Button className="w-full mt-6 py-3" onClick={handleAddToCart}>
           Add to Cart
         </Button>
       </DialogContent>

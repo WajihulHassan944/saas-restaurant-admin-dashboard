@@ -28,7 +28,8 @@ export default function CreateBranchModal({
   const [country, setCountry] = useState("");
   const [area, setArea] = useState("");
   const [isMain, setIsMain] = useState(false);
-
+const [lat, setLat] = useState("");
+const [lng, setLng] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminFirstName, setAdminFirstName] = useState("");
@@ -63,6 +64,8 @@ export default function CreateBranchModal({
         state: stateVal,
         country,
         area,
+         lat,
+        lng,
         isMain,
         branchAdmin: {
           email: adminEmail,
@@ -104,6 +107,8 @@ export default function CreateBranchModal({
       setAdminFirstName("");
       setAdminLastName("");
       setAdminPhone("");
+      setLat("");
+setLng("");
       setAvailability(true);
     } catch (error: any) {
       toast.error(error.message || "Something went wrong");
@@ -190,7 +195,27 @@ export default function CreateBranchModal({
               onChange={(e) => setArea(e.target.value)}
             />
           </div>
+{/* Latitude */}
+<div className="space-y-1">
+  <Label className="text-sm">Latitude</Label>
+  <Input
+    placeholder="eg. 31.5204"
+    className={inputBase}
+    value={lat}
+    onChange={(e) => setLat(e.target.value)}
+  />
+</div>
 
+{/* Longitude */}
+<div className="space-y-1">
+  <Label className="text-sm">Longitude</Label>
+  <Input
+    placeholder="eg. 74.3587"
+    className={inputBase}
+    value={lng}
+    onChange={(e) => setLng(e.target.value)}
+  />
+</div>
           {/* Main Branch Switch */}
           <div className="flex items-center justify-between">
             <Label className="text-sm">Main Branch</Label>

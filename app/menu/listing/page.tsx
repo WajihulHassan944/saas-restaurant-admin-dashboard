@@ -48,10 +48,8 @@ const fetchItems = async () => {
 
   if (!res) return;
 
-  /* ✅ correct handling */
-  const data = Array.isArray(res) ? res : [];
 
-  setItems(data);
+  setItems(res.data);
 };
   
   useEffect(() => {

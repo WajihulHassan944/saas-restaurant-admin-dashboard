@@ -50,7 +50,7 @@ export default function useOrders() {
     )
 
     if (res) {
-      setOrders(res || [])
+      setOrders(res.data || [])
     } else {
       setOrders([])
     }

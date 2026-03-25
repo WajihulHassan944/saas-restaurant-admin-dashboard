@@ -22,8 +22,8 @@ export default function useCategories() {
 
     const data = await get("/v1/menu/categories")
 
-    if (data) {
-      setCategories(data)
+    if (data.data) {
+      setCategories(data.data)
     }
   }
 
