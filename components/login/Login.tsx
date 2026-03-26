@@ -9,11 +9,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/lib/constants";
+import { useAuthContext } from "@/context/AuthContext";
 
 const Login = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-
+ const { login } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -42,7 +43,7 @@ const Login = () => {
   }, [searchParams]);
 
   const handleSubmit = async () => {
-    if (!formData.email || !formData.password || !formData.restaurantId) {
+    if (!formData.email || !formData.password ) {
       toast.error("Please fill all fields");
       return;
     }
@@ -58,7 +59,7 @@ const Login = () => {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          restaurantId: formData.restaurantId,
+          // restaurantId: formData.restaurantId,
         }),
       });
 
@@ -69,8 +70,7 @@ const Login = () => {
         throw new Error(data?.message || "Login failed");
       }
 
-      localStorage.setItem("auth", JSON.stringify(data.data));
-
+login(data.data);
       toast.success("Login successful");
 
       setTimeout(() => {
@@ -127,12 +127,12 @@ const Login = () => {
               onChange={(val) => handleChange("password", val)}
             />
 
-            <FormInput
+            {/* <FormInput
               label="Restaurant ID"
               placeholder="Enter restaurant id"
               value={formData.restaurantId}
               onChange={(val) => handleChange("restaurantId", val)}
-            />
+            /> */}
 
             {/* Remember + Forgot */}
             <div className="flex items-center justify-between text-sm">

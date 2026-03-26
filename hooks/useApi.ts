@@ -48,11 +48,10 @@ export default function useApi(token: string | null) {
       }
 
       return data
-    } catch (err: any) {
-      console.error("API Error:", err)
-      toast.error(err.message)
-      return null
-    } finally {
+       }   catch (err: any) {
+  console.error("API Error:", err);
+  return { error: err.message }; // return error instead
+} finally {
       setLoading(false)
     }
   }

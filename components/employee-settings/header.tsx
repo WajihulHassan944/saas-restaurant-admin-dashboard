@@ -1,16 +1,30 @@
 "use client"
 
-import { HelpCircle } from 'lucide-react'
+import { ChevronDown, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Header from '../header'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import EditCustomerModal from './AddEmployeeModal'
 
-export default function EmployeeSettingsHeader({ title, description }: HeaderProps) {
+type HeaderProps = {
+  title: string;
+  description: string;
+  onEmployeeSuccess?: () => void;
+  onRoleSuccess?: () => void;
+};
+
+import { AddRoleModal } from './AddRoleModal'
+export default function EmployeeSettingsHeader({
+  title,
+  description,
+  onEmployeeSuccess,
+  onRoleSuccess,
+}: HeaderProps) {
     const router = useRouter()
    const [open, setOpen] = useState(false);
- 
+   const [openRoleModal, setOpenRoleModal] = useState(false);
+
     return (
         <>
         <div className="flex flex-col gap-4 md:gap-6 lg:flex-row lg:items-center lg:justify-between w-full">
@@ -30,6 +44,16 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
                     <HelpCircle size={18} className="text-[#767676]" />
                 </Button>
 
+                  <Button
+                    variant="outline"
+              className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 border-[#E6E7EC] text-[15px] font-[500] text-[#767676]"
+           onClick={()=>  setOpenRoleModal(true)}
+                >
+                    <p>Add Role</p>
+                    {/* <HelpCircle size={18} className="text-[#767676]" /> */}
+                </Button>
+
+
                 <Button
                     variant="primary"
                     onClick={() => setOpen(true)}
@@ -43,7 +67,13 @@ export default function EmployeeSettingsHeader({ title, description }: HeaderPro
           <EditCustomerModal
         open={open}
         onOpenChange={setOpen}
+        onSuccess={onEmployeeSuccess}
       />
+      <AddRoleModal
+  open={openRoleModal}
+  onOpenChange={setOpenRoleModal}
+   onSuccess={onRoleSuccess}
+/>
       </>
     )
 }

@@ -1,3 +1,4 @@
+import { AuthProvider } from "@/context/AuthContext";
 import ClientLayout from "./ClientLayout";
 import "./globals.css";
 import { onest } from "@/lib/fonts";
@@ -9,9 +10,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${onest.className} bg-[#F5F5F5]`}>
+    <AuthProvider>
+        <body className={`${onest.className} bg-[#F5F5F5]`}>
         <ClientLayout>{children}</ClientLayout>
       </body>
+    </AuthProvider>
     </html>
   );
 }
