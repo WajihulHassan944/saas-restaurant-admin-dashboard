@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 export const useAuth = () => {
-  const { user, token, loading } = useAuthContext();
+  const { user, token, loading, setUser } = useAuthContext();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -26,10 +26,11 @@ export const useAuth = () => {
     }
   }, [loading, user, pathname]);
 
-  return {
-    user,
-    token,
-    restaurantId: user?.restaurantId,
-    loading,
-  };
+ return {
+  user,
+  token,
+  restaurantId: user?.restaurantId,
+  loading,
+  setUser, // ✅ REQUIRED
+};
 };

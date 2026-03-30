@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/lib/constants";
+import RestaurantPicker from "../shared/RestaurantPicker";
+import { useAuth } from "@/hooks/useAuth";
 
 
 interface CreateBranchModalProps {
@@ -35,9 +37,9 @@ const [lng, setLng] = useState("");
   const [adminFirstName, setAdminFirstName] = useState("");
   const [adminLastName, setAdminLastName] = useState("");
   const [adminPhone, setAdminPhone] = useState("");
-
   const [availability, setAvailability] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+    const { token, user,loading } = useAuth();
 
   const inputBase =
     "h-[44px] rounded-[10px] px-3 text-sm placeholder:text-gray-400 border-gray-300 focus-visible:ring-1 focus-visible:ring-primary";
@@ -46,9 +48,8 @@ const [lng, setLng] = useState("");
     try {
       setIsLoading(true);
 
-      const authData = JSON.parse(localStorage.getItem("auth") || "{}");
-      const token = authData?.accessToken;
-      const restaurantId = authData?.user?.restaurantId;
+
+const restaurantId = user?.restaurantId;
 
       if (!token || !restaurantId) {
         toast.error("User not authenticated");
@@ -117,7 +118,12 @@ setLng("");
     }
   };
 
+
   return (
+    <> 
+    {/* {!loading && (!user?.restaurantId || !user?.branchId) && (
+      <RestaurantPicker />
+    )} */}
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[480px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
         {/* Header */}
@@ -294,5 +300,6 @@ setLng("");
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

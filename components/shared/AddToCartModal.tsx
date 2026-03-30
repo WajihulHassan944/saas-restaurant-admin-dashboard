@@ -27,7 +27,9 @@ export default function AddToCartModal({
   onOpenChange,
   item,
 }: AddToCartModalProps) {
-  const { token, restaurantId, branchId } = useAuth();
+  const { token, user } = useAuth();
+const restaurantId = user?.restaurantId;
+const branchId = user?.branchId;
   const { post, get } = useApi(token);
 
   const [quantity, setQuantity] = useState(1);
@@ -39,23 +41,24 @@ export default function AddToCartModal({
   const [page, setPage] = useState(1);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [hasNext, setHasNext] = useState(false);
-
   /* ================= FETCH CUSTOMERS ================= */
-  useEffect(() => {
-    if (!restaurantId || !token) return;
+useEffect(() => {
+  if (!restaurantId || !token) return;
 
-    const delay = setTimeout(() => {
-      fetchCustomers(1, true);
-    }, 400);
+  // ✅ prevent refetch when customer is already selected
+  if (selectedCustomerId) return;
 
-    return () => clearTimeout(delay);
-  }, [search, restaurantId]);
+  const delay = setTimeout(() => {
+    fetchCustomers(1, true);
+  }, 400);
 
+  return () => clearTimeout(delay);
+}, [search, restaurantId, token, selectedCustomerId]);
   const fetchCustomers = async (pageNumber = 1, reset = false) => {
     try {
       setLoadingCustomers(true);
 
-      let url = `/v1/auth/customers?restaurantId=${restaurantId}&page=${pageNumber}`;
+      let url = `/v1/admin/users/customers?restaurantId=${restaurantId}&page=${pageNumber}`;
 
       if (search) {
         url += `&search=${search}`;
@@ -102,9 +105,14 @@ export default function AddToCartModal({
 
     return [baseOption, ...variations];
   }, [item]);
+const [selectedOptionId, setSelectedOptionId] = useState<string>("base");
 
-  const [selectedOptionId, setSelectedOptionId] = useState(options[0]?.id);
-
+useEffect(() => {
+  if (options.length) {
+    setSelectedOptionId(options[0].id);
+  }
+}, [options]);
+  
   const selectedOption = options.find((opt) => opt.id === selectedOptionId);
   const price = selectedOption?.price || 0;
   const total = price * quantity;
@@ -121,6 +129,10 @@ export default function AddToCartModal({
         toast.error("Please select customer");
         return;
       }
+      if (!branchId) {
+  toast.error("Please select a branch");
+  return;
+}
 
       const payload: any = {
         menuItemId: item.id,
@@ -133,19 +145,34 @@ export default function AddToCartModal({
         payload.variationId = selectedOptionId;
       }
 
-      await post(`/v1/cart/items?customerId=${selectedCustomerId}`, payload);
+     const res = await post(`/v1/cart/items?customerId=${selectedCustomerId}`, payload);
 
-      toast.success("Added to cart");
-      onOpenChange(false);
+if (!res || res.error) {
+  toast.error(res?.error || "Failed to add to cart");
+  return;
+}
+
+ toast.success("Added to cart");
+window.location.reload();
+// ✅ store selected customer for later cart fetch
+if (selectedCustomerId) {
+  localStorage.setItem("activeCustomerId", selectedCustomerId);
+}
+
+setQuantity(1);
+setSelectedCustomerId(null);
+setSearch("");
+
+onOpenChange(false);
     } catch (err) {
       console.error(err);
       toast.error("Failed to add to cart");
     }
   };
-
+const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-2xl p-8">
+      <DialogContent className="max-w-md rounded-2xl p-8 max-h-[100vh] overflow-auto">
         <DialogHeader className="text-center">
           <DialogTitle className="text-2xl font-semibold">
             {item?.name}
@@ -169,33 +196,49 @@ export default function AddToCartModal({
           <Input
             placeholder="Search customer..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+    setSelectedCustomerId(null); // reset selection if user types again
+    setSearch(e.target.value);
+  }}
           />
 
-          <div className="max-h-[150px] overflow-y-auto border rounded-lg">
-            {loadingCustomers && customers.length === 0 ? (
-              <p className="p-3 text-sm text-gray-400">Loading...</p>
-            ) : customers.length === 0 ? (
-              <p className="p-3 text-sm text-gray-400">
-                No customers found
-              </p>
-            ) : (
-              customers.map((c) => (
-                <div
-                  key={c.id}
-                  onClick={() => setSelectedCustomerId(c.id)}
-                  className={`p-3 cursor-pointer hover:bg-gray-100 ${
-                    selectedCustomerId === c.id ? "bg-gray-100" : ""
-                  }`}
-                >
-                  <p className="text-sm font-medium">
-                    {c.profile?.firstName} {c.profile?.lastName}
-                  </p>
-                  <p className="text-xs text-gray-500">{c.email}</p>
-                </div>
-              ))
-            )}
-          </div>
+<div className="max-h-[150px] overflow-y-auto border rounded-lg">
+  {loadingCustomers && customers.length === 0 ? (
+    <p className="p-3 text-sm text-gray-400">Loading...</p>
+
+  ) : customers.length === 0 && selectedCustomer ? (
+    <div className="p-3 bg-gray-100">
+      <p className="text-sm font-medium">
+        {selectedCustomer.profile?.firstName} {selectedCustomer.profile?.lastName}
+      </p>
+      <p className="text-xs text-gray-500">{selectedCustomer.email}</p>
+    </div>
+
+  ) : customers.length === 0 ? (
+    <p className="p-3 text-sm text-gray-400">
+      No customers found
+    </p>
+
+  ) : (
+    customers.map((c) => (
+      <div
+        key={c.id}
+        onClick={() => {
+          setSelectedCustomerId(c.id);
+          setSearch(`${c.profile?.firstName || ""} ${c.profile?.lastName || ""}`);
+        }}
+        className={`p-3 cursor-pointer hover:bg-gray-100 ${
+          selectedCustomerId === c.id ? "bg-gray-100" : ""
+        }`}
+      >
+        <p className="text-sm font-medium">
+          {c.profile?.firstName} {c.profile?.lastName}
+        </p>
+        <p className="text-xs text-gray-500">{c.email}</p>
+      </div>
+    ))
+  )}
+</div>
 
           {hasNext && (
             <Button

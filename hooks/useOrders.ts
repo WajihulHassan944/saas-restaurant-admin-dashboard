@@ -46,7 +46,7 @@ export default function useOrders() {
     if (!restaurantId || !branchId) return
 
     const res = await get(
-      `/v1/orders?restaurantId=${restaurantId}&branchId=${branchId}`
+      `/v1/orders?restaurantId=${restaurantId}`
     )
 
     if (res) {

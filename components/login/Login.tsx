@@ -14,14 +14,18 @@ import { useAuthContext } from "@/context/AuthContext";
 const Login = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
- const { login } = useAuthContext();
+ const { login, setUser } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    restaurantId: "",
   });
+const getStoredAuth = () => {
+    const stored = localStorage.getItem("auth");
+    if (!stored) return null;
+    return JSON.parse(stored);
+  };
 
   const handleChange = (name: string, value: string) => {
     setFormData((prev) => ({
@@ -33,12 +37,10 @@ const Login = () => {
   // ================= PREFILL FROM URL =================
   useEffect(() => {
     const email = searchParams.get("email");
-    const restaurantId = searchParams.get("restaurantId");
-
+  
     setFormData((prev) => ({
       ...prev,
       email: email || prev.email,
-      restaurantId: restaurantId || prev.restaurantId,
     }));
   }, [searchParams]);
 
@@ -69,7 +71,13 @@ const Login = () => {
       if (!res.ok) {
         throw new Error(data?.message || "Login failed");
       }
+const stored = getStoredAuth();
 
+setUser({
+  ...data.user,
+  restaurantId: stored?.user?.restaurantId ?? null,
+  branchId: stored?.user?.branchId ?? null,
+});
 login(data.data);
       toast.success("Login successful");
 

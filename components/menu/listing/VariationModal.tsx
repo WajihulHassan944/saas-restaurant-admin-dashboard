@@ -45,31 +45,51 @@ export default function VariationModal({
     }));
   };
 
-  const handleSubmit = async () => {
-    if (!form.name || !form.price) {
-      toast.error("Name and price are required");
-      return;
-    }
+const handleSubmit = async () => {
+  if (!form.name || !form.price) {
+    toast.error("Name and price are required");
+    return;
+  }
 
-    const payload = {
-      menuItemId: item.id,
-      name: form.name,
-      price: Number(form.price),
-      sku: form.sku,
-      sortOrder: Number(form.sortOrder),
-      isDefault: form.isDefault,
-      isActive: form.isActive,
-    };
-
-    const res = await post("/v1/menu/variations", payload);
-
-    if (res) {
-      toast.success("Variation added");
-      onOpenChange(false);
-      window.location.reload();
-    }
+  const payload = {
+    menuItemId: item.id,
+    name: form.name,
+    price: Number(form.price),
+    sku: form.sku,
+    sortOrder: Number(form.sortOrder),
+    isDefault: form.isDefault,
+    isActive: form.isActive,
   };
 
+  const res = await post("/v1/menu/variations", payload);
+
+  // ❌ CASE 1: no response (token missing etc.)
+  if (!res) {
+    toast.error("Something went wrong. Please try again.");
+    return;
+  }
+
+  // ❌ CASE 2: API returned error
+  if (res.error) {
+    toast.error(res.error || "Failed to add variation");
+    return;
+  }
+
+  // ❌ CASE 3: API responded but no success flag (optional safety)
+  if (!res.success) {
+    toast.error(res.message || "Request failed");
+    return;
+  }
+
+  // ✅ SUCCESS
+  toast.success("Variation added");
+
+  onOpenChange(false);
+
+  // optional: better than reload (but keeping your behavior)
+  window.location.reload();
+};
+  
   return (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">

@@ -13,6 +13,7 @@ import StepOne from "./StepOne";
 import StepTwo from "./StepTwo";
 import StepThree from "./StepThree";
 import { API_BASE_URL } from "@/lib/constants";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CreateMenuItemModalProps {
   open: boolean;
@@ -24,9 +25,9 @@ export default function CreateMenuItemModal({
   onOpenChange,
 }: CreateMenuItemModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
-const [token, setToken] = useState("");
-  const [restaurantId, setRestaurantId] = useState("");
-const stepRef = useRef<any>(null);
+const { token, user } = useAuth();
+const restaurantId = user?.restaurantId;
+  const stepRef = useRef<any>(null);
   const [form, setForm] = useState<any>({
     name: "",
     categoryId: "",
@@ -50,21 +51,6 @@ const stepRef = useRef<any>(null);
   }
 };
   const prevStep = () => currentStep > 1 && setCurrentStep((p) => p - 1);
-
-  useEffect(() => {
-    const authRaw = localStorage.getItem("auth");
-
-    if (!authRaw) return;
-
-    try {
-      const auth = JSON.parse(authRaw);
-
-      setToken(auth?.accessToken || "");
-      setRestaurantId(auth?.user?.restaurant?.id || "");
-    } catch {
-      console.error("Invalid auth");
-    }
-  }, []);
 
 
   /* ================= CREATE MENU ITEM ================= */

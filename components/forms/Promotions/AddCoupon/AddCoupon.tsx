@@ -75,8 +75,8 @@ export default function AddNewCoupon() {
           get(`/v1/menu/items?restaurantId=${restaurantId}`),
         ]);
 
-        setBranches(branchRes || []);
-        setItems(itemRes || []);
+        setBranches(branchRes.data || []);
+        setItems(itemRes.data || []);
       } catch (err) {
         console.error(err);
       }
@@ -95,7 +95,7 @@ export default function AddNewCoupon() {
 
         const res = await get(`/v1/coupons?search=${couponCode}`);
 
-        const coupon = res?.[0];
+       const coupon = res?.data?.[0];
         if (!coupon) return;
 console.log("coupon is", coupon);
         setCouponId(coupon.id);

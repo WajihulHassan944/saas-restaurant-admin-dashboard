@@ -12,51 +12,42 @@ import { useAuth } from "@/hooks/useAuth";
 export default function MenusListingPage() {
   const [editing, setEditing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
   const [items, setItems] = useState<any[]>([]);
 
-  const { token } = useAuth();
+  // ✅ CONSISTENT with Orders page
+  const { token, user } = useAuth();
   const { get, loading } = useApi(token);
 
   const searchParams = useSearchParams();
   const menuId = searchParams.get("id");
 
-  const getStoredAuth = () => {
-    const stored = localStorage.getItem("auth");
-    if (!stored) return null;
-    return JSON.parse(stored);
-  };
-
   const handleManageClick = () => {
     setEditing((prev) => !prev);
   };
+
   /* ================= FETCH ITEMS ================= */
-const fetchItems = async () => {
-  const stored = getStoredAuth();
-  const restaurantId = stored?.user?.restaurantId;
+  const fetchItems = async () => {
+    const restaurantId = user?.restaurantId;
 
-  if (!restaurantId || !menuId) return;
+    if (!restaurantId || !menuId) return;
+// &menuId=${menuId}
+    let url = `/v1/menu/items?restaurantId=${restaurantId}`;
 
-  /* ✅ build query dynamically */
-  let url = `/v1/menu/items?restaurantId=${restaurantId}&menuId=${menuId}`;
+    if (selectedCategory) {
+      url += `&categoryId=${selectedCategory}`;
+    }
 
-  if (selectedCategory) {
-    url += `&categoryId=${selectedCategory}`;
-  }
+    const res = await get(url);
+    if (!res) return;
 
-  const res = await get(url);
+    setItems(res.data);
+  };
 
-  if (!res) return;
-
-
-  setItems(res.data);
-};
-  
   useEffect(() => {
-     if (!token) return; 
+  
     fetchItems();
-  }, [token, menuId, selectedCategory]);
-
+  }, [token, user?.restaurantId, menuId, selectedCategory]);
+console.log("items are", items)
   return (
     <Container>
       <Header

@@ -8,7 +8,6 @@ import ItemList from "@/components/menu/listing/itemList";
 import PosCart from "@/components/pos/PosCart";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -16,21 +15,14 @@ export default function Orders() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
 
-  const { token } = useAuth();
+  // ✅ NEW: get user from context instead of localStorage
+  const { token, user } = useAuth();
   const { get, loading } = useApi(token);
-
- 
-  const getStoredAuth = () => {
-    const stored = localStorage.getItem("auth");
-    if (!stored) return null;
-    return JSON.parse(stored);
-  };
-
+console.log(user);
   /* ================= FETCH ITEMS ================= */
 
   const fetchItems = async () => {
-    const stored = getStoredAuth();
-    const restaurantId = stored?.user?.restaurantId;
+    const restaurantId = user?.restaurantId;
 
     if (!restaurantId) return;
 
@@ -44,15 +36,12 @@ export default function Orders() {
 
     if (!res) return;
 
-    const data = Array.isArray(res) ? res : [];
-
-    setItems(data);
+    setItems(res.data);
   };
 
   useEffect(() => {
-    if (!token) return;
     fetchItems();
-  }, [token, selectedCategory]);
+  }, [token, user?.restaurantId, selectedCategory]);
 
   return (
     <Container>
@@ -79,7 +68,7 @@ export default function Orders() {
             addNewText="Manage Food"
             items={items}
             loading={loading}
-            editing={false} // POS doesn't need edit mode
+            editing={false}
           />
         </div>
 

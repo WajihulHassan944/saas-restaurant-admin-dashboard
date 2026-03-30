@@ -128,8 +128,8 @@ const payload = isEditMode
   ? basePayload
   : {
       ...basePayload,
-      restaurantId: user?.restaurantId,
-      branchId: user?.branchId,
+      // restaurantId: user?.restaurantId,
+      // branchId: user?.branchId,
     };
 
       let res;

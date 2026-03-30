@@ -46,6 +46,8 @@ const openDialog = (branchId: string) => {
           key={branch.id}
           id={branch.id}
           name={branch.name}
+          isActive={branch.isActive}
+          
           isDefault={branch.isMain}
           itemsCount={0} 
           openDialog={openDialog}
