@@ -5,6 +5,7 @@ import { Star, Plus, Heart, X, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import AddToCartModal from "../shared/AddToCartModal";
 import VariationModal from "../menu/listing/VariationModal";
+import AddModifierToItem from "../forms/AddModifierToItem";
 
 type Props = {
   item: any;
@@ -14,6 +15,7 @@ type Props = {
 export default function MenuItemCard({ item, editing }: Props) {
   const [open, setOpen] = useState(false);
 const [openVariation, setOpenVariation] = useState(false);
+const [openModifier, setOpenModifier] = useState(false);
   const image =
   item.imageUrl && item.imageUrl.startsWith("http")
     ? item.imageUrl
@@ -48,10 +50,13 @@ const [openVariation, setOpenVariation] = useState(false);
     <SlidersHorizontal size={16} />
   </button>
 
-  {/* Heart */}
-  <div className="bg-white rounded-full p-2">
-    <Heart className="text-red-500" size={18} fill="red" />
-  </div>
+ {/* Add Modifier */}
+<button
+  onClick={() => setOpenModifier(true)}
+  className="bg-white rounded-full p-2 shadow hover:bg-gray-100"
+>
+  <Plus size={18} className="text-primary" />
+</button>
 </div>
 
         <img
@@ -101,6 +106,11 @@ const [openVariation, setOpenVariation] = useState(false);
       <VariationModal
   open={openVariation}
   onOpenChange={setOpenVariation}
+  item={item}
+/>
+<AddModifierToItem 
+  open={openModifier}
+  onOpenChange={setOpenModifier}
   item={item}
 />
     </div>

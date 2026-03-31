@@ -46,14 +46,22 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
       {/* Right: Actions */}
       <div className="flex flex-wrap gap-3 sm:gap-4 justify-start">
         
-        {/* View Trash */}
         <Button
           variant="outline"
          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
-           onClick={()=>router.push("/menu/trash")}
+           onClick={()=>router.push("/menu/modifier-groups")}
         >
-          <Trash2 size={18} className="text-[#767676]" />
-          View Trash
+          <PlusCircle size={18} className="text-[#767676]" />
+  Modifier Groups
+        </Button>
+
+           <Button
+          variant="outline"
+         className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
+           onClick={()=>router.push("/menu/modifier")}
+        >
+          <PlusCircle size={18} className="text-[#767676]" />
+  Modifiers
         </Button>
 
         {/* Import */}
