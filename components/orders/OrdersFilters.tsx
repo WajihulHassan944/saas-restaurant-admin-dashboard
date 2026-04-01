@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,11 +10,43 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function OrdersFilters() {
+interface Props {
+  onSearch: (value: string) => void;
+  onSortChange: (value: "ASC" | "DESC") => void;
+  onStatusChange: (value: string) => void;
+}
+
+export default function OrdersFilters({
+  onSearch,
+  onSortChange,
+  onStatusChange,
+}: Props) {
+  const [searchValue, setSearchValue] = useState("");
+  const [sort, setSort] = useState<"ASC" | "DESC">("DESC");
+  const [status, setStatus] = useState("ALL");
+
+  const handleSearch = () => {
+    onSearch(searchValue);
+  };
+
+  const statuses = [
+    { label: "All Status", value: "ALL" },
+    { label: "Placed", value: "PLACED" },
+    { label: "Confirmed", value: "CONFIRMED" },
+    { label: "Preparing", value: "PREPARING" },
+    { label: "Ready for Pickup", value: "READY_FOR_PICKUP" },
+    { label: "Picked Up", value: "PICKED_UP" },
+    { label: "Out for Delivery", value: "OUT_FOR_DELIVERY" },
+    { label: "Delivered", value: "DELIVERED" },
+    { label: "Cancelled", value: "CANCELLED" },
+    { label: "Rejected", value: "REJECTED" },
+  ];
+
   return (
     <div className="w-full bg-white p-4 lg:p-[20px] rounded-lg">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-4">
-        {/* Search Area */}
+
+        {/* SEARCH */}
         <div className="relative flex-1">
           <Search
             size={22}
@@ -21,77 +54,73 @@ export default function OrdersFilters() {
           />
 
           <input
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
             type="text"
-            placeholder="Search by name"
-            className="
-              w-full h-[49px]
-              pl-12 pr-[150px]
-              bg-transparent
-              border border-gray-200
-              rounded-[16px]
-              text-lg text-dark
-              placeholder:text-gray-400
-              focus:outline-none
-              focus:border-primary
-            "
+            placeholder="Search by order id"
+            className="w-full h-[49px] pl-12 pr-[150px] border border-gray-200 rounded-[16px]"
           />
 
-          {/* Search Button */}
           <Button
-            className="
-              absolute right-0 top-1/1 -translate-y-1/1
-              h-full
-              px-8
-              rounded-[14px]
-              bg-primary
-              text-white
-              text-lg
-              font-medium
-              hover:bg-primary/90
-            "
+            onClick={handleSearch}
+            className="absolute right-0 h-full px-8 rounded-[14px] bg-primary text-white"
           >
             Search
           </Button>
         </div>
 
-        {/* Status Dropdown */}
+        {/* STATUS */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="h-[48px] px-6 rounded-[14px] text-red-600 border-red-200 bg-red-50 flex items-center gap-2"
-            >
-              All Status
+            <Button className="h-[48px] px-6 rounded-[14px] text-red-600 border-red-200 bg-red-50 flex items-center gap-2 hover:text-white">
+              {statuses.find((s) => s.value === status)?.label}
               <ChevronDown size={18} />
             </Button>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>All Status</DropdownMenuItem>
-            <DropdownMenuItem>Delivered</DropdownMenuItem>
-            <DropdownMenuItem>Pending</DropdownMenuItem>
-            <DropdownMenuItem>Cancelled</DropdownMenuItem>
-            <DropdownMenuItem>Refunded</DropdownMenuItem>
+            {statuses.map((item) => (
+              <DropdownMenuItem
+              
+                key={item.value}
+                onClick={() => {
+                  setStatus(item.value);
+                  onStatusChange(item.value);
+                }}
+              >
+                {item.label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Date Dropdown */}
+        {/* SORT */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="h-[48px] px-6 rounded-[14px] text-red-600 border-red-200 bg-red-50 flex items-center gap-2"
-            >
-              Today
+            <Button className="h-[48px] px-6 rounded-[14px] text-red-600 border-red-200 bg-red-50 flex items-center gap-2 hover:text-white">
+              {sort === "DESC" ? "Newest" : "Oldest"}
               <ChevronDown size={18} />
             </Button>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Today</DropdownMenuItem>
-            <DropdownMenuItem>Yesterday</DropdownMenuItem>
-            <DropdownMenuItem>Last 7 Days</DropdownMenuItem>
-            <DropdownMenuItem>This Month</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setSort("DESC");
+                onSortChange("DESC");
+              }}
+            >
+              Newest
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => {
+                setSort("ASC");
+                onSortChange("ASC");
+              }}
+            >
+              Oldest
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

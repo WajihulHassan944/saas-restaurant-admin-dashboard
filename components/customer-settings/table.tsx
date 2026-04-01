@@ -10,29 +10,135 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { customersData } from "@/constants/customer-settings";
 import SortableHeader from "@/components/shared/sortable-head";
 import { Eye, MoreHorizontal } from "lucide-react";
-import Pagination from "@/components/pagination";
 import EmptyState from "../shared/EmptyState";
-import { useState } from "react";
+import { useState, useEffect } from "react"; // ✅ added useEffect
 import CustomerDetailModal from "./CustomerDetailModal";
+import PaginationSection from "@/components/pagination";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import AddCustomerModal from "./AddCustomerModal";
+import useApi from "@/hooks/useApi";
+import { useAuthContext } from "@/context/AuthContext";
+import { toast } from "sonner";
 
-const CustomerTable = () => {
-const [openDetails, setOpenDetails] = useState(false);
-  if (!customersData || customersData.length === 0) {
+interface Customer {
+  id: string;
+  email?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  profile?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  };
+  _count?: {
+    customerOrders?: number;
+  };
+}
+
+interface Props {
+  customers: Customer[];
+  loading: boolean;
+  meta: any;
+  onPageChange: (page: number) => void;
+  onRefresh: () => void;
+}
+const CustomerTable = ({
+  customers,
+  loading,
+  meta,
+  onPageChange,
+  onRefresh,
+}: Props) => {
+  const [openDetails, setOpenDetails] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  // ✅ NEW: local state
+  const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
+
+  // ✅ NEW: sync with props
+  useEffect(() => {
+    setLocalCustomers(customers);
+  }, [customers]);
+
+  const { token } = useAuthContext();
+  const { patch, post, del } = useApi(token);
+
+const handleDelete = async (id?: string) => {
+  if (!id) return;
+
+  const res = await del(`/v1/admin/users/${id}`);
+
+  if (res?.error) {
+    toast.error(res.error);
+    return;
+  }
+  toast.success("Customer deleted");
+
+// instant UI update
+setLocalCustomers((prev) =>
+  prev.filter((c) => c.id !== id)
+);
+
+// sync from server
+onRefresh();
+};
+
+  // ✅ BLOCK / UNBLOCK (UPDATED)
+  const handleToggleStatus = async (id: string, current: boolean) => {
+    // 🔥 optimistic UI update
+    setLocalCustomers((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, isActive: !current } : c
+      )
+    );
+
+    const res = await patch(`/v1/admin/users/customers/${id}/status`, {
+      isActive: !current,
+    });
+
+    if (res?.error) {
+      toast.error(res.error);
+
+      // ❌ rollback
+      setLocalCustomers((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, isActive: current } : c
+        )
+      );
+      return;
+    }
+
+    toast.success(`Customer ${!current ? "unblocked" : "blocked"}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="text-sm text-gray-400 py-10 text-center">
+        Loading customers...
+      </div>
+    );
+  }
+
+  if (!customers || customers.length === 0) {
     return (
       <EmptyState
         title="Looks like there are no customers yet!"
-        description="You haven’t added any customers yet. Start by creating a new one."
+        description="You haven’t added any customers yet."
       />
     );
   }
 
-
   return (
     <>
-      {/* Desktop Table */}
+      {/* -------- Desktop -------- */}
       <div className="hidden md:block">
         <Table className="my-10">
           <TableHeader>
@@ -40,116 +146,220 @@ const [openDetails, setOpenDetails] = useState(false);
               <TableHead className="w-[50px]">
                 <Checkbox />
               </TableHead>
+
               <SortableHeader label="SL" />
               <SortableHeader label="Customer Name" />
               <SortableHeader label="Customer Info" />
+
               <TableHead className="text-center px-4 font-semibold">
                 Total Order
               </TableHead>
+
               <SortableHeader label="Joining Date" />
               <SortableHeader label="Unblock/Block" />
-              <TableHead className="text-center font-semibold">Actions</TableHead>
+
+              <TableHead className="text-center font-semibold">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {customersData.map((dm, i) => (
-              <TableRow key={i} className="border-none h-[70px]">
-                <TableCell>
-                  <Checkbox defaultChecked />
-                </TableCell>
+            {localCustomers.map((c, i) => { // ✅ CHANGED
+              const fullName = `${c.profile?.firstName || ""} ${
+                c.profile?.lastName || ""
+              }`;
 
-                <TableCell className="px-4">{dm.sl}</TableCell>
+              return (
+                <TableRow key={c.id} className="border-none h-[70px]">
+                  <TableCell>
+                    <Checkbox />
+                  </TableCell>
 
-                <TableCell className="px-4">{dm.deliveryManName}</TableCell>
+                  <TableCell className="px-4">
+                    {(meta?.page - 1) * (meta?.limit || 10) + i + 1}
+                  </TableCell>
 
-                <TableCell className="px-4">
-                  <div>
-                    <p>{dm.phone}</p>
-                    <p className="text-gray">{dm.email}</p>
-                  </div>
-                </TableCell>
+                  <TableCell className="px-4">
+                    {fullName || "-"}
+                  </TableCell>
 
-                <TableCell className="px-4 text-center">{dm.orderLimit}</TableCell>
+                  <TableCell className="px-4">
+                    <div>
+                      <p>{c.profile?.phone || "-"}</p>
+                      <p className="text-gray max-w-[180px] truncate">
+                        {c.email}
+                      </p>
+                    </div>
+                  </TableCell>
 
-                <TableCell className="px-4">
-                 {dm.joiningDate}
-                </TableCell>
+                  <TableCell className="px-4 text-center">
+                    {c._count?.customerOrders || 0}
+                  </TableCell>
 
-                <TableCell className=" text-center pr-14">
-                  <Switch defaultChecked={dm.status} />
-                </TableCell>
+                  <TableCell className="px-4">
+                    {c.createdAt
+                      ? new Date(c.createdAt).toLocaleDateString()
+                      : "-"}
+                  </TableCell>
 
-                <TableCell className="px-4">
-                  <div className="flex items-center justify-center gap-2 text-gray">
-                    <button className="p-2" onClick={() => setOpenDetails(true)}>
-                      <Eye size={18} />
-                    </button>
-                    <button className="p-2">
-                      <MoreHorizontal size={18} />
-                    </button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                  <TableCell className="text-center pr-14">
+                    <Switch
+                      checked={!!c.isActive} // ✅ ensure boolean
+                      onCheckedChange={() =>
+                        handleToggleStatus(c.id, !!c.isActive)
+                      }
+                    />
+                  </TableCell>
+
+                  <TableCell className="px-4">
+                    <div className="flex items-center justify-center gap-2 text-gray">
+                      <button
+                        className="p-2"
+                       onClick={() => {
+  setSelectedCustomer(c);
+  setOpenDetails(true);
+}}
+                      >
+                        <Eye size={18} />
+                      </button>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-2">
+                            <MoreHorizontal size={18} />
+                          </button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedCustomer(c);
+                              setOpenEdit(true);
+                            }}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            className="text-red-600"
+                        onClick={() => handleDelete(c.id)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
 
-        <Pagination />
+        <PaginationSection meta={meta} onPageChange={onPageChange} />
       </div>
 
-      {/* Mobile Cards */}
+      {/* -------- Mobile -------- */}
       <div className="flex flex-col gap-4 md:hidden">
-        {customersData.map((dm, i) => (
-          <div
-            key={i}
-            className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-200"
-          >
-            {/* Header: Name + Checkbox + Status */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Checkbox defaultChecked />
-                <p className="font-medium">{dm.deliveryManName}</p>
+        {localCustomers.map((c) => { // ✅ CHANGED
+          const fullName = `${c.profile?.firstName || ""} ${
+            c.profile?.lastName || ""
+          }`;
+
+          return (
+            <div
+              key={c.id}
+              className="bg-white rounded-[18px] p-4 shadow-sm border"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox />
+                  <p className="font-medium">{fullName}</p>
+                </div>
+
+                <Switch
+                  checked={!!c.isActive}
+                  onCheckedChange={() =>
+                    handleToggleStatus(c.id, !!c.isActive)
+                  }
+                />
               </div>
-              <Switch defaultChecked={dm.status} />
-            </div>
 
-            {/* SL & Order Limit */}
-            <div className="text-sm text-gray mb-1">
-              <p>SL: {dm.sl}</p>
-              <p>Assign Order Limit: {dm.orderLimit}</p>
-            </div>
+              <div className="text-sm text-gray mb-2">
+                <p>Phone: {c.profile?.phone || "-"}</p>
+                <p className="max-w-[210px] truncate">
+                  Email: {c.email}
+                </p>
+              </div>
 
-            {/* Contact Info */}
-            <div className="text-sm text-gray mb-2">
-              <p>Phone: {dm.phone}</p>
-              <p>Email: {dm.email}</p>
-            </div>
+              <div className="text-sm text-gray mb-2">
+                <p>Total Orders: {c._count?.customerOrders || 0}</p>
+                <p>
+                  Joined:{" "}
+                  {c.createdAt
+                    ? new Date(c.createdAt).toLocaleDateString()
+                    : "-"}
+                </p>
+              </div>
 
-            {/* Branch Info */}
-            <div className="text-xs text-gray mb-2">
-              <p>Joining Date:</p>
-              <p>Currently Assign: {dm.joiningDate}</p>
-            </div>
+              <div className="flex justify-end gap-2 text-gray">
+                <button
+                  className="p-2"
+                 onClick={() => {
+  setSelectedCustomer(c);
+  setOpenDetails(true);
+}}
+                >
+                  <Eye size={18} />
+                </button>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-2 text-gray">
-              <button className="p-2" onClick={() => setOpenDetails(true)}>
-                <Eye size={18} />
-              </button>
-              <button className="p-2">
-                <MoreHorizontal size={18} />
-              </button>
-            </div>
-          </div>
-        ))}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-2">
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </DropdownMenuTrigger>
 
-        <CustomerDetailModal open={openDetails}
-  onOpenChange={setOpenDetails} />
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedCustomer(c);
+                        setOpenEdit(true);
+                      }}
+                    >
+                      Edit
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      className="text-red-600"
+                   onClick={() => handleDelete(c.id)}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          );
+        })}
+
+        <PaginationSection meta={meta} onPageChange={onPageChange} />
+
+      <CustomerDetailModal
+  open={openDetails}
+  onOpenChange={setOpenDetails}
+  customer={selectedCustomer}
+/>
+ <AddCustomerModal
+        open={openEdit}
+        onOpenChange={setOpenEdit}
+        initialData={selectedCustomer} // <-- IMPORTANT (you can handle inside modal)
+         onSuccess={onRefresh}
+      />
       </div>
     </>
   );
-
 };
 
 export default CustomerTable;

@@ -1,4 +1,5 @@
 "use client";
+
 import Image from "next/image";
 import {
   Dialog,
@@ -7,109 +8,110 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+
+/* ---------- TYPES ---------- */
+type Customer = any;
 
 type CustomerDetailModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  customer?: Customer | null;
 };
 
 export default function CustomerDetailModal({
   open,
   onOpenChange,
+  customer,
 }: CustomerDetailModalProps) {
+  if (!customer) return null;
+
+  const fullName = `${customer?.profile?.firstName || ""} ${
+    customer?.profile?.lastName || ""
+  }`.trim();
+
+  const avatar =
+    customer?.profile?.avatarUrl?.startsWith("http")
+      ? customer.profile.avatarUrl
+      : "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200";
+
+  const formatDate = (date?: string) =>
+    date ? new Date(date).toLocaleString() : "-";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="
-          max-w-[420px]
-           max-h-[85vh]
-    overflow-y-auto
-          rounded-[18px]
-          px-6 py-8 
-        "
-      >
+      <DialogContent className="max-w-[420px] max-h-[85vh] overflow-y-auto rounded-[18px] px-6 py-8">
+
         {/* Header */}
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-center">
-            Customer #10003
+            Customer #{customer.id?.slice(-6)}
           </DialogTitle>
           <DialogDescription className="text-sm text-gray-500 text-center">
-            View the customer’s basic information and order history here
+            Full customer details
           </DialogDescription>
         </DialogHeader>
 
         {/* Avatar */}
         <div className="flex justify-center mt-4">
-          <div className="relative">
-            <Image
-              src="/dialog-profile.jpg" // replace with real image
-              alt="Customer"
-              width={120}
-              height={120}
-              className="rounded-[16px] object-cover"
-            />
-
-            <button
-              className="
-                absolute bottom-2 right-2
-                size-8 rounded-full
-                bg-white
-                shadow
-                flex items-center justify-center
-                text-red-500
-              "
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* Block / Unblock */}
-        <div className="flex items-center justify-center gap-3 mt-4">
-          <span className="text-sm text-gray-500">
-            Block / Unblock
-          </span>
-          <Switch defaultChecked />
-        </div>
-
-        {/* Info */}
-        <div className="mt-6 space-y-3 text-sm">
-       <InfoRow label="Phone" value="+9212121212" showDots />
-<InfoRow label="Email" value="example@gmail.com" showDots />
-<InfoRow label="Joining Date" value="12/13/2025 07:00 PM" showDots />
-          <InfoRow
-            label="Address"
-            value="View all Address"
-            link
-            showDots
+          <Image
+            src={avatar}
+            alt="Customer"
+            width={120}
+            height={120}
+            className="rounded-[16px] object-cover"
           />
+        </div>
+
+        {/* Basic Info */}
+        <div className="mt-6 space-y-3 text-sm">
+          <InfoRow label="Name" value={fullName || "-"} />
+        <InfoRow
+  label="Email"
+  value={
+    <span className="max-w-[160px] truncate inline-block" title={customer.email}>
+      {customer.email || "-"}
+    </span>
+  }
+/>  <InfoRow label="Phone" value={customer?.profile?.phone || "-"} />
+          <InfoRow label="Role" value={customer.role} />
+          <InfoRow label="Guest" value={customer.isGuest ? "Yes" : "No"} />
+          <InfoRow label="Verified" value={customer.isVerified ? "Yes" : "No"} />
+          <InfoRow label="Approved" value={customer.isApproved ? "Yes" : "No"} />
+          <InfoRow label="Status" value={customer.isActive ? "Active" : "Blocked"} />
+        </div>
+
+        {/* Meta Info */}
+        <div className="mt-6 space-y-3 text-sm">
+          <InfoRow label="Tenant" value={customer?.tenant?.name || "-"} />
+          <InfoRow label="Restaurant" value={customer?.restaurant?.name || "-"} />
+          <InfoRow label="Branch" value={customer?.branch?.name || "-"} />
+        </div>
+
+        {/* Dates (cleaned) */}
+        <div className="mt-6 space-y-3 text-sm">
+          <InfoRow label="Created At" value={formatDate(customer.createdAt)} />
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 mt-6">
-          <StatCard value="12%" label="Completion Rate" />
-          <StatCard value="3%" label="Ongoing Rate" />
-          <StatCard value="2%" label="Cancellation Rate" />
-          <StatCard value="14%" label="Refund Rate" />
-          <StatCard value="34%" label="Failed Rate" full />
+          <StatCard value={customer?._count?.customerOrders || 0} label="Orders" />
+          <StatCard value={customer?._count?.couponUsages || 0} label="Coupons" />
+          <StatCard value={customer?.verificationOtpAttempts || 0} label="OTP Attempts" />
+          <StatCard value={customer?.resetPasswordOtpAttempts || 0} label="Reset Attempts" />
+          <StatCard
+            value={customer?.deletedAt ? "Yes" : "No"}
+            label="Deleted"
+            full
+          />
         </div>
 
         {/* Footer */}
         <Button
-          className="
-            mt-6
-            w-full
-            h-[44px]
-            rounded-[12px]
-            bg-primary
-            text-white
-            hover:bg-primary/90
-          "
+          onClick={() => onOpenChange(false)}
+          className="mt-6 w-full h-[44px] rounded-[12px] bg-primary text-white hover:bg-primary/90"
         >
-          Edit
+          Close
         </Button>
       </DialogContent>
     </Dialog>
@@ -117,80 +119,43 @@ export default function CustomerDetailModal({
 }
 
 /* ---------- Helpers ---------- */
+
 function InfoRow({
   label,
   value,
-  link,
-  showDots,
 }: {
   label: string;
-  value: string;
-  link?: boolean;
-  showDots?: boolean;
+  value: any;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-      {/* Left: Label */}
-      <span className="text-gray-600">{label}</span>
-
-      {/* Center: Dots */}
-      {showDots ? (
-        <button className="p-1 rounded-full hover:bg-gray-200 justify-self-center">
-         <TwoDotsVertical size={16} color="#6A7282" />
-        </button>
-      ) : (
-        <span />
-      )}
-
-      {/* Right: Value */}
-      {link ? (
-        <button className="text-primary text-sm font-medium justify-self-end">
-          {value}
-        </button>
-      ) : (
-        <span className="text-gray-600 justify-self-end">
-          {value}
-        </span>
-      )}
+    <div className="flex justify-between items-center">
+      <span className="text-gray-500">
+        {label} :
+      </span>
+      <span className="text-gray-700 text-right max-w-[60%] truncate">
+        {value}
+      </span>
     </div>
   );
 }
-const TwoDotsVertical = ({ size = 16, color = "#6A7282" }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill={color}
-  >
-    <circle cx="12" cy="8" r="1.5" />
-    <circle cx="12" cy="16" r="1.5" />
-  </svg>
-);
+
 function StatCard({
   value,
   label,
   full,
 }: {
-  value: string;
+  value: any;
   label: string;
   full?: boolean;
 }) {
   return (
     <div
-      className={`
-        border border-gray-400
-        rounded-[12px]
-        p-4
-        text-center
-        ${full ? "col-span-2" : ""}
-      `}
+      className={`border border-gray-400 rounded-[12px] p-4 text-center ${
+        full ? "col-span-2" : ""
+      }`}
     >
-      <p className="text-lg font-semibold text-dark">
-        {value}
-      </p>
-      <p className="text-sm text-gray-500">
-        {label}
-      </p>
+      <p className="text-lg font-semibold text-dark">{value}</p>
+      <p className="text-sm text-gray-500">{label}</p>
     </div>
   );
 }

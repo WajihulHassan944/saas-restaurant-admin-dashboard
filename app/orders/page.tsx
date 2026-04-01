@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import StatsSection from "@/components/shared/stats-section";
 import Header from "@/components/orders/header";
 import { statsData } from "@/constants/orders";
@@ -8,13 +8,74 @@ import Container from "@/components/container";
 import Table from "@/components/orders/table";
 import { Button } from "@/components/ui/button";
 import OrdersFilters from "@/components/orders/OrdersFilters";
-import useOrders from "@/hooks/useOrders";
+import useApi from "@/hooks/useApi";
+import { useAuthContext } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 type OrderTab = "delivery" | "pickup" | "reservations";
 
+interface Order {
+  id: string;
+  orderType?: string;
+  status?: string;
+  totalAmount?: number;
+  createdAt?: string;
+}
+
 export default function Orders() {
   const [activeTab, setActiveTab] = useState<OrderTab>("delivery");
-const { orders, loading } = useOrders();
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  // ✅ FILTER STATES
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+  const [status, setStatus] = useState("ALL");
+
+  const { user, token } = useAuthContext();
+  const restaurantId = user?.restaurantId;
+
+  const { get, loading } = useApi(token);
+
+  // ✅ FETCH WITH ALL FILTERS
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    const fetchOrders = async () => {
+      const query = new URLSearchParams({
+        restaurantId,
+        ...(search && { search }),
+        ...(status !== "ALL" && { status }),
+        sortOrder,
+      }).toString();
+
+      const res = await get(`/v1/orders?${query}`);
+
+      if (res?.error) {
+        toast.error(res.error);
+        return;
+      }
+
+      setOrders(res?.data || []);
+    };
+
+    fetchOrders();
+  }, [restaurantId, search, sortOrder, status]);
+
+  // ✅ TAB FILTER
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+
+    if (activeTab === "delivery") {
+      return orders.filter((o) => o.orderType === "DELIVERY");
+    }
+
+    if (activeTab === "pickup") {
+      return orders.filter((o) => o.orderType === "TAKEAWAY");
+    }
+
+    return orders;
+  }, [orders, activeTab]);
+
   const getHeaderContent = (tab: OrderTab) => {
     switch (tab) {
       case "delivery":
@@ -44,41 +105,35 @@ const { orders, loading } = useOrders();
 
   return (
     <Container>
-      <Header title={title} description={description} />
+      <Header title={title} description={description} orders={filteredOrders} />
 
       <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm space-y-6">
-        {/* Stats */}
         <StatsSection stats={statsData} className="xl:grid-cols-4" />
 
         {/* Tabs */}
-       <div className="flex items-center gap-0 sm:gap-0 text-sm lg:text-base flex-wrap">
-
-          <TabButton
-            active={activeTab === "delivery"}
-            onClick={() => setActiveTab("delivery")}
-          >
+        <div className="flex items-center gap-0 flex-wrap text-sm lg:text-base">
+          <TabButton active={activeTab === "delivery"} onClick={() => setActiveTab("delivery")}>
             Delivery Orders
           </TabButton>
 
-          <TabButton
-            active={activeTab === "pickup"}
-            onClick={() => setActiveTab("pickup")}
-          >
+          <TabButton active={activeTab === "pickup"} onClick={() => setActiveTab("pickup")}>
             Pick up Orders
           </TabButton>
 
-          <TabButton
-            active={activeTab === "reservations"}
-            onClick={() => setActiveTab("reservations")}
-          >
+          <TabButton active={activeTab === "reservations"} onClick={() => setActiveTab("reservations")}>
             Reservations
           </TabButton>
         </div>
 
-        {/* Filters (can also be conditional if needed) */}
-        <OrdersFilters />
+        {/* ✅ FILTERS */}
+        <OrdersFilters
+          onSearch={setSearch}
+          onSortChange={setSortOrder}
+          onStatusChange={setStatus}
+        />
 
-       <Table orders={orders} loading={loading} />
+        {/* TABLE */}
+        <Table orders={filteredOrders} loading={loading} />
       </div>
     </Container>
   );
@@ -100,8 +155,8 @@ function TabButton({
       variant={active ? "default" : "ghost"}
       className={
         active
-          ? "rounded-[14px] px-3 sm:px-6 py-2.5 bg-primary hover:bg-primary text-white text-[12px] sm:text-[15px] font-medium"
-          : "rounded-full px-3 sm:px-6 py-2 text-gray-500 text-[12px] sm:text-[15px] font-medium hover:text-black hover:bg-transparent"
+          ? "rounded-[14px] px-3 sm:px-6 py-2.5 bg-primary text-white"
+          : "rounded-full px-3 sm:px-6 py-2 text-gray-500 hover:text-black"
       }
     >
       {children}
