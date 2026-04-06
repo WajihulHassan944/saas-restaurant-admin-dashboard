@@ -223,7 +223,7 @@ export default function BranchCard({
     openDialog
       ? {
           label: "Edit Branch",
-          href: `/branches/edit`,
+          href: `/branches/edit?branchId=${id}`,
           icon: <Store size={16} />,
         }
       : {

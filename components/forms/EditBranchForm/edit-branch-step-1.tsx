@@ -4,64 +4,215 @@ import { Label } from "@/components/ui/label";
 import Section from "../Promotions/Section";
 import FormInput from "@/components/register/form/FormInput";
 
-export default function EditBranchStepOne() {
+export default function EditBranchStepOne({ data, setData }: any) {
+  if (!data) return null;
+
+  const update = (path: string[], value: any) => {
+    const newData = { ...data };
+    let obj = newData;
+
+    for (let i = 0; i < path.length - 1; i++) {
+      obj[path[i]] = obj[path[i]] || {};
+      obj = obj[path[i]];
+    }
+
+    obj[path[path.length - 1]] = value;
+    setData(newData);
+  };
+
   return (
-    <div className="rounded-[14px]">
-       <div className="mb-12 mt-8">
-        <h2 className="text-md font-semibold text-gray-600">
-          Basic Information
-        </h2>
-        <p className="text-sm text-gray-500">
-          Select the type or types of access that you validate for this team
-        </p>
-      </div>
+    <div className="rounded-[14px] space-y-8">
 
-   <Section label="Add branch Info" padded={false} withMargin={true}>
-        <FormInput label="Branch Name *" placeholder="eg. John Doe" />
-        <FormInput label="Address Line 1 *" placeholder="eg. 10"/>
-        <FormInput label="Address Line 2 *" placeholder="eg. 10"/>
-          <button className="text-[#6C63EB] text-sm font-medium text-center w-full">
-                + See More
-              </button>
-  </Section>
+      {/* ================= BASIC INFO ================= */}
+      <Section label="Add branch Info">
 
-   <Section label="Add Branch Contact Person Info" padded={false} withMargin={true}>
-        <FormInput label="Contact Person Name *" placeholder="eg. John Doe" />
-          <FormInput label="Designation" placeholder="eg. 10"/>
-        <FormInput label="Contact Phone Number *" placeholder="eg. 10"/>
-        <FormInput label="Email" placeholder="eg. 10"/>
-  </Section>
-<Section label="Add Branch Logo" padded={false} withMargin={true}>
-            <div className="flex flex-col items-center text-center space-y-[12px]">
-              <Label>Business Logo</Label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Branch Name *"
+            value={data.name || ""}
+            onChange={(val) => update(["name"], val)}
+          />
 
-              <div className="w-[180px] rounded-[12px] overflow-hidden border">
-                <img
-                  src="/branch_logo.jpg"
-                  alt="Business Logo"
-                  className="w-full h-[180px] object-cover"
-                />
-              </div>
+          <FormInput
+            label="Description"
+            value={data.description || ""}
+            onChange={(val) => update(["description"], val)}
+          />
+        </div>
 
-              <p className="text-sm text-gray-500 max-w-[420px]">
-                This is the business logo. It has been uploaded in the business
-                setup
-              </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Street"
+            value={data.address?.street || ""}
+            onChange={(val) => update(["address", "street"], val)}
+          />
 
-            </div>
-</Section>
-   <Section label="Add Support Contact Info" padded={false} withMargin={true}>
-             <div className="flex flex-col items-start space-y-[12px]">
-              <Label className="mb-2 text-[16px]">Add Customer Support Contact Info</Label>
-              <p className="text-sm text-gray-500 ">
-                Turn on to set custom support contact info to show in website / POS
-              </p>
+          <FormInput
+            label="Area"
+            value={data.address?.area || ""}
+            onChange={(val) => update(["address", "area"], val)}
+          />
+        </div>
 
-            </div>
-  </Section>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="City"
+            value={data.address?.city || ""}
+            onChange={(val) => update(["address", "city"], val)}
+          />
 
+          <FormInput
+            label="State"
+            value={data.address?.state || ""}
+            onChange={(val) => update(["address", "state"], val)}
+          />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Country"
+            value={data.address?.country || ""}
+            onChange={(val) => update(["address", "country"], val)}
+          />
 
-       </div>
+          <div /> {/* spacing */}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Latitude"
+            value={data.address?.lat || ""}
+            onChange={(val) => update(["address", "lat"], val)}
+          />
+
+          <FormInput
+            label="Longitude"
+            value={data.address?.lng || ""}
+            onChange={(val) => update(["address", "lng"], val)}
+          />
+        </div>
+      </Section>
+
+      {/* ================= COVER IMAGE ================= */}
+      <Section label="Add Branch Logo">
+        <div className="flex flex-col items-center text-center space-y-[12px]">
+          <Label>Branch Cover Image</Label>
+
+          <div className="w-[180px] rounded-[12px] overflow-hidden border">
+            <img
+              src={data.coverImage || "/branch_logo.jpg"}
+              alt="Branch Logo"
+              className="w-full h-[180px] object-cover"
+            />
+          </div>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e: any) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                update(["coverImage"], reader.result); // base64 for now
+              };
+              reader.readAsDataURL(file);
+            }}
+          />
+
+          <p className="text-sm text-gray-500 max-w-[420px]">
+            Upload a new image to update your branch cover
+          </p>
+        </div>
+      </Section>
+
+      {/* ================= ADMIN ================= */}
+      <Section label="Branch Admin">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="First Name"
+            value={data.branchAdmin?.firstName || ""}
+            onChange={(val) =>
+              update(["branchAdmin", "firstName"], val)
+            }
+          />
+
+          <FormInput
+            label="Last Name"
+            value={data.branchAdmin?.lastName || ""}
+            onChange={(val) =>
+              update(["branchAdmin", "lastName"], val)
+            }
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Email"
+            value={data.branchAdmin?.email || ""}
+            onChange={(val) =>
+              update(["branchAdmin", "email"], val)
+            }
+          />
+
+          <FormInput
+            label="Phone"
+            value={data.branchAdmin?.phone || ""}
+            onChange={(val) =>
+              update(["branchAdmin", "phone"], val)
+            }
+          />
+        </div>
+      </Section>
+
+      {/* ================= CONTACT ================= */}
+      <Section label="Contact Info">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Phone"
+            value={data.settings?.contact?.phone || ""}
+            onChange={(val) =>
+              update(["settings", "contact", "phone"], val)
+            }
+          />
+
+          <FormInput
+            label="WhatsApp"
+            value={data.settings?.contact?.whatsapp || ""}
+            onChange={(val) =>
+              update(["settings", "contact", "whatsapp"], val)
+            }
+          />
+        </div>
+      </Section>
+
+      {/* ================= SETTINGS ================= */}
+      <Section label="Settings">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Tax Percentage"
+            value={data.settings?.taxation?.taxPercentage || ""}
+            onChange={(val) =>
+              update(
+                ["settings", "taxation", "taxPercentage"],
+                Number(val)
+              )
+            }
+          />
+
+          <FormInput
+            label="Estimated Prep Time"
+            value={data.settings?.automation?.estimatedPrepTime || ""}
+            onChange={(val) =>
+              update(
+                ["settings", "automation", "estimatedPrepTime"],
+                Number(val)
+              )
+            }
+          />
+        </div>
+      </Section>
+    </div>
   );
 }

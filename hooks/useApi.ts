@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from "react"
@@ -6,12 +5,11 @@ import { API_BASE_URL } from "@/lib/constants"
 import { toast } from "sonner"
 
 export default function useApi(token: string | null) {
-
   const [loading, setLoading] = useState(false)
 
   const request = async (
     endpoint: string,
-    method: "GET" | "POST" | "PATCH" | "DELETE" = "GET",
+    method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "GET",
     body?: any
   ) => {
     if (!token) return null
@@ -48,10 +46,12 @@ export default function useApi(token: string | null) {
       }
 
       return data
-       }   catch (err: any) {
-  console.error("API Error:", err);
-  return { error: err.message }; // return error instead
-} finally {
+
+    } catch (err: any) {
+      console.error("API Error:", err)
+      toast.error(err.message || "Something went wrong") // 🔥 added toast here
+      return { error: err.message }
+    } finally {
       setLoading(false)
     }
   }
@@ -61,6 +61,7 @@ export default function useApi(token: string | null) {
     get: (endpoint: string) => request(endpoint, "GET"),
     post: (endpoint: string, body: any) => request(endpoint, "POST", body),
     patch: (endpoint: string, body: any) => request(endpoint, "PATCH", body),
+    put: (endpoint: string, body: any) => request(endpoint, "PUT", body), // ✅ NEW
     del: (endpoint: string) => request(endpoint, "DELETE"),
   }
 }
