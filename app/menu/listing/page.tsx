@@ -31,7 +31,7 @@ export default function MenusListingPage() {
 
     if (!restaurantId || !menuId) return;
 // &menuId=${menuId}
-    let url = `/v1/menu/items?restaurantId=${restaurantId}`;
+    let url = `/v1/menu/items?restaurantId=${restaurantId}&menuId=${menuId}`;
 
     if (selectedCategory) {
       url += `&categoryId=${selectedCategory}`;
@@ -67,6 +67,7 @@ console.log("items are", items)
         editing={editing}
         items={items}
         loading={loading}
+         refetch={fetchItems} 
       />
     </Container>
   );

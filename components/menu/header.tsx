@@ -65,7 +65,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
         </Button>
 
         {/* Import */}
-        <Button
+        {/* <Button
           variant="outline"
          className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
               onClick={() => setOpen(true)}
@@ -73,7 +73,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
           <Download size={18} className="text-[#767676]" />
           Import
           <HelpCircle size={16} className="text-[#767676] ml-1" />
-        </Button>
+        </Button> */}
  <Button
   variant="outline"
         className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"

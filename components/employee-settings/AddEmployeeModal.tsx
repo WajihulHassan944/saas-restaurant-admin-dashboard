@@ -248,7 +248,7 @@ export default function EmployeeInvitationModal({
         <Button
           onClick={handleSubmit}
           disabled={loading}
-          className="mt-6 w-full h-[46px] rounded-xl bg-red-500 text-white hover:bg-red-600"
+          className="mt-6 w-full h-[46px] rounded-xl bg-primary text-white hover:bg-red-600"
         >
           {loading
             ? isEdit

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, X } from "lucide-react";
 import CreateCategoryModalParent from "./CreateCategoryModalParent";
 import useCategories from "@/hooks/useCategories";
+import DeleteDialog from "@/components/dialogs/delete-dialog";
 
 interface CategoriesProps {
   editing?: boolean;
@@ -21,6 +22,25 @@ export default function Categories({
 }: CategoriesProps) {
   const { categories, loading, deleteCategory, refetch } = useCategories();
   const [createCategory, setCreateCategory] = useState(false);
+const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+const [isDeleting, setIsDeleting] = useState(false);
+
+const handleDeleteCategory = async () => {
+  if (!deletingCategoryId) return;
+
+  try {
+    setIsDeleting(true);
+    await deleteCategory(deletingCategoryId);
+    setDeleteDialogOpen(false);
+    setDeletingCategoryId(null);
+    refetch();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    setIsDeleting(false);
+  }
+};
 
 const handleModalChange = (open: boolean) => {
   setCreateCategory(open);
@@ -58,9 +78,22 @@ useEffect(()=>{
 
       {/* Category Pills */}
 
-      {loading ? (
-        <p className="text-sm text-gray-400">Loading categories...</p>
-      ) : (
+  {loading ? (
+  <div className="flex flex-wrap gap-x-3 gap-y-5 max-w-[900px]">
+    {[...Array(6)].map((_, i) => (
+      <div
+        key={i}
+        className="relative h-[42px] w-[140px] rounded-[12px] border border-gray-200 bg-white px-4 py-2 animate-pulse overflow-hidden"
+      >
+        {/* soft shimmer */}
+        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_infinite] bg-gradient-to-r from-transparent via-gray-100 to-transparent" />
+
+        {/* fake text line */}
+        <div className="relative z-10 h-4 w-20 rounded bg-gray-200 mt-1" />
+      </div>
+    ))}
+  </div>
+) : (
         <div className="flex flex-wrap gap-x-3 gap-y-5 max-w-[900px]">
           {categories.map((category) => {
             const isActive = selectedCategory === category.id;
@@ -90,7 +123,10 @@ useEffect(()=>{
                 {/* Delete button */}
                 {editing && (
                   <button
-                   onClick={() => deleteCategory(category.id)}
+                   onClick={() => {
+      setDeletingCategoryId(category.id);
+      setDeleteDialogOpen(true);
+    }}
                     className="
                       absolute
                       -top-1
@@ -116,6 +152,19 @@ useEffect(()=>{
      <CreateCategoryModalParent
   open={createCategory}
   onOpenChange={handleModalChange}
+/>
+<DeleteDialog
+  open={deleteDialogOpen}
+  onOpenChange={(open) => {
+    setDeleteDialogOpen(open);
+    if (!open) setDeletingCategoryId(null);
+  }}
+  onConfirm={handleDeleteCategory}
+  isLoading={isDeleting}
+  title="Delete Category"
+  description={`Are you sure you want to delete "${
+    categories.find((c) => c.id === deletingCategoryId)?.name || "this category"
+  }"? This action cannot be undone.`}
 />
     </div>
   );

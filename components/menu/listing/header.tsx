@@ -26,7 +26,7 @@ export default function BranchesHeader({ title, description, editing, onManageCl
   onClick={onManageClick}
   className="h-[44px] rounded-[12px] px-11 bg-primary hover:bg-red-800 text-white"
 >
-  {editing ? "Save & Back" : "Manage"}
+  {editing ? "Back" : "Manage"}
 </Button>
 
 

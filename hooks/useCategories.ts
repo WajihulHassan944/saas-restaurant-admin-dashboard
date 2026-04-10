@@ -12,21 +12,20 @@ export interface Category {
 
 export default function useCategories() {
 
-  const { token } = useAuth()
+  const { token, restaurantId } = useAuth()
   const { get, del, loading } = useApi(token)
 
   const [categories, setCategories] = useState<Category[]>([])
 
-  const fetchCategories = async () => {
-    if (!token) return
+const fetchCategories = async () => {
+  if (!token || !restaurantId) return
 
-    const data = await get("/v1/menu/categories")
+  const data = await get(`/v1/menu/categories?restaurantId=${restaurantId}`)
 
-    if (data.data) {
-      setCategories(data.data)
-    }
+  if (data.data) {
+    setCategories(data.data)
   }
-
+}
   const deleteCategory = async (id: string) => {
     const res = await del(`/v1/menu/categories/${id}`)
 
@@ -35,10 +34,10 @@ export default function useCategories() {
     }
   }
 
-  useEffect(() => {
-    if (!token) return
-    fetchCategories()
-  }, [token])
+useEffect(() => {
+  if (!token || !restaurantId) return
+  fetchCategories()
+}, [token, restaurantId])
 
   return {
     categories,

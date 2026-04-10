@@ -59,18 +59,36 @@ const SidebarItem = ({ item, isActive, onLinkClick }: SidebarItemProps) => {
 
 export default function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname();
-const router = useRouter();
+  const router = useRouter();
+
   const mainItems = menuItems.filter((i) => i.section === "main");
   const accountItems = menuItems.filter((i) => i.section === "account");
-const handleLogout = () => {
-  localStorage.removeItem("auth");
 
-  toast.success("Logged out successfully");
+  /**
+   * ✅ Robust Active Route Checker
+   */
+  const isActiveRoute = (href: string) => {
+    if (!pathname) return false;
 
-  setTimeout(() => {
-    router.push("/login");
-  }, 500);
-};
+    // exact match
+    if (pathname === href) return true;
+
+    // nested route match (e.g. /menu/details, /menu/edit/1)
+    if (pathname.startsWith(`${href}/`)) return true;
+
+    return false;
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("auth");
+
+    toast.success("Logged out successfully");
+
+    setTimeout(() => {
+      router.push("/login");
+    }, 500);
+  };
+
   return (
     <aside className="flex flex-col w-72 bg-white h-full border-r overflow-y-auto">
       {/* MENU */}
@@ -79,7 +97,7 @@ const handleLogout = () => {
           <SidebarItem
             key={item.title}
             item={item}
-            isActive={pathname === item.href}
+            isActive={isActiveRoute(item.href)}
             onLinkClick={onLinkClick}
           />
         ))}
@@ -96,7 +114,7 @@ const handleLogout = () => {
             <SidebarItem
               key={item.title}
               item={item}
-              isActive={pathname === item.href}
+              isActive={isActiveRoute(item.href)}
               onLinkClick={onLinkClick}
             />
           ))}
@@ -145,7 +163,7 @@ const handleLogout = () => {
             className="mt-4 flex items-center gap-3 text-primary hover:bg-red-50 w-full justify-start"
             onClick={handleLogout}
           >
-            <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center" >
+            <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center">
               <LogOut size={18} />
             </div>
             <span className="text-sm font-semibold">Logout</span>

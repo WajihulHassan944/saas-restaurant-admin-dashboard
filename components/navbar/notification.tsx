@@ -22,7 +22,7 @@ export default function NotificationBell() {
         strokeWidth={0.4}
       />
       
-      {NOTIFICATION_DATA.count > 0 && (
+      {/* {NOTIFICATION_DATA.count > 0 && (
         <span 
           className={cn(
             barlow.className, 
@@ -33,7 +33,7 @@ export default function NotificationBell() {
         >
           {NOTIFICATION_DATA.count}
         </span>
-      )}
+      )} */}
     </Link>
   )
 }

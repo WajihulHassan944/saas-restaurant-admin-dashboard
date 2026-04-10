@@ -64,7 +64,9 @@ const isEdit = Boolean(menuId);
       console.error("Invalid auth");
     }
   }, []);
-const fetchMenuDetails = async () => {
+
+  
+  const fetchMenuDetails = async () => {
   if (!menuId || !token) return;
 
   try {
@@ -75,22 +77,25 @@ const fetchMenuDetails = async () => {
     });
 
     const data = await res.json();
-
     if (!res.ok) throw new Error(data.message);
 
     const menu = data.data;
 
+    const prefilledItemIds =
+      menu?.items?.map((item: any) => item.menuItemId).filter(Boolean) || [];
+
     setForm({
-      name: menu.name || "",
-      slug: menu.slug || "",
-      description: menu.description || "",
-      sortOrder: String(menu.sortOrder || ""),
-      menuItemsIds: menu.itemIds || [],
+      name: menu?.name || "",
+      slug: menu?.slug || "",
+      description: menu?.description || "",
+      sortOrder: String(menu?.sortOrder ?? ""),
+      menuItemsIds: prefilledItemIds,
     });
   } catch (err: any) {
     toast.error(err.message || "Failed to load menu");
   }
 };
+
   /* ================= FETCH MENU ITEMS ================= */
 
   const fetchMenuItems = async () => {
@@ -121,17 +126,21 @@ const fetchMenuDetails = async () => {
   };
 console.log("menu items", menuItems);
  
-
 useEffect(() => {
-  if (open && token && restaurantId) {
-    fetchMenuItems();
+  if (!open || !token || !restaurantId) return;
+
+  const init = async () => {
+    await fetchMenuItems();
 
     if (menuId) {
-      fetchMenuDetails();
+      await fetchMenuDetails();
+    } else {
+      handleReset();
     }
-  }
-}, [open, token, restaurantId, menuId]);
+  };
 
+  init();
+}, [open, token, restaurantId, menuId]);
 
   /* ================= FORM UPDATE ================= */
 
@@ -285,35 +294,59 @@ useEffect(() => {
 
           {/* MENU ITEMS */}
 
-          <div>
-            <p className="text-[16px] mb-2 font-medium">Menu Items</p>
+        <div>
+  <div className="flex items-center justify-between mb-2">
+    <p className="text-[16px] font-medium">Menu Items</p>
+    {!!form.menuItemsIds.length && (
+      <span className="text-xs font-medium text-primary bg-red-50 px-2 py-1 rounded-full">
+        {form.menuItemsIds.length} selected
+      </span>
+    )}
+  </div>
 
-            {loadingItems ? (
-              <div className="flex justify-center py-3">
-                <Loader2 className="animate-spin text-primary" />
-              </div>
-            ) : (
-              <div className="max-h-[200px] overflow-auto border rounded-lg p-2 space-y-2">
-                {menuItems.map((item) => {
-                  const selected = form.menuItemsIds.includes(item.id);
+  {loadingItems ? (
+    <div className="border rounded-xl bg-white p-3 space-y-2">
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className="h-10 rounded-lg bg-gray-100 animate-pulse"
+        />
+      ))}
+    </div>
+  ) : menuItems.length === 0 ? (
+    <div className="border rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+      No menu items available
+    </div>
+  ) : (
+    <div className="max-h-[240px] overflow-auto border rounded-xl p-2 bg-white space-y-2">
+      {menuItems.map((item) => {
+        const selected = form.menuItemsIds.includes(item.id);
 
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => toggleMenuItem(item.id)}
-                      className={`cursor-pointer px-3 py-2 rounded-md text-sm ${
-                        selected
-                          ? "bg-primary text-white"
-                          : "hover:bg-gray-100"
-                      }`}
-                    >
-                      {item.name}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+        return (
+          <button
+            type="button"
+            key={item.id}
+            onClick={() => toggleMenuItem(item.id)}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm border transition ${
+              selected
+                ? "bg-primary text-white border-primary"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <span className="truncate text-left">{item.name}</span>
+            <span
+              className={`ml-3 text-xs font-semibold ${
+                selected ? "text-white" : "text-gray-400"
+              }`}
+            >
+              {selected ? "Selected" : "Select"}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  )}
+</div>
         </div>
 
         {/* FOOTER */}

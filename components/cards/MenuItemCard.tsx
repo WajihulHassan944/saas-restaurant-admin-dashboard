@@ -6,16 +6,25 @@ import { useState } from "react";
 import AddToCartModal from "../shared/AddToCartModal";
 import VariationModal from "../menu/listing/VariationModal";
 import AddModifierToItem from "../forms/AddModifierToItem";
+import { useAuth } from "@/hooks/useAuth";
+import useApi from "@/hooks/useApi";
+import { toast } from "sonner";
+import DeleteDialog from "../dialogs/delete-dialog";
 
 type Props = {
   item: any;
   editing?: boolean;
+  onDelete?: () => void;
 };
 
-export default function MenuItemCard({ item, editing }: Props) {
+export default function MenuItemCard({ item, editing, onDelete }: Props) {
   const [open, setOpen] = useState(false);
 const [openVariation, setOpenVariation] = useState(false);
 const [openModifier, setOpenModifier] = useState(false);
+const [openDelete, setOpenDelete] = useState(false);
+const [isDeleting, setIsDeleting] = useState(false);
+const { token } = useAuth();
+const { del } = useApi(token);
   const image =
   item.imageUrl && item.imageUrl.startsWith("http")
     ? item.imageUrl
@@ -26,13 +35,31 @@ const [openModifier, setOpenModifier] = useState(false);
       ? item.variations[0].price
       : item.basePrice;
 
-  return (
+      const handleDelete = async () => {
+  try {
+    setIsDeleting(true);
+
+    const res = await del(`/v1/menu/items/${item.id}`);
+
+    if (res?.error) return;
+
+    toast.success(res?.message || "Item deleted successfully");
+    setOpenDelete(false);
+    onDelete?.();
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err.message || "Failed to delete item");
+  } finally {
+    setIsDeleting(false);
+  }
+};
+      return (
     <div className="relative w-full bg-white rounded-[22px] flex flex-col sm:max-w-[280px] mb-5">
       
       {/* Delete */}
       {editing && (
         <button
-          onClick={() => console.log("delete item:", item.id)}
+         onClick={() => setOpenDelete(true)}
           className="absolute top-0 right-0 z-20 bg-[#c6c6c6] text-black border border-black rounded-full p-1 shadow-md hover:bg-red-600"
         >
           <X size={14} />
@@ -112,6 +139,15 @@ const [openModifier, setOpenModifier] = useState(false);
   open={openModifier}
   onOpenChange={setOpenModifier}
   item={item}
+/>
+
+<DeleteDialog
+  open={openDelete}
+  onOpenChange={setOpenDelete}
+  onConfirm={handleDelete}
+  isLoading={isDeleting}
+  title="Delete Menu Item"
+  description={`Are you sure you want to delete "${item.name}"? This action cannot be undone.`}
 />
     </div>
   );

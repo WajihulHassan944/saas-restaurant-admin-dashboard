@@ -22,6 +22,11 @@ import {
   useActivateBranch,
   useSuspendBranch,
 } from "@/hooks/useBranches";
+import { useAuth } from "@/hooks/useAuth";
+import useApi from "@/hooks/useApi";
+import { toast } from "sonner";
+import DeleteDialog from "../dialogs/delete-dialog";
+import BranchCoverModal from "../branches/BranchCoverModal";
 
 export default function BranchCard({
   id,
@@ -35,11 +40,15 @@ export default function BranchCard({
   loading, // ✅ NEW
 }: BranchProps & { loading?: boolean }) {
   const [openingHoursOpen, setOpeningHoursOpen] = useState(false);
-console.log("loading state", loading);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+const [isDeleting, setIsDeleting] = useState(false);
   const deleteMutation = useDeleteBranch();
   const activateMutation = useActivateBranch();
   const suspendMutation = useSuspendBranch();
 
+const { token } = useAuth();
+const { del } = useApi(token);
   const handleOpenChange = (value: boolean) => {
     setOpeningHoursOpen(value);
   };
@@ -57,14 +66,31 @@ console.log("loading state", loading);
   /**
    * ================= DELETE
    */
-  const handleDelete = async () => {
-    try {
-      await deleteMutation.mutateAsync(id);
-    } catch (err: any) {
-      console.error(err);
-    }
-  };
+ const handleDelete = async () => {
+  try {
+    setIsDeleting(true);
 
+    if (openDialog) {
+      // Branch delete
+      await deleteMutation.mutateAsync(id);
+    } else {
+      // Menu delete
+      const res = await del(`/v1/menus/${id}`);
+
+      if (res?.error) return;
+
+      toast.success(res?.message || "Menu deleted successfully");
+      window.location.reload();
+    }
+
+    setDeleteDialogOpen(false);
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err.message || "Failed to delete");
+  } finally {
+    setIsDeleting(false);
+  }
+}; 
   /**
    * ================= ACTIVATE
    */
@@ -178,12 +204,14 @@ console.log("loading state", loading);
           </>
         )}
 
-        <Divider />
-
-        <ActionButton>
-          <ImageIcon size={18} />
-        </ActionButton>
-
+      {openDialog && (
+  <>
+    <Divider />
+    <ActionButton onClick={() => setCoverModalOpen(true)}>
+      <ImageIcon size={18} />
+    </ActionButton>
+  </>
+)}
         <Divider />
 
         <ActionDropdown
@@ -230,15 +258,15 @@ console.log("loading state", loading);
                 ]
               : []),
 
-            {
-              label: "Delete",
-              onClick: handleDelete,
-              icon: deleteMutation.isPending ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Trash size={16} className="text-red-500" />
-              ),
-            },
+          {
+  label: "Delete",
+  onClick: () => setDeleteDialogOpen(true),
+  icon: isDeleting || deleteMutation.isPending ? (
+    <Loader2 size={16} className="animate-spin" />
+  ) : (
+    <Trash size={16} className="text-red-500" />
+  ),
+},
           ]}
         />
       </div>
@@ -250,6 +278,23 @@ console.log("loading state", loading);
         branchId={id}
         branchName={name}
       />
+
+      <DeleteDialog
+  open={deleteDialogOpen}
+  onOpenChange={setDeleteDialogOpen}
+  onConfirm={handleDelete}
+  isLoading={isDeleting || deleteMutation.isPending}
+  title={openDialog ? "Delete Branch" : "Delete Menu"}
+  description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
+/>
+
+<BranchCoverModal
+  open={coverModalOpen}
+  onOpenChange={setCoverModalOpen}
+  branchId={id}
+  branchName={name}
+/>
+
     </div>
   );
 }
