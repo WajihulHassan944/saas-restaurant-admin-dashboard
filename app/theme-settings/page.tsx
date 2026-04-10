@@ -1,9 +1,9 @@
 import Container from "@/components/container";
 import Header from "@/components/header";
+import RestaurantPicker from "@/components/shared/RestaurantPicker";
 import BrandAssetsSection from "@/components/theme-settings/brand-assets-section";
 import ColorSchemeSection from "@/components/theme-settings/color-scheme-section";
 import PreviewSection from "@/components/theme-settings/preview-section";
-import RestaurantSelector from "@/components/theme-settings/restaurant-selector";
 import TypographySection from "@/components/theme-settings/typography-section";
 
 const ThemeSettingsPage = () => {
@@ -13,7 +13,7 @@ const ThemeSettingsPage = () => {
                 title="Theme Settings"
                 description="Welcome back! Here's what's happening with your platform today."
             />
-            <RestaurantSelector />
+            <RestaurantPicker />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div>
                     <BrandAssetsSection />
