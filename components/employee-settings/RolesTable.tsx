@@ -42,7 +42,7 @@ const [open, setOpen] = useState(false);
       setLoading(true);
 
       const res = await get(
-        `/v1/staff-roles?restaurantId=${user?.restaurantId}&branchId=${user?.branchId}`
+        `/v1/staff-roles`
       );
 
       if (res?.data) {
@@ -134,7 +134,7 @@ if (loading) {
               <TableHead>Role</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Permissions</TableHead>
-              <TableHead>Branch</TableHead>
+              {/* <TableHead>Branch</TableHead> */}
               <TableHead>Status</TableHead>
               <TableHead className="text-center">Actions</TableHead>
             </TableRow>
@@ -165,7 +165,7 @@ if (loading) {
                   </div>
                 </TableCell>
 
-                <TableCell>{role.branch?.name}</TableCell>
+                {/* <TableCell>{role.branch?.name}</TableCell> */}
 
                 {/* Status */}
                 <TableCell>
@@ -212,7 +212,6 @@ if (loading) {
   initialData={editRole}
   onSuccess={onSuccess}
 />
-        <Pagination />
       </div>
     </>
   );

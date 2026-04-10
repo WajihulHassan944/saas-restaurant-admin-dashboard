@@ -12,32 +12,41 @@ import { Input } from "@/components/ui/input";
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import useApi from "@/hooks/useApi";
-import { useAuthContext } from "@/context/AuthContext";
 import { useFileUpload } from "@/hooks/useFileUpload";
+
+import {
+  useCreateStaff,
+  useUpdateStaff,
+  useGetStaffRoles,
+} from "@/hooks/useEmployees";
+
+import { staffSchema } from "@/validations/employees";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialData?: any; // 👈 NEW
-   onSuccess?: () => void;
+  initialData?: any;
+  onSuccess?: () => void;
 };
 
 export default function EmployeeInvitationModal({
   open,
   onOpenChange,
   initialData,
-  onSuccess
+  onSuccess,
 }: Props) {
-  const { token } = useAuthContext();
-  const { post, patch, get } = useApi(token);
-
   const { uploadFile, uploading } = useFileUpload();
 
-  const [loading, setLoading] = useState(false);
-  const [roles, setRoles] = useState<any[]>([]);
-
   const isEdit = !!initialData;
+
+  const createStaffMutation = useCreateStaff();
+  const updateStaffMutation = useUpdateStaff();
+
+  const { data: rolesData } = useGetStaffRoles({ page: 1 });
+  const roles = rolesData?.data || [];
+
+  const loading =
+    createStaffMutation.isPending || updateStaffMutation.isPending;
 
   const [form, setForm] = useState({
     email: "",
@@ -57,12 +66,12 @@ export default function EmployeeInvitationModal({
       setForm({
         email: initialData.email || "",
         password: "",
-        firstName: initialData.profile?.firstName || "",
-        lastName: initialData.profile?.lastName || "",
+        firstName: initialData.firstName || "",
+        lastName: initialData.lastName || "",
         staffRoleId: initialData.staffRoleId || "",
-        phone: initialData.profile?.phone || "",
-        avatarUrl: initialData.profile?.avatarUrl || "",
-        bio: initialData.profile?.bio || "",
+        phone: initialData.phone || "",
+        avatarUrl: initialData.avatarUrl || "",
+        bio: initialData.bio || "",
         isActive: initialData.isActive ?? true,
       });
     }
@@ -85,20 +94,6 @@ export default function EmployeeInvitationModal({
     }
   }, [open]);
 
-  /* ---------- Fetch Roles ---------- */
-  useEffect(() => {
-    const fetchRoles = async () => {
-      try {
-        const res = await get(`/v1/staff-roles`);
-        if (res?.data) setRoles(res.data);
-      } catch {
-        toast.error("Failed to fetch roles");
-      }
-    };
-
-    if (open) fetchRoles();
-  }, [open]);
-
   /* ---------- Change ---------- */
   const handleChange = (key: string, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -113,44 +108,46 @@ export default function EmployeeInvitationModal({
   /* ---------- Submit ---------- */
   const handleSubmit = async () => {
     try {
-      if (!form.email || !form.firstName || !form.lastName || !form.staffRoleId) {
-        return toast.error("Please fill required fields");
+      // ✅ Prepare payload
+      const payload = {
+        email: form.email,
+        password: form.password,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        staffRoleId: form.staffRoleId,
+        phone: form.phone,
+        bio: form.bio,
+        isActive: form.isActive,
+      };
+
+      // ✅ ZOD VALIDATION
+      const parsed = staffSchema.safeParse(payload);
+
+      if (!parsed.success) {
+        const firstError =
+          parsed.error.errors[0]?.message || "Invalid input";
+        return toast.error(firstError);
       }
-
-      setLoading(true);
-
-      let res;
 
       if (isEdit) {
-        const { password, ...payload } = form;
+        // const { password, ...updatePayload } = payload;
 
-  res = await patch(`/v1/staff-management/${initialData.id}`, payload);
+        await updateStaffMutation.mutateAsync({
+          id: initialData.id,
+          data: payload,
+        });
       } else {
-        // ✅ POST
-        if (!form.password) {
-          return toast.error("Password is required");
-        }
-
-        res = await post("/v1/staff-management", form);
+        await createStaffMutation.mutateAsync(payload);
       }
 
-      if (!res || res.error) {
-        toast.error(res?.error || "Failed");
-        return;
-      }
-
-      toast.success(isEdit ? "Employee updated" : "Invitation sent");
+      // toast.success(isEdit ? "Employee updated" : "Invitation sent");
 
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
       console.error(err);
-      toast.error("Something went wrong");
-    } finally {
-      setLoading(false);
     }
   };
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,10 +156,10 @@ export default function EmployeeInvitationModal({
         {/* Header */}
         <DialogHeader className="text-center space-y-1">
           <DialogTitle className="text-xl font-semibold">
-           {isEdit ? "Edit Employee" : "Employee Invitation"}
+            {isEdit ? "Edit Employee" : "Employee Invitation"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-gray-500 text-center">
-           {isEdit
+          <DialogDescription className="text-sm text-gray-500 text-left">
+            {isEdit
               ? "Update employee details"
               : "Send invitation to employee"}
           </DialogDescription>
@@ -190,19 +187,22 @@ export default function EmployeeInvitationModal({
             />
           </div>
 
- <div className="grid grid-cols-2 gap-3">
-          <FormField
-            label="Phone"
-            value={form.phone}
-            onChange={(v) => handleChange("phone", v)}
-          />
-             {!isEdit && (
+          <div className="grid grid-cols-2 gap-3">
             <FormField
-              label="Password *"
-              value={form.password}
-              onChange={(v) => handleChange("password", v)}
-            /> )}
-</div>
+              label="Phone"
+              value={form.phone}
+              onChange={(v) => handleChange("phone", v)}
+            />
+
+            {/* {!isEdit && ( */}
+              <FormField
+                label="Password *"
+                value={form.password}
+                onChange={(v) => handleChange("password", v)}
+              />
+            {/* )} */}
+          </div>
+
           {/* Role Dropdown */}
           <div>
             <label className="text-sm font-medium">Role *</label>
@@ -214,7 +214,7 @@ export default function EmployeeInvitationModal({
               className="mt-1 h-[44px] w-full rounded-lg border border-gray-300 px-3 text-sm"
             >
               <option value="">Select Role</option>
-              {roles.map((r) => (
+              {roles.map((r: any) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
@@ -228,7 +228,7 @@ export default function EmployeeInvitationModal({
             <Input
               type="file"
               onChange={handleFile}
-              className="mt-1 h-[44px] rounded-lg border border-gray-300"
+              className="mt-1 h-[40px] pt-1 rounded-lg border border-gray-300"
             />
             {uploading && (
               <p className="text-xs text-gray-400 mt-1">
@@ -250,7 +250,7 @@ export default function EmployeeInvitationModal({
           disabled={loading}
           className="mt-6 w-full h-[46px] rounded-xl bg-red-500 text-white hover:bg-red-600"
         >
-         {loading
+          {loading
             ? isEdit
               ? "Updating..."
               : "Sending..."

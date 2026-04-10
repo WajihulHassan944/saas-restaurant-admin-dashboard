@@ -1,27 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, XCircle } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
 
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+
 import FormInput from "../register/form/FormInput";
 import FormSelect from "../register/form/FormSelect";
 import { Radio } from "../ui/radioBtn";
 import { Separator } from "../ui/separator";
 import PosModalHeader from "../pos/PosModalHeader";
 import ModalActionFooter from "../pos/PosModalActionFooter";
+import AsyncSelect from "../ui/AsyncSelect";
+
+import { useAuthContext } from "@/context/AuthContext";
+import useApi from "@/hooks/useApi";
+import { toast } from "sonner";
+import { useGetBranches } from "@/hooks/useBranches";
 
 export default function MakeReservationModal({
   open,
@@ -30,72 +36,165 @@ export default function MakeReservationModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
+  const { user, token } = useAuthContext();
+  const { get, post, loading } = useApi(token);
+
+  const restaurantId = user?.restaurantId ?? undefined;
+
   const [tableType, setTableType] = useState<"full" | "specific">("specific");
 
+  const [reservationDate, setReservationDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [guestCount, setGuestCount] = useState("");
+  const [note, setNote] = useState("");
+
+  const [selectedBranch, setSelectedBranch] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+
+  // ================= FETCH BRANCHES =================
+  const { data: branchesData } = useGetBranches({
+    restaurantId,
+  });
+
+  const fetchBranches = async ({ search }: any) => {
+    if (!restaurantId) return { data: [] };
+
+    const list = branchesData?.data || [];
+
+    return {
+      data: list.filter((b: any) =>
+        b?.name?.toLowerCase().includes(search.toLowerCase())
+      ),
+    };
+  };
+
+const fetchCustomers = async ({ search, page }: any) => {
+  if (!restaurantId) return { data: [], meta: {} };
+
+  let url = `/v1/admin/users/customers?restaurantId=${restaurantId}&page=${page}`;
+
+  if (search) url += `&search=${search}`;
+
+  const res = await get(url);
+
+  const raw =
+    res?.data?.data || res?.data || [];
+
+  // ✅ TRANSFORM DATA (CRITICAL FIX)
+  const normalized = raw.map((u: any) => ({
+    ...u,
+    firstName: u?.profile?.firstName || "No Name",
+    lastName: u?.profile?.lastName || "",
+    fullName: `${u?.profile?.firstName || ""} ${u?.profile?.lastName || ""}`,
+  }));
+
+  return {
+    data: normalized,
+    meta: res?.data?.meta || res?.meta,
+  };
+};
+
+  // ================= SUBMIT =================
+  const handleSubmit = async () => {
+    try {
+      if (!selectedBranch || !selectedCustomer) {
+        toast.error("Please select branch and customer");
+        return;
+      }
+
+      if (!reservationDate || !startTime || !guestCount) {
+        toast.error("Please fill all required fields");
+        return;
+      }
+
+      const isoDate = new Date(
+        `${reservationDate}T${startTime}`
+      ).toISOString();
+
+      const payload = {
+        branchId: selectedBranch?.id,
+        reservationDate: isoDate,
+        guestCount: Number(guestCount),
+        note: note || "",
+      };
+
+      const res = await post(
+        `/v1/customer-app/table-reservations?customerId=${selectedCustomer?.id}`,
+        payload
+      );
+
+      if (res?.error) {
+        toast.error(res.error);
+        return;
+      }
+
+      toast.success("Reservation created successfully");
+
+      onOpenChange(false);
+      router.push("/orders?tab=reservation");
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong");
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full sm:max-w-[618px] rounded-[28px] px-10 py-8 bg-white max-h-[95vh] overflow-auto">
-        {/* ================= HEADER ================= */}
-       <PosModalHeader
-  title="Make Reservation"
-  description="Create a new Reservation by filling necessary info from here"
-/>
+    <Dialog open={open} onOpenChange={onOpenChange} >
+      <DialogContent
+        className="w-full sm:max-w-[618px] rounded-[28px] px-10 py-8 bg-white max-h-[95vh] overflow-auto text-black"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <PosModalHeader
+          title="Make Reservation"
+          description="Create a new Reservation by filling necessary info from here"
+        />
 
         {/* ================= RESERVATION INFO ================= */}
         <Collapsible defaultOpen className="mt-6">
-          <CollapsibleTrigger
-            className="
-              flex items-center justify-between w-full text-[16px]  text-[#909090]
-              [&[data-state=open]>svg]:rotate-180
-            "
-          >
+          <CollapsibleTrigger className="flex items-center justify-between w-full text-[16px] text-[#909090]">
             Reservation Information
-            <ChevronDown className="transition-transform" />
+            <ChevronDown />
           </CollapsibleTrigger>
-         <Separator className="my-3" />
+
+          <Separator className="my-3" />
+
           <CollapsibleContent className="mt-4 space-y-4 px-1">
-            <FormInput label="Reservation Date *" placeholder="eg. jhon doe" />
-
-            <div className="space-y-2">
-  <label className="text-[16px]">
-    Reservation Time<span className="text-red-500">*</span>
-  </label>
-
-  <div className="grid grid-cols-2 gap-4 mt-2">
-    <Input
-      type="time"
-      className="border-[#BBBBBB] focus:border-primary focus:ring-1 focus:ring-primary"
-    />
-    <Input
-      type="time"
-      className="border-[#BBBBBB] focus:border-primary focus:ring-1 focus:ring-primary"
-    />
-  </div>
-</div>
-
-            <FormInput label="No. of Person *" placeholder="eg. 1" />
-
-            <FormSelect
-              placeholder="Select Floor"
-              options={["Floor 1", "Floor 2", "Floor 3"]}
+            <Input
+              type="date"
+              value={reservationDate}
+              onChange={(e) => setReservationDate(e.target.value)}
             />
 
-            {/* Choose Table */}
-            <div>
-              <p className="mb-3 text-[16px]">
-                Choose Table<span className="text-red-500">*</span>
-              </p>
+            <Input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
 
-              <div className="flex gap-6">
-                <div onClick={() => setTableType("full")}>
-                  <Radio label="Full Floor" active={tableType === "full"} />
-                </div>
-                <div onClick={() => setTableType("specific")}>
-                  <Radio
-                    label="Specific Table"
-                    active={tableType === "specific"}
-                  />
-                </div>
+            <FormInput
+              label="No. of Person *"
+              value={guestCount}
+              onChange={(val) => setGuestCount(val)}
+            />
+
+            {/* BRANCH */}
+            <AsyncSelect
+              value={selectedBranch}
+              onChange={setSelectedBranch}
+              fetchOptions={fetchBranches}
+              labelKey="name"
+              valueKey="id"
+              placeholder="Select branch"
+            />
+
+            {/* TABLE TYPE */}
+            <div className="flex gap-6">
+              <div onClick={() => setTableType("full")}>
+                <Radio label="Full Floor" active={tableType === "full"} />
+              </div>
+              <div onClick={() => setTableType("specific")}>
+                <Radio label="Specific Table" active={tableType === "specific"} />
               </div>
             </div>
 
@@ -103,102 +202,40 @@ export default function MakeReservationModal({
               placeholder="Select Table"
               options={["Table 1", "Table 2", "Table 3"]}
             />
+
+            <FormInput
+              label="Note"
+              value={note}
+              onChange={(val) => setNote(val)}
+            />
           </CollapsibleContent>
         </Collapsible>
 
-        {/* ================= CUSTOMER INFO ================= */}
-        <Collapsible className="mt-6">
-          <CollapsibleTrigger
-            className="
-              flex items-center justify-between w-full text-[16px] text-[#909090]
-              [&[data-state=open]>svg]:rotate-180
-            "
-          >
-            Customer Information
-            <ChevronDown className="transition-transform" />
-          </CollapsibleTrigger>
-<Separator className="my-3" />
-          <CollapsibleContent className="mt-4 space-y-4">
-            <div>
-              <label className="mb-2 block text-[16px]">Customer</label>
+        {/* ================= CUSTOMER ================= */}
+        <div className="mt-6">
+          <label className="block mb-2 text-[16px] text-black">
+            Customer<span className="text-red-500">*</span>
+          </label>
 
-              <div className="relative">
-                <Input
-                  value="Walk in Customer"
-                  readOnly
-                  className="border-[#BBBBBB] pr-10"
-                />
-                <button className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <XCircle size={20} />
-                </button>
-              </div>
-            </div>
-
-            <button className="text-primary text-sm font-medium  text-center w-full">
-              +Add Contact Person Info
-            </button>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* ================= BILLING ================= */}
-        <Collapsible className="mt-6">
-          <CollapsibleTrigger
-            className="
-              flex items-center justify-between w-full text-[16px] text-[#909090]
-              [&[data-state=open]>svg]:rotate-180
-            "
-          >
-            Billing
-            <ChevronDown className="transition-transform" />
-          </CollapsibleTrigger>
-<Separator className="my-3" />
-          <CollapsibleContent className="mt-4 space-y-4">
-            <div className="space-y-2 text-sm text-[#667085]">
-              <div className="flex justify-between">
-                <span>Advance Booking Fee</span>
-                <span>$0</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax (0%)</span>
-                <span>$0</span>
-              </div>
-            </div>
-<Separator />
-            <div className="flex justify-between font-semibold text-[#101828]">
-              <span>Total</span>
-              <span>$0</span>
-            </div>
-
-            <div className="flex items-center gap-4 mt-4">
-              <span className="text-sm">Payment Method</span>
-              <span className="px-3 py-1 rounded-full bg-[#00A63E] text-white text-sm">
-                Cash
-              </span>
-            </div>
-
-            <div className="border border-[#BBBBBB] rounded-xl p-4 space-y-2">
-              <div className="flex justify-between">
-                <span>Paid Amount</span>
-                <span className="text-[#667085]">Enter Paid Amount</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Due</span>
-                <span>$0</span>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* ================= ACTIONS ================= */}
-        <ModalActionFooter
-  leftLabel="Cancel"
-  rightLabel="Create"
-  onLeftClick={() => onOpenChange(false)}
-  onRightClick={() => {
-    // submit reservation
-  }}
+        <AsyncSelect
+  value={selectedCustomer}
+  onChange={setSelectedCustomer}
+  fetchOptions={fetchCustomers}
+  labelKey="fullName"   // ✅ FIXED
+  valueKey="id"
+  placeholder="Select customer"
 />
+        </div>
 
+        {/* ACTION */}
+        <div className="mt-6" onClick={(e) => e.stopPropagation()}>
+          <ModalActionFooter
+            leftLabel="Cancel"
+            rightLabel={loading ? "Creating..." : "Create"}
+            onLeftClick={() => onOpenChange(false)}
+            onRightClick={handleSubmit}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

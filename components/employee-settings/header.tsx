@@ -1,6 +1,5 @@
 "use client"
 
-import { ChevronDown, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Header from '../header'
 import { useRouter } from 'next/navigation'
@@ -35,14 +34,14 @@ export default function EmployeeSettingsHeader({
 
             {/* 2. Buttons stack on tiny mobile, become row on sm (640px) */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:gap-4">
-                <Button
+                {/* <Button
                     variant="outline"
               className="h-[44px] rounded-[12px] px-4 flex items-center gap-2 border-[#E6E7EC] text-[15px] font-[500] text-[#767676]"
                 onClick={()=>router.push("/employees-settings/trash")}
                 >
                     <p>View Trash</p>
                     <HelpCircle size={18} className="text-[#767676]" />
-                </Button>
+                </Button> */}
 
                   <Button
                     variant="outline"
@@ -55,7 +54,6 @@ export default function EmployeeSettingsHeader({
 
 
                 <Button
-                    variant="primary"
                     onClick={() => setOpen(true)}
               className="h-[44px] rounded-[12px] px-5 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[15px] font-[500]"
             >

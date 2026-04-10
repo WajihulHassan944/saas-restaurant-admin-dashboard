@@ -37,7 +37,7 @@ const triggerRolesRefresh = () => {
         <BranchFilters />
 
         {/* Tabs */}
-<div className="flex gap-3 pl-4 lg:pl-6 flex-wrap">
+<div className="flex gap-3 flex-wrap">
   {[
     { key: "employees", label: "Employees" },
     { key: "roles", label: "Roles" },

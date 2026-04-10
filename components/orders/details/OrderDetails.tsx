@@ -1,129 +1,162 @@
-'use client';
+"use client";
 
-import { X } from 'lucide-react';
+import { X } from "lucide-react";
 
-const OrderDetailsMain = () => {
-  const items = [
-    { name: 'Watermelon juice with ice', qty: 1, price: 4.12 },
-    { name: 'Italiano pizza with garlic', qty: 1, price: 15.44 },
-    { name: 'Chicken curry special with cucumber', qty: 3, price: 14.99 },
+const formatDate = (date?: string) => {
+  if (!date) return "-";
+  return new Date(date).toLocaleString();
+};
+
+const OrderDetailsMain = ({ order }: { order: any }) => {
+  const items = order?.items || [];
+
+  const history = [
+    {
+      label: "Order Delivered",
+      date: formatDate(order?.deliveredAt),
+      active: !!order?.deliveredAt,
+    },
+    {
+      label: "On Delivery",
+      date: order?.status === "ON_DELIVERY" ? "In progress" : "-",
+      active:
+        order?.status === "ON_DELIVERY" ||
+        order?.status === "DELIVERED",
+    },
+    {
+      label: "Payment Success",
+      date:
+        order?.paymentStatus === "PAID"
+          ? "Paid"
+          : order?.paymentStatus,
+      active:
+        order?.paymentStatus === "PAID" ||
+        order?.status === "DELIVERED",
+    },
+    {
+      label: "Order Created",
+      date: formatDate(order?.createdAt),
+      active: true,
+    },
   ];
 
   return (
-    <div className="w-full mt-5 ">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-9">
-        {/* ITEMS CARD */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          {/* Header */}
-          <div className="grid grid-cols-[1fr_80px_100px_120px_40px] text-sm font-semibold text-gray-600 pb-4 border-b">
-            <span>Items</span>
-            <span className="text-center">Qty</span>
-            <span className="text-right">Price</span>
-            <span className="text-right">Total Price</span>
-            <span />
-          </div>
+    <div className="w-full mt-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-9">
 
-          {/* Items */}
-          <div className="divide-y">
-            {items.map((item, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[1fr_80px_100px_120px_40px] items-center py-5"
-              >
-                {/* Item Info */}
-                <div className="flex gap-4">
-                  <div className="w-14 h-14 rounded-lg bg-gray-200" />
-                  <div>
-                    <p className="text-xs font-semibold text-red-500 uppercase">
-                      Main Course
-                    </p>
-                    <p className="font-medium text-gray-900">
-                      {item.name}
-                    </p>
-                    <div className="flex items-center gap-1 text-sm text-orange-400 mt-1">
-                      ★★★★☆
-                      <span className="text-gray-400 text-xs ml-1">
-                        (454 reviews)
-                      </span>
+        {/* ITEMS */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+
+          {/* ✅ Scroll wrapper for mobile ONLY */}
+          <div className="w-full overflow-x-auto">
+            
+            {/* HEADER */}
+            <div className="min-w-[600px] grid grid-cols-[1fr_80px_100px_120px_40px] text-xs sm:text-sm font-semibold text-gray-600 pb-4 border-b">
+              <span>Items</span>
+              <span className="text-center">Qty</span>
+              <span className="text-right">Price</span>
+              <span className="text-right">Total Price</span>
+              <span />
+            </div>
+
+            {/* ITEMS */}
+            <div className="divide-y min-w-[600px]">
+              {items.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="grid grid-cols-[1fr_80px_100px_120px_40px] items-center py-4 sm:py-5"
+                >
+                  <div className="flex gap-3 sm:gap-4 min-w-0">
+                    <img
+                      src={item?.menuItem?.imageUrl}
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg object-cover flex-shrink-0"
+                    />
+
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs font-semibold text-red-500 uppercase truncate">
+                        {item?.menuItem?.category?.name || "Item"}
+                      </p>
+
+                      <p className="font-medium text-gray-900 text-xs sm:text-sm truncate">
+                        {item.menuItemName}
+                      </p>
+
+                      <p className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
+                        {item.variationName}
+                      </p>
                     </div>
                   </div>
+
+                  <span className="text-center text-xs sm:text-sm">
+                    {item.quantity}x
+                  </span>
+
+                  <span className="text-right text-xs sm:text-sm">
+                    Rs {item.unitPrice.toFixed(2)}
+                  </span>
+
+                  <span className="text-right font-semibold text-xs sm:text-sm">
+                    Rs {item.lineTotal.toFixed(2)}
+                  </span>
+
+                  <div className="flex justify-end">
+                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 cursor-pointer" />
+                  </div>
                 </div>
+              ))}
+            </div>
 
-                {/* Qty */}
-                <span className="text-center text-gray-700">
-                  {item.qty}x
-                </span>
-
-                {/* Price */}
-                <span className="text-right text-gray-700">
-                  ${item.price.toFixed(2)}
-                </span>
-
-                {/* Total */}
-                <span className="text-right font-semibold text-gray-900">
-                  ${(item.qty * item.price).toFixed(2)}
-                </span>
-
-                {/* Remove */}
-                <div className="flex justify-end">
-                  <X className="w-5 h-5 text-red-500 cursor-pointer" />
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 
-        {/* HISTORY CARD */}
-       {/* HISTORY CARD */}
-<div className="bg-white rounded-2xl p-6 shadow-sm">
-  <h3 className="text-lg font-semibold mb-6">History</h3>
+        {/* HISTORY */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+          <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6">
+            History
+          </h3>
 
-  <div className="space-y-0">
-    {[
-      { label: 'Order Delivered', date: '-', active: false },
-      { label: 'On Delivery', date: 'Sat, 23 Jul 2020, 01:24 PM', active: true },
-      { label: 'Payment Success', date: 'Fri, 22 Jul 2020, 10:44 AM', active: true },
-      { label: 'Order Created', date: 'Thu, 21 Jul 2020, 11:49 AM', active: true },
-    ].map((h, i, arr) => {
-      const nextIsActive = arr[i + 1]?.active;
+          <div className="space-y-0">
+            {history.map((h, i, arr) => {
+              const nextIsActive = arr[i + 1]?.active;
 
-      return (
-        <div key={i} className="relative flex gap-4">
-          {/* Timeline column */}
-          <div className="flex flex-col items-center">
-            {/* Dot */}
-            <span
-              className={`w-3 h-3 rounded-full ${
-                h.active ? 'bg-red-500' : 'bg-gray-300'
-              }`}
-            />
+              return (
+                <div key={i} className="relative flex gap-3 sm:gap-4 items-start">
+                  
+                  {/* TIMELINE */}
+                  <div className="flex flex-col items-center pt-[4px] sm:pt-[6px]">
+                    
+                    <span
+                      className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${
+                        h.active ? "bg-red-500" : "bg-gray-300"
+                      }`}
+                    />
 
-            {/* Line BELOW dot */}
-            {i !== arr.length - 1 && (
-              <span
-                className={`w-px flex-1 ${
-                  h.active && nextIsActive
-                    ? 'bg-red-500'
-                    : 'bg-gray-200'
-                }`}
-              />
-            )}
-          </div>
+                    {i !== arr.length - 1 && (
+                      <span
+                        className={`w-px h-full ${
+                          h.active && nextIsActive
+                            ? "bg-red-500"
+                            : "bg-gray-200"
+                        }`}
+                        style={{ minHeight: "24px" }}
+                      />
+                    )}
+                  </div>
 
-          {/* Content — aligned to dot */}
-          <div className="pt-[2px] pb-6">
-            <p className="font-medium text-gray-900 leading-tight">
-              {h.label}
-            </p>
-            <p className="text-sm text-gray-500 leading-tight">
-              {h.date}
-            </p>
+                  {/* CONTENT */}
+                  <div className="pb-5 sm:pb-6">
+                    <p className="font-medium text-gray-900 text-sm sm:text-base leading-tight">
+                      {h.label}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-[2px] leading-tight">
+                      {h.date}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-      );
-    })}
-  </div>
-</div>
 
       </div>
     </div>

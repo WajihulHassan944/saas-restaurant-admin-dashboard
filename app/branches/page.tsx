@@ -1,80 +1,68 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState } from "react";
 import Container from "@/components/container";
 import Header from "@/components/branches/header";
 import BranchesClient from "@/components/branches/BranchesClient";
-import { API_BASE_URL } from "@/lib/constants";
+import { useGetBranches } from "@/hooks/useBranches";
+import { useAuth } from "@/hooks/useAuth"; // assuming you already have this
 
 export default function BranchesPage() {
-  const [branches, setBranches] = useState<any[]>([]);
-  const [meta, setMeta] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  /**
+   * ==============================
+   * LOCAL FILTER STATE
+   * ==============================
+   */
+  const [filters, setFilters] = useState({
+    search: "",
+    sortOrder: "ASC" as "ASC" | "DESC",
+    includeInactive: false,
+    withDeleted: false,
+    page: 1,
+  });
 
-  const fetchBranches = useCallback(async (filters: any = {}) => {
-    setLoading(true);
+  const { user } = useAuth(); // cleaner than localStorage
+const restaurantId =
+  user?.restaurantId ?? undefined;
+  /**
+   * ==============================
+   * QUERY
+   * ==============================
+   */
+  const { data, isLoading, refetch } = useGetBranches({
+    ...filters,
+    restaurantId,
+  });
 
-    try {
-      const authRaw = localStorage.getItem("auth");
-      if (!authRaw) return;
+  const branches = data?.data || [];
+  const meta = data?.meta || null;
 
-      const auth = JSON.parse(authRaw);
-
-      const token = auth?.accessToken;
-      const restaurantId = auth?.user?.restaurantId;
-
-      if (!token || !restaurantId) return;
-
-      const params = new URLSearchParams({
-        restaurantId,
-        search: filters.search || "",
-        sortOrder: filters.sortOrder || "ASC",
-        includeInactive: String(filters.includeInactive || false),
-        withDeleted: String(filters.withDeleted || false),
-        page: String(filters.page || 1),
-      });
-
-      const res = await fetch(
-        `${API_BASE_URL}/v1/branches?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setBranches(data?.data || []);
-        setMeta(data?.meta || null);
-      }
-    } catch (error) {
-      console.error("Failed to fetch branches:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBranches();
-  }, [fetchBranches]);
+  /**
+   * ==============================
+   * HANDLERS
+   * ==============================
+   */
+  const handleFetchBranches = (newFilters?: Partial<typeof filters>) => {
+    setFilters((prev) => ({
+      ...prev,
+      ...newFilters,
+    }));
+  };
 
   return (
     <Container>
       <Header
         title="Branch List"
         description="View and manage all branches from here"
-        onBranchCreated={() => fetchBranches()}
+        onBranchCreated={refetch} // ✅ clean refetch
       />
 
       <div className="space-y-[32px] bg-white lg:p-[30px] rounded-[14px] shadow-sm">
         <BranchesClient
           branches={branches}
           meta={meta}
-          loading={loading}
-          fetchBranches={fetchBranches}
+          loading={isLoading}
+          fetchBranches={handleFetchBranches} // ✅ controlled filter update
         />
       </div>
     </Container>

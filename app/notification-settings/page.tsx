@@ -12,10 +12,10 @@ const NotificationSettingsPage = () => {
                 title="Notification Settings"
                 description="Automatically print orders and connect your POS system."
             />
-             <Button variant="primary"  className="h-[38px] sm:h-[44px] rounded-[12px] px-4 sm:px-15 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[13px] sm:text-[15px] font-[500]"
+             {/* <Button variant="primary"  className="h-[38px] sm:h-[44px] rounded-[12px] px-4 sm:px-15 flex items-center gap-2 bg-primary hover:bg-red-700 text-white text-[13px] sm:text-[15px] font-[500]"
       >
                 Save
-             </Button>
+             </Button> */}
 </div>
             <div className="flex flex-col gap-[32px] w-full bg-white p-[30px] rounded-[14px]">
                 <NotificationForm />

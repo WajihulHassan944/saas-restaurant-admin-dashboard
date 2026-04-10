@@ -1,33 +1,41 @@
-"use client"
+"use client";
 
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Info } from "lucide-react"
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Info } from "lucide-react";
+import AsyncSelect from "../ui/AsyncSelect";
 
 interface Props {
-  formData: any
-  setFormData: (data: any) => void
+  formData: any;
+  setFormData: (data: any) => void;
+  selectedBranch: any;
+  setSelectedBranch: (val: any) => void;
+  fetchBranches: any;
 }
 
-const DeliveryManForm = ({ formData, setFormData }: Props) => {
-
+const DeliveryManForm = ({
+  formData,
+  setFormData,
+  selectedBranch,
+  setSelectedBranch,
+  fetchBranches,
+}: Props) => {
   const handleChange = (field: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
       [field]: value,
-    }))
-  }
+    }));
+  };
 
   return (
-    <div className="bg-white rounded-[14px] p-[30px]">
-      <div className="grid grid-cols-12 gap-[48px]">
+    <div className="bg-white rounded-[14px] p-[30px] h-fit overflow-visible">
+      <div className="grid grid-cols-12 gap-[48px] overflow-visible">
         <div className="col-span-4 space-y-[64px]">
           <SectionTitle title="Setup Basic Info" />
         </div>
 
-        <div className="col-span-8 space-y-[40px]">
-          <section className="space-y-[24px]">
-
+        <div className="col-span-8 space-y-[40px] overflow-visible">
+          <section className="space-y-[24px] overflow-visible">
             <div className="grid grid-cols-2 gap-[24px]">
               <FormField
                 label="First Name *"
@@ -70,18 +78,25 @@ const DeliveryManForm = ({ formData, setFormData }: Props) => {
               />
             </div>
 
+            <div className="space-y-[6px] overflow-visible h-[55vh]">
+              <Label>Branch *</Label>
+
+              <AsyncSelect
+                value={selectedBranch}
+                onChange={setSelectedBranch}
+                placeholder="Select Branch"
+                fetchOptions={fetchBranches}
+
+              />
+            </div>
           </section>
         </div>
-
-        {/* <div className="col-span-4 space-y-[64px]"> <SectionTitle title="Identity Information" /> </div> <div className="col-span-8 space-y-[40px]"> <section className="space-y-[24px]"> <div className="flex gap-[24px]"> <Radio label="Passport" /> <Radio label="National ID" /> <Radio label="Driving License" active /> </div> <FormField value="" label="Identity Number *" onChange={(e)=>console.log(e)} /> <div className="flex flex-col items-center text-center space-y-[12px]"> <Label>Business Logo</Label> <div className="w-[180px] rounded-[12px] overflow-hidden border"> <img src="/dummy-user.jpg" alt="Business Logo" className="w-full h-[180px] object-cover" /> </div> <p className="text-sm text-gray-500 max-w-[320px]"> This is the business logo. It has been uploaded in the business setup </p> <button className="text-primary text-sm font-medium"> + See More </button> </div> </section></div> */}
-    
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default DeliveryManForm
-
+export default DeliveryManForm;
 
 /* helpers */
 
@@ -91,7 +106,7 @@ function SectionTitle({ title }: { title: string }) {
       <Info size={18} className="text-gray-400" />
       <span className="text-base font-semibold text-[#646982]">{title}</span>
     </div>
-  )
+  );
 }
 
 function FormField({
@@ -99,9 +114,9 @@ function FormField({
   value,
   onChange,
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
 }) {
   return (
     <div className="space-y-[6px]">
@@ -112,5 +127,5 @@ function FormField({
         className="h-[44px] border-[#BBBBBB]"
       />
     </div>
-  )
+  );
 }

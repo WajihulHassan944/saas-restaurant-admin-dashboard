@@ -28,8 +28,8 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
       {/* RIGHT SIDE (matched with design) */}
        <div className="flex flex-wrap gap-3 sm:gap-4 justify-start">
        {/* Ongoing Orders */}
-        <div className="relative">
-          <Button
+          {/* <div className="relative">
+        <Button
             variant="outline"
           className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
              onClick={() => setOpenOngoingOrders(true)}
@@ -41,7 +41,6 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
           </span>
         </div>
 
-        {/* Hold Orders */}
         <div className="relative">
           <Button
             variant="outline"
@@ -53,7 +52,7 @@ const [openMakeReservation, setOpenMakeReservation] = useState(false);
           <span className="absolute -top-2 -right-2 size-5 rounded-full bg-primary text-white text-xs flex items-center justify-center">
             1
           </span>
-        </div>
+        </div> */}
 
         {/* Make Reservation */}
         <Button

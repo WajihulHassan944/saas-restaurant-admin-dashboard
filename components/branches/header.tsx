@@ -45,14 +45,14 @@ export default function BranchesHeader({
         {!isEditMode ? (
           <>
             {/* View Trash */}
-            <Button
+            {/* <Button
               variant="outline"
               className="h-[38px] sm:h-[44px] rounded-[12px] px-3 sm:px-4 flex items-center gap-2 text-[#767676] border-[#E6E7EC] text-[13px] sm:text-[15px] font-[500]"
               onClick={() => router.push("/branches/trash")}
             >
               <Trash2 size={18} className="text-[#767676]" />
               View Trash
-            </Button>
+            </Button> */}
 
             {/* Import */}
             <Button

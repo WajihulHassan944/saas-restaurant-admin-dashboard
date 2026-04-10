@@ -72,9 +72,19 @@ const getStoredAuth = () => {
         throw new Error(data?.message || "Login failed");
       }
 const stored = getStoredAuth();
+const allowedRoles = ["BUSINESS_ADMIN", "BRANCH_ADMIN"];
+const user = data?.data?.user;
 
+if (!user) {
+  throw new Error("Invalid login response");
+}
+
+if (!allowedRoles.includes(user.role)) {
+  toast.error("You are not authorized to access this system");
+  return;
+}
 setUser({
-  ...data.user,
+  ...user,
   restaurantId: stored?.user?.restaurantId ?? null,
   branchId: stored?.user?.branchId ?? null,
 });

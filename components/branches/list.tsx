@@ -22,15 +22,29 @@ const openDialog = (branchId: string) => {
 
   const closeDialog = () => setIsModalOpen(false);
 
-  if (loading) {
+    if (loading) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center text-gray-400">
-        Loading branches...
+      <div className="flex items-center justify-between bg-white rounded-[14px] border border-gray-200 px-4 py-4 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="size-4 bg-gray-200 rounded" />
+          <div className="size-10 bg-gray-200 rounded-lg" />
+          <div className="space-y-2">
+            <div className="h-3 w-[120px] bg-gray-200 rounded" />
+            <div className="h-2 w-[80px] bg-gray-200 rounded" />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+        </div>
       </div>
     );
   }
 
-  if (!branches || branches.length === 0) {
+
+  if (!branches || branches.length === 0  && !loading) {
     return (
       <EmptyState
         title="Looks like there are no branches yet!"
@@ -47,7 +61,7 @@ const openDialog = (branchId: string) => {
           id={branch.id}
           name={branch.name}
           isActive={branch.isActive}
-          
+          loading={loading}
           isDefault={branch.isMain}
           itemsCount={0} 
           openDialog={openDialog}

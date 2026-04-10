@@ -1,22 +1,48 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Container from "@/components/container";
 import AddDeliveryManHeader from "@/components/deliveryman/add/AddDeliveryManHeader";
 import DeliveryManForm from "@/components/forms/deliveryman-form";
 import { toast } from "sonner";
-import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useCreateDeliveryman,
+  useUpdateDeliveryman,
+  useDeliveryman,
+} from "@/hooks/useDeliverymen";
+import { useGetBranches } from "@/hooks/useBranches";
+import { deliverymanSchema } from "@/validations/deliverymen";
 
 const AddDeliveryMan = () => {
-  const { token } = useAuth();
-  const { post, patch, get } = useApi(token);
-
+  const { restaurantId } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const editId = searchParams.get("editId");
+
+  /* ================= DELIVERYMAN HOOKS ================= */
+  const { data: deliveryman, isLoading: isFetching } =
+    useDeliveryman(editId || undefined);
+
+  const createMutation = useCreateDeliveryman();
+  const updateMutation = useUpdateDeliveryman();
+
+  /* ================= BRANCH STATE (FOR SEARCH/PAGINATION) ================= */
+  const [branchQuery, setBranchQuery] = useState({
+    search: "",
+    page: 1,
+  });
+
+  const { data: branchesData, isFetching: isBranchesFetching } =
+    useGetBranches({
+      search: branchQuery.search,
+      restaurantId: restaurantId ?? undefined, 
+    });
+
+  /* ================= STATE ================= */
+  const [selectedBranch, setSelectedBranch] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -25,132 +51,102 @@ const AddDeliveryMan = () => {
     email: "",
     vehicleType: "",
     vehicleNumber: "",
-    status: "OFFLINE",
+    status: "OFFLINE" as "ONLINE" | "OFFLINE",
   });
 
-  const [isFetching, setIsFetching] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const hasFetched = useRef(false); // 🔥 prevent duplicate calls
-
-  /* ================= GET AUTH ================= */
-  const getStoredAuth = () => {
-    try {
-      const stored = localStorage.getItem("auth");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  };
-
-  /* ================= FETCH FOR EDIT ================= */
-  const fetchDeliverymanDetails = async () => {
-    if (!editId || !token || hasFetched.current) return;
-
-    try {
-      hasFetched.current = true; // 🔥 prevent multiple calls
-      setIsFetching(true);
-
-      const res = await get(`/v1/deliverymen/${editId}`);
-
-      if (res.data) {
-        setFormData({
-          firstName: res.data.firstName || "",
-          lastName: res.data.lastName || "",
-          phone: res.data.phone || "",
-          email: res.data.email || "",
-          vehicleType: res.data.vehicleType || "",
-          vehicleNumber: res.data.vehicleNumber || "",
-          status: res.data.status || "OFFLINE",
-        });
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch deliveryman");
-    } finally {
-      setIsFetching(false);
-    }
-  };
-
-  /* ================= EFFECT ================= */
+  /* ================= PREFILL ================= */
   useEffect(() => {
-    if (!token) return;
-    fetchDeliverymanDetails();
-  }, [token, editId]);
+    if (!deliveryman) return;
+
+    setFormData({
+      firstName: deliveryman.firstName || "",
+      lastName: deliveryman.lastName || "",
+      phone: deliveryman.phone || "",
+      email: deliveryman.email || "",
+      vehicleType: deliveryman.vehicleType || "",
+      vehicleNumber: deliveryman.vehicleNumber || "",
+      status: deliveryman.status || "OFFLINE",
+    });
+
+    if (deliveryman.branch) {
+      setSelectedBranch(deliveryman.branch);
+    }
+  }, [deliveryman]);
+
+  /* ================= BRANCH FETCH WRAPPER ================= */
+  const fetchBranches = async ({ search, page }: any) => {
+    // update query → triggers hook refetch
+    setBranchQuery({
+      search: search || "",
+      page: page || 1,
+    });
+
+    // return current cached data (React Query handles freshness)
+    return {
+      data: branchesData?.data || [],
+      meta: branchesData?.meta,
+    };
+  };
 
   /* ================= SUBMIT ================= */
- const handleSubmit = async () => {
-  const stored = getStoredAuth();
+  const handleSubmit = async () => {
+    const branchId = selectedBranch?.id;
 
-  const restaurantId = stored?.user?.restaurantId;
-  const branchId = stored?.user?.branchId;
-
-  if (!formData.firstName || !formData.lastName || !formData.phone) {
-    toast.error("Please fill required fields");
-    return;
-  }
-
-  try {
-    setIsSaving(true);
-
-    let res;
-
-    if (editId) {
-      /* ================= UPDATE ================= */
-      const payload = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone,
-        email: formData.email,
-        vehicleType: formData.vehicleType,
-        vehicleNumber: formData.vehicleNumber,
-      };
-
-      res = await patch(`/v1/deliverymen/${editId}`, payload);
-    } else {
-      /* ================= CREATE ================= */
-      if (!restaurantId || !branchId) {
-        toast.error("Restaurant or branch not found");
-        return;
-      }
-
+    try {
       const payload = {
         ...formData,
         restaurantId,
         branchId,
       };
 
-      res = await post("/v1/deliverymen", payload);
-    }
+      const parsed = deliverymanSchema.safeParse(payload);
 
-    if (res) {
-      toast.success(
-        editId
-          ? "Delivery man updated successfully"
-          : "Delivery man created successfully"
-      );
+      if (!parsed.success) {
+        toast.error(parsed.error.errors[0]?.message || "Invalid form data");
+        return;
+      }
 
-      router.push("/deliveryman");
+      /* CREATE */
+      if (!editId) {
+        if (!restaurantId || !branchId) {
+          toast.error("Restaurant or branch not found");
+          return;
+        }
+
+        await createMutation.mutateAsync(parsed.data);
+        return;
+      }
+
+      /* UPDATE */
+      await updateMutation.mutateAsync({
+  id: editId,
+  payload: (({ restaurantId, status, ...rest }) => rest)(parsed.data), 
+});
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Something went wrong");
     }
-  } catch (err) {
-    console.error(err);
-    toast.error("Something went wrong");
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
+
+  /* ================= LOADING ================= */
+  const isSaving =
+    createMutation.isPending || updateMutation.isPending;
+
   return (
     <Container>
       <AddDeliveryManHeader
         title={editId ? "Edit Delivery Man" : "Create New Delivery Man"}
         description="Manage delivery man details"
         onConfirm={handleSubmit}
-        loading={isSaving} // ✅ FIXED (no fetch loading here)
+        loading={isSaving || isFetching}
       />
 
       <DeliveryManForm
         formData={formData}
         setFormData={setFormData}
+        selectedBranch={selectedBranch}
+        setSelectedBranch={setSelectedBranch}
+        fetchBranches={fetchBranches}
       />
     </Container>
   );

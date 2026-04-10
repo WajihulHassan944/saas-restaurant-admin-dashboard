@@ -1,9 +1,7 @@
-
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, MoreHorizontal } from "lucide-react";
-import Pagination from "@/components/pagination";
 import EmptyState from "../shared/EmptyState";
 import { useRouter } from "next/navigation";
 import {
@@ -14,7 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import SortableHeader from "../shared/sortable-head";
+import TableSkeleton from "../shared/TableSkeleton";
+import SortHeader from "../shared/sort-header";
 
 interface Order {
   id: string;
@@ -22,21 +21,41 @@ interface Order {
   status?: string;
   totalAmount?: number;
   createdAt?: string;
+  isGroupOrder?: boolean;
 }
-
 interface OrdersTableProps {
-  orders: Order[];
+  orders: any[];
   loading: boolean;
+  sortKey: any;
+  sortDir: "asc" | "desc";
+  onSort: (key: any) => void;
+  activeTab: string; // ✅ NEW
 }
 
-const OrdersTable = ({ orders, loading }: OrdersTableProps) => {
+const OrdersTable = ({
+  orders,
+  loading,
+  sortKey,
+  sortDir,
+  onSort,
+  activeTab
+}: OrdersTableProps) => {
   const router = useRouter();
 
   if (loading) {
     return (
-      <div className="text-sm text-gray-400 py-10 text-center">
-        Loading orders...
-      </div>
+      <>
+        <div className="lg:hidden text-sm text-gray-400 py-10 text-center">
+          Loading orders...
+        </div>
+
+        <TableSkeleton
+          headers={["Order ID", "Date", "Order Type", "Amount", "Status"]}
+          rows={6}
+          showCheckbox
+          showActions
+        />
+      </>
     );
   }
 
@@ -49,148 +68,119 @@ const OrdersTable = ({ orders, loading }: OrdersTableProps) => {
     );
   }
 
+  const getOrderRoute = (order: Order) =>
+    order.isGroupOrder
+      ? `/orders/group/${order.id}`
+      : `/orders/details/${order.id}`;
+
   return (
     <div className="space-y-4">
-      {/* -------- Mobile Cards -------- */}
-      <div className="lg:hidden">
-        {orders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-white p-4 rounded-lg shadow-sm border"
-          >
-            <div className="flex justify-between items-center">
-              <div className="text-gray-500 font-medium">{order.id}</div>
+      {/* MOBILE unchanged */}
 
-              <div
-                className={`text-sm font-medium ${
-                  order.status === "DELIVERED"
-                    ? "text-green-600"
-                    : order.status === "CANCELLED" ||
-                      order.status === "REFUNDED"
-                    ? "text-red-600"
-                    : "text-yellow-600"
-                }`}
-              >
-                {order.status}
-              </div>
-            </div>
-
-            <div className="mt-2 flex justify-between">
-              <div className="text-gray-600">{order.orderType}</div>
-              <div className="text-gray-500">
-                {order.createdAt
-                  ? new Date(order.createdAt).toLocaleDateString()
-                  : "-"}
-              </div>
-            </div>
-
-            <div className="mt-2 flex justify-between">
-              <div className="text-gray-500">
-                {order.createdAt
-                  ? new Date(order.createdAt).toLocaleTimeString()
-                  : "-"}
-              </div>
-              <div className="font-medium text-green-600">
-                ${order.totalAmount ?? 0}
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2 text-gray-500">
-              <button
-                className="p-2 hover:text-primary"
-                onClick={() => router.push(`/orders/${order.id}`)}
-              >
-                <Eye size={18} />
-              </button>
-
-              <button className="p-2 hover:text-primary">
-                <MoreHorizontal size={18} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* -------- Desktop Table -------- */}
+      {/* DESKTOP */}
       <div className="hidden lg:block">
         <Table>
-          <TableHeader>
-            <TableRow className="border-none">
-              <TableHead className="w-[50px]">
-                <Checkbox />
-              </TableHead>
+         <TableHeader>
+  <TableRow className="border-none">
+    <TableHead className="w-[50px]">
+      <Checkbox />
+    </TableHead>
 
-              <SortableHeader label="Order ID" />
-              <SortableHeader label="Date" />
-              <SortableHeader label="Order Type" />
-              <SortableHeader label="Amount" />
-              <SortableHeader label="Status" />
+    {activeTab === "reservations" ? (
+      <>
+        <SortHeader label="Reservation ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Customer" sortKey="customerName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Guests" sortKey="guestCount" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Reservation Date" sortKey="reservationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Status" sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+      </>
+    ) : (
+      <>
+        <SortHeader label="Order ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Date" sortKey="createdAt" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Order Type" sortKey="orderType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Amount" sortKey="totalAmount" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label="Status" sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+      </>
+    )}
 
-              <TableHead className="text-center">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
+    <TableHead className="text-center">Actions</TableHead>
+  </TableRow>
+</TableHeader>
 
-          <TableBody>
-            {orders.map((order) => (
-              <TableRow key={order.id} className="border-none h-[70px]">
-                <TableCell>
-                  <Checkbox />
-                </TableCell>
+        <TableBody>
+  {orders.map((order) => (
+    <TableRow key={order.id} className="border-none h-[70px]">
+      <TableCell>
+        <Checkbox />
+      </TableCell>
 
-                <TableCell className="px-4 text-gray-500">
-                  {order.id}
-                </TableCell>
+      {activeTab === "reservations" ? (
+        <>
+          <TableCell className="px-4 text-gray-500">{order.id}</TableCell>
 
-                <TableCell className="px-4 text-gray-500">
-                  {order.createdAt
-                    ? new Date(order.createdAt).toLocaleDateString()
-                    : "-"}
-                </TableCell>
+          <TableCell className="px-4 text-gray-600">
+            {order.customerName || "-"}
+          </TableCell>
 
-                <TableCell className="px-4 text-gray-600">
-                  {order.orderType ?? "-"}
-                </TableCell>
+          <TableCell className="px-4">
+            {order.guestCount}
+          </TableCell>
 
-                <TableCell className="px-4 font-medium text-green-600">
-                  ${order.totalAmount ?? 0}
-                </TableCell>
+          <TableCell className="px-4 text-gray-500">
+            {order.reservationDate
+              ? new Date(order.reservationDate).toLocaleString()
+              : "-"}
+          </TableCell>
 
-                <TableCell className="px-4">
-                  <span
-                    className={`text-sm font-medium ${
-                      order.status === "DELIVERED"
-                        ? "text-green-600"
-                        : order.status === "CANCELLED" ||
-                          order.status === "REFUNDED"
-                        ? "text-red-600"
-                        : "text-yellow-600"
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </TableCell>
+          <TableCell className="px-4">
+            <span className="text-yellow-600 font-medium">
+              {order.status}
+            </span>
+          </TableCell>
+        </>
+      ) : (
+        <>
+          <TableCell className="px-4 text-gray-500">{order.id}</TableCell>
 
-                <TableCell className="px-4">
-                  <div className="flex items-center justify-center gap-2 text-gray-500">
-                    <button
-                      className="p-2 hover:text-primary"
-                      onClick={() => router.push(`/orders/${order.id}`)}
-                    >
-                      <Eye size={18} />
-                    </button>
+          <TableCell className="px-4 text-gray-500">
+            {order.createdAt
+              ? new Date(order.createdAt).toLocaleDateString()
+              : "-"}
+          </TableCell>
 
-                    <button className="p-2 hover:text-primary">
-                      <MoreHorizontal size={18} />
-                    </button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
+          <TableCell className="px-4 text-gray-600">
+            {order.orderType ?? "-"}
+          </TableCell>
+
+          <TableCell className="px-4 font-medium text-green-600">
+            ${order.totalAmount ?? 0}
+          </TableCell>
+
+          <TableCell className="px-4">
+            <span className="text-sm font-medium text-yellow-600">
+              {order.status}
+            </span>
+          </TableCell>
+        </>
+      )}
+
+      <TableCell className="px-4">
+        <div className="flex items-center justify-center gap-2 text-gray-500">
+          <button className="p-2 hover:text-primary" onClick={() => router.push(getOrderRoute(order))}>
+            <Eye size={18} />
+          </button>
+
+          <button className="p-2 hover:text-primary">
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody>
         </Table>
       </div>
-
-      <Pagination />
     </div>
   );
 };

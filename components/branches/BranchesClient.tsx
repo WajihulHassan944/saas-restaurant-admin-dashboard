@@ -3,7 +3,6 @@
 import { useState } from "react";
 import BranchFilters from "./BranchFilters";
 import Table from "./list";
-import BranchesPagination from "./BranchesPagination";
 
 interface Props {
   branches: any[];
@@ -45,12 +44,7 @@ export default function BranchesClient({
       <div className="px-2 lg:px-0">
         <Table branches={branches} loading={loading} />
 
-        {/* <BranchesPagination
-          meta={meta}
-          onPageChange={(page: number) =>
-            handleFilterChange({ page })
-          }
-        /> */}
+      
       </div>
     </>
   );

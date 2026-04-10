@@ -10,9 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import useApi from "@/hooks/useApi";
-import { useAuthContext } from "@/context/AuthContext";
 import { X } from "lucide-react";
+
+import {
+  useCreateStaffRole,
+  useUpdateStaffRole,
+} from "@/hooks/useEmployees";
+
+import { staffRoleSchema } from "@/validations/employees";
 
 type Permission = {
   access: string;
@@ -23,8 +28,9 @@ type RoleModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: any;
-  onSuccess?: () => void; // 👈 add this
+  onSuccess?: () => void;
 };
+
 const ACCESS_OPTIONS = [
   "Zone",
   "Orders",
@@ -38,13 +44,9 @@ const OPERATIONS = ["Create", "Read", "Update", "Delete"];
 export function AddRoleModal({
   open,
   onOpenChange,
-  initialData, onSuccess
+  initialData,
+  onSuccess,
 }: RoleModalProps) {
-  const { token, user } = useAuthContext();
-  const { post, patch } = useApi(token);
-
-  const [loading, setLoading] = useState(false);
-
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -54,13 +56,18 @@ export function AddRoleModal({
 
   const isEditMode = !!initialData;
 
+  const createRoleMutation = useCreateStaffRole();
+  const updateRoleMutation = useUpdateStaffRole();
+
+  const loading =
+    createRoleMutation.isPending || updateRoleMutation.isPending;
+
   /* ---------- Prefill for Edit ---------- */
   useEffect(() => {
     if (initialData && open) {
       setName(initialData.name || "");
       setDescription(initialData.description || "");
 
-      // transform backend permissions
       const mappedPermissions =
         initialData.permissions?.map((p: any) => ({
           access: p.access,
@@ -112,52 +119,34 @@ export function AddRoleModal({
   /* ---------- Submit ---------- */
   const handleSubmit = async () => {
     try {
-      if (!name || permissions.length === 0) {
-        return toast.error("Role name and permissions are required");
+      const payload = {
+        name,
+        description,
+        permissions,
+      };
+
+      // ✅ ZOD VALIDATION
+      const parsed = staffRoleSchema.safeParse(payload);
+
+      if (!parsed.success) {
+        const firstError =
+          parsed.error.errors[0]?.message || "Invalid input";
+        return toast.error(firstError);
       }
-
-      setLoading(true);
-
-const basePayload = {
-  name,
-  permissions,
-  description,
-};
-
-const payload = isEditMode
-  ? basePayload
-  : {
-      ...basePayload,
-      // restaurantId: user?.restaurantId,
-      // branchId: user?.branchId,
-    };
-
-      let res;
 
       if (isEditMode) {
-        // ✅ PATCH
-        res = await patch(`/v1/staff-roles/${initialData.id}`, payload);
+        await updateRoleMutation.mutateAsync({
+          id: initialData.id,
+          data: payload,
+        });
       } else {
-        // ✅ POST
-        res = await post("/v1/staff-roles", payload);
+        await createRoleMutation.mutateAsync(payload);
       }
-
-      if (!res || res.error) {
-        toast.error(res?.error || "Failed to save role");
-        return;
-      }
-
-      toast.success(
-        isEditMode ? "Role updated successfully" : "Role created successfully"
-      );
 
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
       console.error(err);
-      toast.error("Something went wrong");
-    } finally {
-      setLoading(false);
     }
   };
 

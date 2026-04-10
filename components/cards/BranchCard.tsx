@@ -14,27 +14,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { BranchProps } from "@/types/branch";
 import ActionDropdown from "../shared/ActionDropdown";
-import { API_BASE_URL } from "@/lib/constants";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import OpeningHoursModal from "../branches/OpeningHoursModal";
+
+import {
+  useDeleteBranch,
+  useActivateBranch,
+  useSuspendBranch,
+} from "@/hooks/useBranches";
 
 export default function BranchCard({
   id,
   name,
   isDefault,
   itemsCount,
-  isActive, // ✅ NEW PROP
+  isActive,
   openDialog,
   openMenuDetails,
   editMenu,
-}: BranchProps) {
+  loading, // ✅ NEW
+}: BranchProps & { loading?: boolean }) {
   const [openingHoursOpen, setOpeningHoursOpen] = useState(false);
-  const [token, setToken] = useState("");
-
-  const [statusLoading, setStatusLoading] = useState<
-    "activate" | "suspend" | null
-  >(null);
+console.log("loading state", loading);
+  const deleteMutation = useDeleteBranch();
+  const activateMutation = useActivateBranch();
+  const suspendMutation = useSuspendBranch();
 
   const handleOpenChange = (value: boolean) => {
     setOpeningHoursOpen(value);
@@ -50,110 +54,75 @@ export default function BranchCard({
       name?.toLowerCase().includes(key)
     )?.icon || Store;
 
-  useEffect(() => {
-    const authRaw = localStorage.getItem("auth");
-    if (!authRaw) return;
-
-    try {
-      const auth = JSON.parse(authRaw);
-      setToken(auth?.accessToken || "");
-    } catch {
-      console.error("Invalid auth");
-    }
-  }, []);
-
-  // ================= DELETE =================
+  /**
+   * ================= DELETE
+   */
   const handleDelete = async () => {
     try {
-      const endpoint = openDialog
-        ? `${API_BASE_URL}/v1/branches/${id}`
-        : `${API_BASE_URL}/v1/menus/${id}`;
-
-      const res = await fetch(endpoint, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
-      toast.success("Deleted successfully");
-      window.location.reload();
+      await deleteMutation.mutateAsync(id);
     } catch (err: any) {
-      toast.error(err.message || "Delete failed");
+      console.error(err);
     }
   };
 
-  // ================= STATUS HANDLERS =================
+  /**
+   * ================= ACTIVATE
+   */
   const handleActivate = async () => {
     if (isActive) return;
-
     try {
-      setStatusLoading("activate");
-
-      const res = await fetch(
-        `${API_BASE_URL}/v1/branches/${id}/activate`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
-      toast.success("Branch activated");
-      window.location.reload();
+      await activateMutation.mutateAsync(id);
     } catch (err: any) {
-      toast.error(err.message || "Activation failed");
-    } finally {
-      setStatusLoading(null);
+      console.error(err);
     }
   };
 
+  /**
+   * ================= SUSPEND
+   */
   const handleSuspend = async () => {
     if (!isActive) return;
-
     try {
-      setStatusLoading("suspend");
-
-      const res = await fetch(
-        `${API_BASE_URL}/v1/branches/${id}/suspend`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
-      toast.success("Branch suspended");
-      window.location.reload();
+      await suspendMutation.mutateAsync(id);
     } catch (err: any) {
-      toast.error(err.message || "Suspend failed");
-    } finally {
-      setStatusLoading(null);
+      console.error(err);
     }
   };
+
+  /**
+   * ================= SKELETON STATE
+   */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-between bg-white rounded-[14px] border border-gray-200 px-4 py-4 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="size-4 bg-gray-200 rounded" />
+          <div className="size-10 bg-gray-200 rounded-lg" />
+          <div className="space-y-2">
+            <div className="h-3 w-[120px] bg-gray-200 rounded" />
+            <div className="h-2 w-[80px] bg-gray-200 rounded" />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-    className={`
-  flex flex-col gap-4 items-start
-  bg-white rounded-[14px] border border-gray-200
-  px-4 py-4 overflow-x-auto
-  lg:flex-row lg:items-center lg:justify-between
-  transition
-
-  ${typeof isActive === "boolean" && !isActive ? "opacity-60" : ""}
-`}
+      className={`
+        flex flex-col gap-4 items-start
+        bg-white rounded-[14px] border border-gray-200
+        px-4 py-4 overflow-x-auto
+        lg:flex-row lg:items-center lg:justify-between
+        transition
+        ${typeof isActive === "boolean" && !isActive ? "opacity-60" : ""}
+      `}
     >
       {/* LEFT */}
       <div className="flex items-center gap-4 min-w-0">
@@ -217,62 +186,61 @@ export default function BranchCard({
 
         <Divider />
 
-  <ActionDropdown
-  items={[
-    // ✅ EDIT
-    openDialog
-      ? {
-          label: "Edit Branch",
-          href: `/branches/edit?branchId=${id}`,
-          icon: <Store size={16} />,
-        }
-      : {
-          label: "Edit Menu",
-          onClick: () => editMenu?.(id),
-          icon: <List size={16} />,
-        },
+        <ActionDropdown
+          items={[
+            openDialog
+              ? {
+                  label: "Edit Branch",
+                  href: `/branches/edit?branchId=${id}`,
+                  icon: <Store size={16} />,
+                }
+              : {
+                  label: "Edit Menu",
+                  onClick: () => editMenu?.(id),
+                  icon: <List size={16} />,
+                },
 
-    // ✅ ONLY FOR BRANCH
-    ...(openDialog
-      ? [
-          {
-            label: "Opening Hours",
-            onClick: () => setOpeningHoursOpen(true),
-            icon: <Store size={16} />,
-          },
-          {
-            label: "Activate",
-            onClick: handleActivate,
-            icon:
-              statusLoading === "activate" ? (
+            ...(openDialog
+              ? [
+                  {
+                    label: "Opening Hours",
+                    onClick: () => setOpeningHoursOpen(true),
+                    icon: <Store size={16} />,
+                  },
+                  {
+                    label: "Activate",
+                    onClick: handleActivate,
+                    icon: activateMutation.isPending ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Power size={16} />
+                    ),
+                    className: isActive ? "opacity-40 pointer-events-none" : "",
+                  },
+                  {
+                    label: "Suspend",
+                    onClick: handleSuspend,
+                    icon: suspendMutation.isPending ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <PauseCircle size={16} />
+                    ),
+                    className: !isActive ? "opacity-40 pointer-events-none" : "",
+                  },
+                ]
+              : []),
+
+            {
+              label: "Delete",
+              onClick: handleDelete,
+              icon: deleteMutation.isPending ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Power size={16} />
+                <Trash size={16} className="text-red-500" />
               ),
-            className: isActive ? "opacity-40 pointer-events-none" : "",
-          },
-          {
-            label: "Suspend",
-            onClick: handleSuspend,
-            icon:
-              statusLoading === "suspend" ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <PauseCircle size={16} />
-              ),
-            className: !isActive ? "opacity-40 pointer-events-none" : "",
-          },
-        ]
-      : []),
-
-    // ✅ DELETE (COMMON)
-    {
-      label: "Delete",
-      onClick: handleDelete,
-      icon: <Trash size={16} className="text-red-500" />,
-    },
-  ]}
-/>
+            },
+          ]}
+        />
       </div>
 
       {/* MODAL */}
@@ -286,8 +254,9 @@ export default function BranchCard({
   );
 }
 
-// ================= UI =================
-
+/**
+ * UI
+ */
 function ActionButton({
   children,
   onClick,

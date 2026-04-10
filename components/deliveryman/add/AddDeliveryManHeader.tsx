@@ -36,10 +36,9 @@ export default function AddDeliveryManHeader({
         </Button>
 
         <Button
-          variant="primary"
           onClick={onConfirm}
           disabled={loading}
-          className="w-full sm:w-auto whitespace-nowrap text-[15px]"
+          className="w-full sm:w-auto whitespace-nowrap text-[15px] bg-primary"
         >
           {loading ? (
             <span className="flex items-center gap-2">

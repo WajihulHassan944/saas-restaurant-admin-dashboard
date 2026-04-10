@@ -1,4 +1,5 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://deliveryway.dcodax.co/api"
+export const baseURL = process.env.NEXT_PUBLIC_API_URL || "https://deliveryway.dcodax.co/api/v1"
 // https://deliveryway.dcodax.co/api
 // http://104.128.190.131:5050
 export const ROUTES = {
