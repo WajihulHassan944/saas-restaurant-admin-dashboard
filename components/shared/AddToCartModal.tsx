@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Radio } from "../ui/radioBtn";
 import { Input } from "../ui/input";
 import { toast } from "sonner";
+import { useGetBranches } from "@/hooks/useBranches";
+import AsyncSelect from "../ui/AsyncSelect";
 
 interface AddToCartModalProps {
   open: boolean;
@@ -28,65 +30,55 @@ export default function AddToCartModal({
   item,
 }: AddToCartModalProps) {
   const { token, user } = useAuth();
-const restaurantId = user?.restaurantId;
+const restaurantId = user?.restaurantId ?? undefined;
 const branchId = user?.branchId;
   const { post, get } = useApi(token);
 
   const [quantity, setQuantity] = useState(1);
 
   /* ================= CUSTOMER STATE ================= */
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [loadingCustomers, setLoadingCustomers] = useState(false);
-  const [hasNext, setHasNext] = useState(false);
-  /* ================= FETCH CUSTOMERS ================= */
-useEffect(() => {
-  if (!restaurantId || !token) return;
+  const [selectedBranch, setSelectedBranch] = useState<any>(null);
+const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  // ================= FETCH BRANCHES =================
+const { data: branchesData } = useGetBranches({
+  restaurantId,
+});
 
-  // ✅ prevent refetch when customer is already selected
-  if (selectedCustomerId) return;
+const fetchBranches = async ({ search }: any) => {
+  if (!restaurantId) return { data: [] };
 
-  const delay = setTimeout(() => {
-    fetchCustomers(1, true);
-  }, 400);
+  const list = branchesData?.data || [];
 
-  return () => clearTimeout(delay);
-}, [search, restaurantId, token, selectedCustomerId]);
-  const fetchCustomers = async (pageNumber = 1, reset = false) => {
-    try {
-      setLoadingCustomers(true);
-
-      let url = `/v1/admin/users/customers?restaurantId=${restaurantId}&page=${pageNumber}`;
-
-      if (search) {
-        url += `&search=${search}`;
-      }
-
-      const res = await get(url);
-      if (!res) return;
-
-      const data = res.data || [];
-      const meta = res.meta || {};
-
-      setCustomers((prev) =>
-        reset ? data : [...prev, ...data]
-      );
-
-      setHasNext(meta.hasNext);
-      setPage(pageNumber);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingCustomers(false);
-    }
+  return {
+    data: list.filter((b: any) =>
+      b?.name?.toLowerCase().includes(search.toLowerCase())
+    ),
   };
+};
 
-  const loadMore = () => {
-    if (!hasNext) return;
-    fetchCustomers(page + 1);
+// ================= FETCH CUSTOMERS =================
+const fetchCustomers = async ({ search, page }: any) => {
+  if (!restaurantId) return { data: [], meta: {} };
+
+  let url = `/v1/admin/users/customers?restaurantId=${restaurantId}&page=${page}`;
+
+  if (search) url += `&search=${search}`;
+
+  const res = await get(url);
+
+  const raw = res?.data || [];
+
+  // ✅ normalize (IMPORTANT)
+  const normalized = raw.map((u: any) => ({
+    ...u,
+    fullName: `${u?.profile?.firstName || ""} ${u?.profile?.lastName || ""}`,
+  }));
+
+  return {
+    data: normalized,
+    meta: res?.meta,
   };
+};
 
   /* ================= OPTIONS ================= */
   const options = useMemo(() => {
@@ -125,11 +117,11 @@ useEffect(() => {
   /* ================= ADD TO CART ================= */
   const handleAddToCart = async () => {
     try {
-      if (!selectedCustomerId) {
+   if (!selectedCustomer){
         toast.error("Please select customer");
         return;
       }
-      if (!branchId) {
+   if (!selectedBranch) {
   toast.error("Please select a branch");
   return;
 }
@@ -137,7 +129,7 @@ useEffect(() => {
       const payload: any = {
         menuItemId: item.id,
         quantity,
-        branchId, // ✅ added
+       branchId: selectedBranch?.id,
         note: "",
       };
 
@@ -145,7 +137,7 @@ useEffect(() => {
         payload.variationId = selectedOptionId;
       }
 
-     const res = await post(`/v1/cart/items?customerId=${selectedCustomerId}`, payload);
+     const res = await post(`/v1/cart/items?customerId=${selectedCustomer?.id}`, payload);
 
 if (!res || res.error) {
   toast.error(res?.error || "Failed to add to cart");
@@ -154,14 +146,13 @@ if (!res || res.error) {
 
  toast.success("Added to cart");
 window.location.reload();
-// ✅ store selected customer for later cart fetch
-if (selectedCustomerId) {
-  localStorage.setItem("activeCustomerId", selectedCustomerId);
+
+if (selectedCustomer?.id) {
+  localStorage.setItem("activeCustomerId", selectedCustomer.id);
 }
 
 setQuantity(1);
-setSelectedCustomerId(null);
-setSearch("");
+setSelectedCustomer(null);
 
 onOpenChange(false);
     } catch (err) {
@@ -169,7 +160,7 @@ onOpenChange(false);
       toast.error("Failed to add to cart");
     }
   };
-const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md rounded-2xl p-8 max-h-[100vh] overflow-auto">
@@ -188,69 +179,33 @@ const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
         <p className="text-center text-primary font-semibold mt-2">
           ${price}
         </p>
+{/* ================= BRANCH SELECT ================= */}
+<div className="mt-6">
+  <p className="text-sm font-medium mb-2">Select Branch</p>
 
-        {/* ================= CUSTOMER SELECT ================= */}
-        <div className="mt-6 space-y-3">
-          <p className="text-sm font-medium">Select Customer</p>
-
-          <Input
-            placeholder="Search customer..."
-            value={search}
-            onChange={(e) => {
-    setSelectedCustomerId(null); // reset selection if user types again
-    setSearch(e.target.value);
-  }}
-          />
-
-<div className="max-h-[150px] overflow-y-auto border rounded-lg">
-  {loadingCustomers && customers.length === 0 ? (
-    <p className="p-3 text-sm text-gray-400">Loading...</p>
-
-  ) : customers.length === 0 && selectedCustomer ? (
-    <div className="p-3 bg-gray-100">
-      <p className="text-sm font-medium">
-        {selectedCustomer.profile?.firstName} {selectedCustomer.profile?.lastName}
-      </p>
-      <p className="text-xs text-gray-500">{selectedCustomer.email}</p>
-    </div>
-
-  ) : customers.length === 0 ? (
-    <p className="p-3 text-sm text-gray-400">
-      No customers found
-    </p>
-
-  ) : (
-    customers.map((c) => (
-      <div
-        key={c.id}
-        onClick={() => {
-          setSelectedCustomerId(c.id);
-          setSearch(`${c.profile?.firstName || ""} ${c.profile?.lastName || ""}`);
-        }}
-        className={`p-3 cursor-pointer hover:bg-gray-100 ${
-          selectedCustomerId === c.id ? "bg-gray-100" : ""
-        }`}
-      >
-        <p className="text-sm font-medium">
-          {c.profile?.firstName} {c.profile?.lastName}
-        </p>
-        <p className="text-xs text-gray-500">{c.email}</p>
-      </div>
-    ))
-  )}
+  <AsyncSelect
+    value={selectedBranch}
+    onChange={setSelectedBranch}
+    fetchOptions={fetchBranches}
+    labelKey="name"
+    valueKey="id"
+    placeholder="Select branch"
+  />
 </div>
+        {/* ================= CUSTOMER SELECT ================= */}
+      {/* ================= CUSTOMER SELECT ================= */}
+<div className="mt-6">
+  <p className="text-sm font-medium mb-2">Select Customer</p>
 
-          {hasNext && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadMore}
-              disabled={loadingCustomers}
-            >
-              {loadingCustomers ? "Loading..." : "Load More"}
-            </Button>
-          )}
-        </div>
+  <AsyncSelect
+    value={selectedCustomer}
+    onChange={setSelectedCustomer}
+    fetchOptions={fetchCustomers}
+    labelKey="fullName"
+    valueKey="id"
+    placeholder="Select customer"
+  />
+</div>
 
         {/* Quantity */}
         <div className="flex justify-between mt-6">

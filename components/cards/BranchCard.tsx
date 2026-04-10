@@ -139,17 +139,112 @@ const { del } = useApi(token);
     );
   }
 
-  return (
-    <div
-      className={`
-        flex flex-col gap-4 items-start
-        bg-white rounded-[14px] border border-gray-200
-        px-4 py-4 overflow-x-auto
-        lg:flex-row lg:items-center lg:justify-between
-        transition
-        ${typeof isActive === "boolean" && !isActive ? "opacity-60" : ""}
-      `}
-    >
+return (
+  <div
+    className={`
+      bg-white rounded-[14px] border border-gray-200
+      p-4 transition
+      ${typeof isActive === "boolean" && !isActive ? "opacity-60" : ""}
+    `}
+  >
+    {/* MOBILE CARD LAYOUT */}
+    <div className="flex flex-col gap-3 lg:hidden">
+
+      {/* TOP */}
+      <div className="flex items-center gap-3">
+        <Checkbox
+          defaultChecked
+          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+        />
+
+        <div className="size-10 rounded-lg bg-[#F4F6FA] flex items-center justify-center shrink-0">
+          <Icon size={20} className="text-gray-500" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-sm font-semibold truncate">{name}</h4>
+
+            {isDefault && (
+              <span className="text-[11px] font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full">
+                main
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs text-gray-400 mt-1">
+            ID: #{id} • {itemsCount} Items
+          </p>
+        </div>
+      </div>
+
+      {/* ACTION ROW */}
+      <div className="flex items-center justify-between pt-3 border-t">
+
+        <div className="flex items-center gap-2">
+          {(openDialog || openMenuDetails) && (
+            <ActionButton
+              onClick={() =>
+                openDialog ? openDialog(id) : openMenuDetails?.(id)
+              }
+            >
+              <Eye size={18} />
+            </ActionButton>
+          )}
+
+          {openDialog && (
+            <ActionButton onClick={() => setCoverModalOpen(true)}>
+              <ImageIcon size={18} />
+            </ActionButton>
+          )}
+        </div>
+
+        <ActionDropdown
+          items={[
+            openDialog
+              ? {
+                  label: "Edit Branch",
+                  href: `/branches/edit?branchId=${id}`,
+                  icon: <Store size={16} />,
+                }
+              : {
+                  label: "Edit Menu",
+                  onClick: () => editMenu?.(id),
+                  icon: <List size={16} />,
+                },
+
+            ...(openDialog
+              ? [
+                  {
+                    label: "Opening Hours",
+                    onClick: () => setOpeningHoursOpen(true),
+                    icon: <Store size={16} />,
+                  },
+                  {
+                    label: "Activate",
+                    onClick: handleActivate,
+                    icon: <Power size={16} />,
+                  },
+                  {
+                    label: "Suspend",
+                    onClick: handleSuspend,
+                    icon: <PauseCircle size={16} />,
+                  },
+                ]
+              : []),
+
+            {
+              label: "Delete",
+              onClick: () => setDeleteDialogOpen(true),
+              icon: <Trash size={16} className="text-red-500" />,
+            },
+          ]}
+        />
+      </div>
+    </div>
+
+    {/* DESKTOP (UNCHANGED ORIGINAL STRUCTURE) */}
+    <div className="hidden lg:flex items-center justify-between gap-4">
       {/* LEFT */}
       <div className="flex items-center gap-4 min-w-0">
         <Checkbox
@@ -162,10 +257,8 @@ const { del } = useApi(token);
         </div>
 
         <div className="space-y-1 min-w-0">
-          <div className="flex flex-col items-start gap-2 lg:flex-row lg:items-center">
-            <h4 className="text-base font-semibold text-dark truncate">
-              {name}
-            </h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-base font-semibold truncate">{name}</h4>
 
             {isDefault && (
               <div className="flex items-center">
@@ -177,7 +270,7 @@ const { del } = useApi(token);
             )}
           </div>
 
-          <p className="text-sm text-gray-400 truncate">
+          <p className="text-sm text-gray-400">
             ID: #{id} | {itemsCount} Items
           </p>
         </div>
@@ -185,7 +278,6 @@ const { del } = useApi(token);
 
       {/* RIGHT */}
       <div className="flex items-center border border-gray-200 rounded-[10px] overflow-hidden">
-
         {openDialog && (
           <>
             <ActionButton onClick={() => openDialog(id)}>
@@ -204,15 +296,14 @@ const { del } = useApi(token);
           </>
         )}
 
-      {openDialog && (
-  <>
-    <Divider />
-    <ActionButton onClick={() => setCoverModalOpen(true)}>
-      <ImageIcon size={18} />
-    </ActionButton>
-  </>
-)}
-        <Divider />
+        {openDialog && (
+          <>
+            <ActionButton onClick={() => setCoverModalOpen(true)}>
+              <ImageIcon size={18} />
+            </ActionButton>
+            <Divider />
+          </>
+        )}
 
         <ActionDropdown
           items={[
@@ -243,7 +334,6 @@ const { del } = useApi(token);
                     ) : (
                       <Power size={16} />
                     ),
-                    className: isActive ? "opacity-40 pointer-events-none" : "",
                   },
                   {
                     label: "Suspend",
@@ -253,50 +343,50 @@ const { del } = useApi(token);
                     ) : (
                       <PauseCircle size={16} />
                     ),
-                    className: !isActive ? "opacity-40 pointer-events-none" : "",
                   },
                 ]
               : []),
 
-          {
-  label: "Delete",
-  onClick: () => setDeleteDialogOpen(true),
-  icon: isDeleting || deleteMutation.isPending ? (
-    <Loader2 size={16} className="animate-spin" />
-  ) : (
-    <Trash size={16} className="text-red-500" />
-  ),
-},
+            {
+              label: "Delete",
+              onClick: () => setDeleteDialogOpen(true),
+              icon:
+                isDeleting || deleteMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Trash size={16} className="text-red-500" />
+                ),
+            },
           ]}
         />
       </div>
-
-      {/* MODAL */}
-      <OpeningHoursModal
-        open={openingHoursOpen}
-        onOpenChange={handleOpenChange}
-        branchId={id}
-        branchName={name}
-      />
-
-      <DeleteDialog
-  open={deleteDialogOpen}
-  onOpenChange={setDeleteDialogOpen}
-  onConfirm={handleDelete}
-  isLoading={isDeleting || deleteMutation.isPending}
-  title={openDialog ? "Delete Branch" : "Delete Menu"}
-  description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
-/>
-
-<BranchCoverModal
-  open={coverModalOpen}
-  onOpenChange={setCoverModalOpen}
-  branchId={id}
-  branchName={name}
-/>
-
     </div>
-  );
+
+    {/* MODALS */}
+    <OpeningHoursModal
+      open={openingHoursOpen}
+      onOpenChange={handleOpenChange}
+      branchId={id}
+      branchName={name}
+    />
+
+    <DeleteDialog
+      open={deleteDialogOpen}
+      onOpenChange={setDeleteDialogOpen}
+      onConfirm={handleDelete}
+      isLoading={isDeleting || deleteMutation.isPending}
+      title={openDialog ? "Delete Branch" : "Delete Menu"}
+      description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
+    />
+
+    <BranchCoverModal
+      open={coverModalOpen}
+      onOpenChange={setCoverModalOpen}
+      branchId={id}
+      branchName={name}
+    />
+  </div>
+);
 }
 
 /**
