@@ -14,6 +14,7 @@ import useApi from "@/hooks/useApi"
 import { useAuthContext } from "@/context/AuthContext"
 import { toast } from "sonner"
 import { API_BASE_URL } from "@/lib/constants"
+import { useCreateCustomer, useUpdateCustomer } from "@/hooks/useCustomers"
 
 interface Customer {
   id?: string
@@ -39,16 +40,20 @@ export default function AddCustomerModal({
   initialData,
   onSuccess,
 }: Props) {
-      const { token, user } = useAuthContext()
-  const { post, patch, loading } = useApi(token)
+  const { user } = useAuthContext();
+  const restaurantId = user?.restaurantId;
+  const isEditMode = !!initialData?.id;
 
-  const restaurantId = user?.restaurantId
-  const isEditMode = !!initialData?.id
+  const createCustomerMutation = useCreateCustomer();
+  const updateCustomerMutation = useUpdateCustomer();
 
-  const [step, setStep] = useState<"form" | "otp">("form")
-  const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [otp, setOtp] = useState("")
-  const [isVerifying, setIsVerifying] = useState(false)
+  const isSubmitting =
+    createCustomerMutation.isPending || updateCustomerMutation.isPending;
+
+  const [step, setStep] = useState<"form" | "otp">("form");
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const [form, setForm] = useState({
     email: "",
@@ -56,7 +61,7 @@ export default function AddCustomerModal({
     firstName: "",
     lastName: "",
     phone: "",
-  })
+  });
 
   useEffect(() => {
     if (open) {
@@ -67,10 +72,7 @@ export default function AddCustomerModal({
           firstName: initialData.profile?.firstName || "",
           lastName: initialData.profile?.lastName || "",
           phone: initialData.profile?.phone || "",
-        })
-        setStep("form")
-        setOtp("")
-        setAccessToken(null)
+        });
       } else {
         setForm({
           email: "",
@@ -78,20 +80,21 @@ export default function AddCustomerModal({
           firstName: "",
           lastName: "",
           phone: "",
-        })
-        setStep("form")
-        setOtp("")
-        setAccessToken(null)
+        });
       }
+
+      setStep("form");
+      setOtp("");
+      setAccessToken(null);
     }
-  }, [open, initialData])
+  }, [open, initialData]);
 
   const handleChange = (key: string, value: string) => {
     setForm((prev) => ({
       ...prev,
       [key]: value,
-    }))
-  }
+    }));
+  };
 
   const resetModalState = () => {
     setForm({
@@ -100,90 +103,90 @@ export default function AddCustomerModal({
       firstName: "",
       lastName: "",
       phone: "",
-    })
-    setOtp("")
-    setStep("form")
-    setAccessToken(null)
-  }
+    });
+    setOtp("");
+    setStep("form");
+    setAccessToken(null);
+  };
 
-  // ✅ CREATE CUSTOMER / UPDATE CUSTOMER
   const handleSubmit = async () => {
     if (!form.email || !form.firstName || !form.lastName || !form.phone) {
-      toast.error("Please fill all required fields")
-      return
+      toast.error("Please fill all required fields");
+      return;
     }
 
-    // CREATE mode still requires password
     if (!isEditMode && !form.password) {
-      toast.error("Please fill all fields")
-      return
+      toast.error("Please fill all fields");
+      return;
     }
 
-    // ================= UPDATE MODE =================
     if (isEditMode && initialData?.id) {
-   const payload: Record<string, any> = {
-  email: form.email,
-  firstName: form.firstName,
-  lastName: form.lastName,
-  phone: form.phone,
-}
+      const payload = {
+        email: form.email,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+      };
 
-      const res = await patch(`/v1/admin/users/customers/${initialData.id}`, payload)
+      try {
+        await updateCustomerMutation.mutateAsync({
+          id: initialData.id,
+          data: payload,
+        });
 
-      if (res?.error) {
-        toast.error(res.error)
-        return
+        onSuccess?.();
+        resetModalState();
+        onOpenChange(false);
+      } catch {
+        // toast already handled in hook
       }
 
-    toast.success("Customer updated successfully")
-onSuccess?.()
-resetModalState()
-onOpenChange(false)
-return
-    }
-
-    // ================= CREATE MODE =================
-    const res = await post("/v1/auth/register-customer", {
-      ...form,
-      restaurantId,
-    })
-
-    if (res?.error) {
-      toast.error(res.error)
-      return
-    }
-
-    const tokenFromRes = res?.data?.accessToken
-
-    if (!tokenFromRes) {
-      toast.error("Missing access token")
-      return
-    }
-
-    setAccessToken(tokenFromRes)
-    localStorage.setItem("signupAccessToken", tokenFromRes)
-
-    toast.success("OTP sent to email")
-    setStep("otp")
-  }
-
-  // ✅ VERIFY OTP (CREATE MODE ONLY)
-  const handleVerifyOtp = async () => {
-    const tokenToUse =
-      accessToken || localStorage.getItem("signupAccessToken")
-
-    if (!otp) {
-      toast.error("Please enter OTP")
-      return
-    }
-
-    if (!tokenToUse) {
-      toast.error("Missing access token")
-      return
+      return;
     }
 
     try {
-      setIsVerifying(true)
+      const res = await createCustomerMutation.mutateAsync({
+        email: form.email,
+        password: form.password,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+        restaurantId: restaurantId || "",
+      });
+
+      const tokenFromRes = res?.data?.accessToken;
+
+      if (!tokenFromRes) {
+        toast.error("Missing access token");
+        return;
+      }
+
+      setAccessToken(tokenFromRes);
+      localStorage.setItem("signupAccessToken", tokenFromRes);
+
+      toast.success("OTP sent to email");
+      setStep("otp");
+    } catch {
+      // toast already handled in hook
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const tokenToUse =
+      accessToken || localStorage.getItem("signupAccessToken");
+
+    if (!otp) {
+      toast.error("Please enter OTP");
+      return;
+    }
+
+    if (!tokenToUse) {
+      toast.error("Missing access token");
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
 
       const res = await fetch(`${API_BASE_URL}/v1/auth/verify-email`, {
         method: "POST",
@@ -192,26 +195,26 @@ return
           Authorization: `Bearer ${tokenToUse}`,
         },
         body: JSON.stringify({ otp }),
-      })
+      });
 
-      const data = await res.json()
+      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.message || "OTP verification failed")
+        throw new Error(data?.message || "OTP verification failed");
       }
 
-    toast.success("Customer verified successfully!")
+      toast.success("Customer verified successfully!");
 
-localStorage.removeItem("signupAccessToken")
-onSuccess?.()
-resetModalState()
-onOpenChange(false)
+      localStorage.removeItem("signupAccessToken");
+      onSuccess?.();
+      resetModalState();
+      onOpenChange(false);
     } catch (error: any) {
-      toast.error(error.message || "Verification failed")
+      toast.error(error.message || "Verification failed");
     } finally {
-      setIsVerifying(false)
+      setIsVerifying(false);
     }
-  }
+  };
 
   return (
     <Dialog
@@ -309,10 +312,10 @@ onOpenChange(false)
             {/* BUTTON */}
             <Button
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full h-[48px] rounded-[10px] mt-2 bg-primary"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={18} />
                   {isEditMode ? "Updating..." : "Creating..."}

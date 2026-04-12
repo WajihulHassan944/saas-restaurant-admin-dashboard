@@ -200,45 +200,47 @@ return (
         </div>
 
         <ActionDropdown
-          items={[
-            openDialog
-              ? {
-                  label: "Edit Branch",
-                  href: `/branches/edit?branchId=${id}`,
-                  icon: <Store size={16} />,
-                }
-              : {
-                  label: "Edit Menu",
-                  onClick: () => editMenu?.(id),
-                  icon: <List size={16} />,
-                },
+       items={[
+  openDialog
+    ? {
+        label: "Edit Branch",
+        href: `/branches/edit?branchId=${id}`,
+        icon: <Store size={16} />,
+      }
+    : {
+        label: "Edit Menu",
+        onClick: () => editMenu?.(id),
+        icon: <List size={16} />,
+      },
 
-            ...(openDialog
-              ? [
-                  {
-                    label: "Opening Hours",
-                    onClick: () => setOpeningHoursOpen(true),
-                    icon: <Store size={16} />,
-                  },
-                  {
-                    label: "Activate",
-                    onClick: handleActivate,
-                    icon: <Power size={16} />,
-                  },
-                  {
-                    label: "Suspend",
-                    onClick: handleSuspend,
-                    icon: <PauseCircle size={16} />,
-                  },
-                ]
-              : []),
+  ...(openDialog
+    ? [
+        {
+          label: "Opening Hours",
+          onClick: () => setOpeningHoursOpen(true),
+          icon: <Store size={16} />,
+        },
+        {
+          label: "Activate",
+          onClick: !isActive ? handleActivate : undefined,
+          className: isActive ? "opacity-50 pointer-events-none" : "",
+          icon: <Power size={16} />,
+        },
+        {
+          label: "Suspend",
+          onClick: isActive ? handleSuspend : undefined,
+          className: !isActive ? "opacity-50 pointer-events-none" : "",
+          icon: <PauseCircle size={16} />,
+        },
+      ]
+    : []),
 
-            {
-              label: "Delete",
-              onClick: () => setDeleteDialogOpen(true),
-              icon: <Trash size={16} className="text-red-500" />,
-            },
-          ]}
+  {
+    label: "Delete",
+    onClick: () => setDeleteDialogOpen(true),
+    icon: <Trash size={16} className="text-red-500" />,
+  },
+]}
         />
       </div>
     </div>
@@ -306,58 +308,47 @@ return (
         )}
 
         <ActionDropdown
-          items={[
-            openDialog
-              ? {
-                  label: "Edit Branch",
-                  href: `/branches/edit?branchId=${id}`,
-                  icon: <Store size={16} />,
-                }
-              : {
-                  label: "Edit Menu",
-                  onClick: () => editMenu?.(id),
-                  icon: <List size={16} />,
-                },
+      items={[
+  openDialog
+    ? {
+        label: "Edit Branch",
+        href: `/branches/edit?branchId=${id}`,
+        icon: <Store size={16} />,
+      }
+    : {
+        label: "Edit Menu",
+        onClick: () => editMenu?.(id),
+        icon: <List size={16} />,
+      },
 
-            ...(openDialog
-              ? [
-                  {
-                    label: "Opening Hours",
-                    onClick: () => setOpeningHoursOpen(true),
-                    icon: <Store size={16} />,
-                  },
-                  {
-                    label: "Activate",
-                    onClick: handleActivate,
-                    icon: activateMutation.isPending ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Power size={16} />
-                    ),
-                  },
-                  {
-                    label: "Suspend",
-                    onClick: handleSuspend,
-                    icon: suspendMutation.isPending ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <PauseCircle size={16} />
-                    ),
-                  },
-                ]
-              : []),
+  ...(openDialog
+    ? [
+        {
+          label: "Opening Hours",
+          onClick: () => setOpeningHoursOpen(true),
+          icon: <Store size={16} />,
+        },
+        {
+          label: "Activate",
+          onClick: !isActive ? handleActivate : undefined,
+          className: isActive ? "opacity-50 pointer-events-none" : "",
+          icon: <Power size={16} />,
+        },
+        {
+          label: "Suspend",
+          onClick: isActive ? handleSuspend : undefined,
+          className: !isActive ? "opacity-50 pointer-events-none" : "",
+          icon: <PauseCircle size={16} />,
+        },
+      ]
+    : []),
 
-            {
-              label: "Delete",
-              onClick: () => setDeleteDialogOpen(true),
-              icon:
-                isDeleting || deleteMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Trash size={16} className="text-red-500" />
-                ),
-            },
-          ]}
+  {
+    label: "Delete",
+    onClick: () => setDeleteDialogOpen(true),
+    icon: <Trash size={16} className="text-red-500" />,
+  },
+]}
         />
       </div>
     </div>

@@ -116,12 +116,12 @@ const handleLogout = () => {
             <MenuItem
               icon={<Settings size={18} />}
               label="Account Settings"
-              onClick={() => navigate("/settings")}
+              onClick={() => navigate("/live-chat")}
             />
             <MenuItem
               icon={<HelpCircle size={18} />}
               label="Help Center"
-              onClick={() => navigate("/help")}
+              onClick={() => navigate("/live-chat")}
             />
           </div>
 

@@ -23,9 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddCustomerModal from "./AddCustomerModal";
-import useApi from "@/hooks/useApi";
-import { useAuthContext } from "@/context/AuthContext";
-import { toast } from "sonner";
+import { useDeleteCustomer, useUpdateCustomerStatus } from "@/hooks/useCustomers";
 
 interface Customer {
   id: string;
@@ -60,63 +58,50 @@ const CustomerTable = ({
   const [openEdit, setOpenEdit] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  // ✅ NEW: local state
   const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
 
-  // ✅ NEW: sync with props
   useEffect(() => {
     setLocalCustomers(customers);
   }, [customers]);
 
-  const { token } = useAuthContext();
-  const { patch, post, del } = useApi(token);
+  const deleteCustomerMutation = useDeleteCustomer();
+  const updateCustomerStatusMutation = useUpdateCustomerStatus();
 
-const handleDelete = async (id?: string) => {
-  if (!id) return;
+  const handleDelete = async (id?: string) => {
+    if (!id) return;
 
-  const res = await del(`/v1/admin/users/${id}`);
+    try {
+      await deleteCustomerMutation.mutateAsync(id);
 
-  if (res?.error) {
-    toast.error(res.error);
-    return;
-  }
-  toast.success("Customer deleted");
+      // instant UI update
+      setLocalCustomers((prev) => prev.filter((c) => c.id !== id));
 
-// instant UI update
-setLocalCustomers((prev) =>
-  prev.filter((c) => c.id !== id)
-);
+      // sync from server
+      onRefresh();
+    } catch {
+      // toast already handled in hook
+    }
+  };
 
-// sync from server
-onRefresh();
-};
-
-  // ✅ BLOCK / UNBLOCK (UPDATED)
   const handleToggleStatus = async (id: string, current: boolean) => {
-    // 🔥 optimistic UI update
+    // optimistic UI update
     setLocalCustomers((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, isActive: !current } : c
-      )
+      prev.map((c) => (c.id === id ? { ...c, isActive: !current } : c))
     );
 
-    const res = await patch(`/v1/admin/users/customers/${id}/status`, {
-      isActive: !current,
-    });
+    try {
+      await updateCustomerStatusMutation.mutateAsync({
+        id,
+        isActive: !current,
+      });
 
-    if (res?.error) {
-      toast.error(res.error);
-
-      // ❌ rollback
+      onRefresh();
+    } catch {
+      // rollback
       setLocalCustomers((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, isActive: current } : c
-        )
+        prev.map((c) => (c.id === id ? { ...c, isActive: current } : c))
       );
-      return;
     }
-
-    toast.success(`Customer ${!current ? "unblocked" : "blocked"}`);
   };
 
   if (loading) {
@@ -127,7 +112,7 @@ onRefresh();
     );
   }
 
-  if (!customers || customers.length === 0) {
+  if (!localCustomers || localCustomers.length === 0) {
     return (
       <EmptyState
         title="Looks like there are no customers yet!"
@@ -136,8 +121,7 @@ onRefresh();
     );
   }
 
-  return (
-    <>
+  return (    <>
       {/* -------- Desktop -------- */}
       <div className="hidden md:block">
         <Table className="my-10">

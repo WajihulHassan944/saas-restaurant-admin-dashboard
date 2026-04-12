@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Container from "@/components/container";
 import StatsSection from "@/components/customer-settings/stats-section";
 import Table from "@/components/customer-settings/table";
 import Header from "@/components/customer-settings/header";
 import BranchFilters from "@/components/branches/BranchFilters";
-import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
-import { toast } from "sonner";
+import { useGetCustomersList } from "@/hooks/useCustomers";
 
 interface Customer {
   id: string;
   email?: string;
   isActive?: boolean;
   createdAt?: string;
+  deletedAt?: string | null;
   profile?: {
     firstName?: string;
     lastName?: string;
@@ -26,56 +26,96 @@ interface Customer {
 }
 
 export default function CustomerSettingsPage() {
-  const { user, token } = useAuthContext();
+  const { user } = useAuthContext();
   const restaurantId = user?.restaurantId;
 
-  const { get, loading } = useApi(token);
+  const [filters, setFilters] = useState({
+    page: 1,
+    search: "",
+    sortOrder: "DESC" as "ASC" | "DESC",
+    withDeleted: false,
+    includeInactive: true,
+  });
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [meta, setMeta] = useState<any>(null);
-  const [page, setPage] = useState(1);
-
-const fetchCustomers = async (targetPage = page) => {
-  if (!restaurantId) return;
-
-  const res = await get(
-    `/v1/admin/users/customers?restaurantId=${restaurantId}&page=${targetPage}`
+  const {
+    data,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetCustomersList(
+    restaurantId
+      ? {
+          page: filters.page,
+          search: filters.search || undefined,
+          sortOrder: filters.sortOrder,
+          withDeleted: filters.withDeleted,
+          includeInactive: filters.includeInactive,
+          restaurantId,
+        }
+      : undefined
   );
 
-  if (res?.error) {
-    toast.error(res.error);
-    return;
-  }
+  const customers: Customer[] = useMemo(() => {
+    return data?.data || [];
+  }, [data]);
 
-  setCustomers(res?.data || []);
-  setMeta(res?.meta || null);
-};
+  const meta = data?.meta || null;
 
-useEffect(() => {
-  fetchCustomers(page);
-}, [restaurantId, page]);
+  const handleFilterChange = (updatedFilters: Partial<typeof filters>) => {
+    setFilters((prev) => ({
+      ...prev,
+      ...updatedFilters,
+      page:
+        updatedFilters.page ??
+        (updatedFilters.search !== undefined ? 1 : prev.page),
+    }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setFilters((prev) => ({
+      ...prev,
+      page: newPage,
+    }));
+  };
+
+  const customerFilterData = useMemo(() => {
+    return customers.map((customer) => ({
+      id: customer.id,
+      name:
+        `${customer.profile?.firstName || ""} ${customer.profile?.lastName || ""}`.trim() ||
+        "-",
+      email: customer.email || "-",
+      phone: customer.profile?.phone || "-",
+      isActive: !!customer.isActive,
+      createdAt: customer.createdAt || "",
+      orders: customer._count?.customerOrders ?? 0,
+    }));
+  }, [customers]);
 
   return (
     <Container>
       <Header
         title="Customer List"
         description="View and manage all customers from here"
-        onRefresh={() => fetchCustomers(page)}
+        onRefresh={() => refetch()}
       />
 
       <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm space-y-6">
         <StatsSection />
 
-        <BranchFilters />
+        <BranchFilters
+          branches={customerFilterData}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+        />
 
-        {/* ✅ PASS DATA */}
-      <Table
-  customers={customers}
-  loading={loading}
-  meta={meta}
-  onPageChange={setPage}
-  onRefresh={() => fetchCustomers(page)}
-/>
+        <Table
+          customers={customers}
+          loading={isLoading || isFetching}
+          meta={meta}
+          onPageChange={handlePageChange}
+          onRefresh={() => refetch()}
+        />
       </div>
     </Container>
   );
