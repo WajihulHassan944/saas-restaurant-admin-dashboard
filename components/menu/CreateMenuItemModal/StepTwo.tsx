@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle, useState } from "react";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFileUpload } from "@/hooks/useFileUpload";
 type Field = keyof z.infer<typeof schema>;
 
 const schema = z.object({
@@ -12,14 +13,19 @@ const schema = z.object({
 
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
-
+const { uploadFile, uploading } = useFileUpload();
   const update = (key: string, value: string) => {
     setForm((prev: any) => ({
       ...prev,
       [key]: value,
     }));
   };
-
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const result = await uploadFile(e);
+  if (result?.fileUrl) {
+    update("imageUrl", result.fileUrl);
+  }
+};
 
 const validateField = (field: Field, value: any) => {
   try {
@@ -61,15 +67,27 @@ const validateField = (field: Field, value: any) => {
   return (
     <div className="space-y-5">
 
-      <div className="space-y-2">
-        <Label>Image URL</Label>
+   <div className="space-y-2">
+  <Label>Image</Label>
 
-        <Input
-          value={form.imageUrl || ""}
-          onChange={(e) => update("imageUrl", e.target.value)}
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
-      </div>
+  <Input
+    type="file"
+    accept="image/*"
+    onChange={handleImageUpload}
+    className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400 pt-1"
+  />
+
+  {uploading && (
+    <p className="text-xs text-gray-500">Uploading...</p>
+  )}
+
+  <Input
+    value={form.imageUrl || ""}
+    onChange={(e) => update("imageUrl", e.target.value)}
+    placeholder="Uploaded image URL will appear here"
+    className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+  />
+</div>
 
       <div className="space-y-2">
         <Label>Slug</Label>

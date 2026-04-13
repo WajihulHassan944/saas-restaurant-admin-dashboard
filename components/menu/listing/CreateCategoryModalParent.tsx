@@ -14,6 +14,7 @@ import { Loader2, PlusCircle } from "lucide-react";
 import FormInput from "@/components/register/form/FormInput";
 import { API_BASE_URL } from "@/lib/constants";
 import { toast } from "sonner";
+import { useFileUpload } from "@/hooks/useFileUpload";
 
 interface CreateMenuModalProps {
   open: boolean;
@@ -26,7 +27,7 @@ export default function CreateCategoryModalParent({
   onOpenChange,
 }: CreateMenuModalProps) {
 const { categories, loading, refetch } = useCategories()
-
+const { uploadFile, uploading } = useFileUpload();
   const [creating, setCreating] = useState(false)
 const { token, restaurantId } = useAuth()
   const [form, setForm] = useState({
@@ -37,7 +38,12 @@ const { token, restaurantId } = useAuth()
     sortOrder: 0,
     isActive: true,
   })
-
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const result = await uploadFile(e);
+  if (result?.fileUrl) {
+    updateForm("imageUrl", result.fileUrl);
+  }
+};
 
   /* ================= HANDLE INPUT ================= */
 
@@ -177,12 +183,27 @@ useEffect(() => {
             onChange={(v) => updateForm("description", v)}
           />
 
-          <FormInput
-            label="Image URL"
-            placeholder="https://example.com/image.jpg"
-            value={form.imageUrl}
-            onChange={(v) => updateForm("imageUrl", v)}
-          />
+      <div className="space-y-2">
+  <label className="text-sm font-medium">Image</label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={handleImageUpload}
+    className="w-full rounded-[10px] border border-gray-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-white"
+  />
+
+  {uploading && (
+    <p className="text-xs text-gray-500">Uploading...</p>
+  )}
+
+  <FormInput
+    label=""
+    placeholder="Uploaded image URL will appear here"
+    value={form.imageUrl}
+    onChange={(v) => updateForm("imageUrl", v)}
+  />
+</div>
 
           <FormInput
             label="Sort Order"
