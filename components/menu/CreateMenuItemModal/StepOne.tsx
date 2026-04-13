@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, forwardRef, useImperativeHandle } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { z } from "zod";
-import { API_BASE_URL } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import useCategories from "@/hooks/useCategories";
 import {
   Select,
   SelectContent,
@@ -20,22 +20,11 @@ const schema = z.object({
   basePrice: z.string().min(1, "Price is required"),
 });
 
-const StepOne = forwardRef(({ form, setForm, token }: any, ref: any) => {
-  const [categories, setCategories] = useState([]);
+const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
+const { categories } = useCategories();
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
 
-  const fetchCategories = async () => {
-    const res = await fetch(`${API_BASE_URL}/v1/menu/categories`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = await res.json();
-    setCategories(data.data || []);
-  };
 
 
 const validateField = (field: Field, value: any) => {
