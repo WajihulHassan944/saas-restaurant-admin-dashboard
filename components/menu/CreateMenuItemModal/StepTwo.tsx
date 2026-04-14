@@ -5,12 +5,13 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFileUpload } from "@/hooks/useFileUpload";
+import { toast } from "sonner";
+import { X } from "lucide-react";
 type Field = keyof z.infer<typeof schema>;
 
 const schema = z.object({
-  prepTimeMinutes: z.string().min(1, "Preparation time required"),
+  prepTimeMinutes: z.string().optional(),
 });
-
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
 const { uploadFile, uploading } = useFileUpload();
@@ -29,6 +30,15 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
 const validateField = (field: Field, value: any) => {
   try {
+    if (field === "prepTimeMinutes" && (value === "" || value === null || value === undefined)) {
+      setErrors((prev: any) => {
+        const copy = { ...prev };
+        delete copy[field];
+        return copy;
+      });
+      return;
+    }
+
     schema.shape[field].parse(value);
 
     setErrors((prev: any) => {
@@ -43,22 +53,38 @@ const validateField = (field: Field, value: any) => {
     }));
   }
 };
-  const validateStep = () => {
-    const result = schema.safeParse(form);
 
-    if (!result.success) {
-      const fieldErrors: any = {};
-      result.error.issues.forEach((err) => {
-        fieldErrors[err.path[0]] = err.message;
-      });
+const validateStep = () => {
+  // ❌ block navigation while uploading
+  if (uploading) {
+    toast.error("Please wait until image upload is complete");
+    return false;
+  }
 
-      setErrors(fieldErrors);
-      return false;
-    }
-
-    setErrors({});
+  if (!form.prepTimeMinutes || String(form.prepTimeMinutes).trim() === "") {
+    setErrors((prev: any) => {
+      const copy = { ...prev };
+      delete copy.prepTimeMinutes;
+      return copy;
+    });
     return true;
-  };
+  }
+
+  const result = schema.safeParse(form);
+
+  if (!result.success) {
+    const fieldErrors: any = {};
+    result.error.issues.forEach((err) => {
+      fieldErrors[err.path[0]] = err.message;
+    });
+
+    setErrors(fieldErrors);
+    return false;
+  }
+
+  setErrors({});
+  return true;
+};
 
   useImperativeHandle(ref, () => ({
     validateStep,
@@ -66,7 +92,23 @@ const validateField = (field: Field, value: any) => {
 
   return (
     <div className="space-y-5">
+{form.imageUrl && (
+  <div className="relative w-full">
+    <img
+      src={form.imageUrl}
+      alt="Preview"
+      className="h-40 w-full rounded-[14px] object-cover border"
+    />
 
+    <button
+      type="button"
+      onClick={() => update("imageUrl", "")}
+      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
+    >
+      <X size={14} />
+    </button>
+  </div>
+)}
    <div className="space-y-2">
   <Label>Image</Label>
 
@@ -80,13 +122,13 @@ const validateField = (field: Field, value: any) => {
   {uploading && (
     <p className="text-xs text-gray-500">Uploading...</p>
   )}
-
+{/* 
   <Input
     value={form.imageUrl || ""}
     onChange={(e) => update("imageUrl", e.target.value)}
     placeholder="Uploaded image URL will appear here"
     className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-  />
+  /> */}
 </div>
 
       <div className="space-y-2">
@@ -110,16 +152,16 @@ const validateField = (field: Field, value: any) => {
       </div>
 
       <div className="space-y-2">
-        <Label>Preparation Time (minutes)</Label>
+     <Label>Preparation Time (minutes) - Optional</Label>
 
-        <Input
-          type="number"
-          value={form.prepTimeMinutes || ""}
-          onChange={(e) => update("prepTimeMinutes", e.target.value)}
-          onBlur={(e) => validateField("prepTimeMinutes", e.target.value)}
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
-
+<Input
+  type="number"
+  value={form.prepTimeMinutes || ""}
+  onChange={(e) => update("prepTimeMinutes", e.target.value)}
+  onBlur={(e) => validateField("prepTimeMinutes", e.target.value)}
+  placeholder="Enter preparation time if applicable"
+  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+/>
         {errors.prepTimeMinutes && (
           <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
         )}

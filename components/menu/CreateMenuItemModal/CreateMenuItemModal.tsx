@@ -7,112 +7,221 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import StepOne from "./StepOne";
 import StepTwo from "./StepTwo";
 import StepThree from "./StepThree";
-import { API_BASE_URL } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  useCreateMenuItem,
+  useUpdateMenuItem,
+} from "@/hooks/useMenus";
 
 interface CreateMenuItemModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialData?: any;
+  onSuccess?: () => void;
 }
+
+const getInitialForm = (restaurantId?: string, initialData?: any) => ({
+  name: initialData?.name || "",
+  categoryId:
+    initialData?.categoryId ||
+    initialData?.category?.id ||
+    "",
+  description: initialData?.description || "",
+  basePrice:
+    String(
+      initialData?.basePrice ??
+        initialData?.price ??
+        ""
+    ) || "",
+  imageUrl: initialData?.imageUrl || "",
+  slug: initialData?.slug || "",
+  sku: initialData?.sku || "",
+  prepTimeMinutes:
+    initialData?.prepTimeMinutes !== undefined &&
+    initialData?.prepTimeMinutes !== null
+      ? String(initialData.prepTimeMinutes)
+      : "",
+  dietaryFlags: Array.isArray(initialData?.dietaryFlags)
+    ? initialData.dietaryFlags.join(", ")
+    : initialData?.dietaryFlags || "",
+  allergenFlags: Array.isArray(initialData?.allergenFlags)
+    ? initialData.allergenFlags.join(", ")
+    : initialData?.allergenFlags || "",
+  sizes: initialData?.sizes || [],
+  addons: initialData?.addons || [],
+  restaurantId: restaurantId || initialData?.restaurantId || "",
+});
 
 export default function CreateMenuItemModal({
   open,
   onOpenChange,
+  initialData,
+  onSuccess,
 }: CreateMenuItemModalProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-const { token, user } = useAuth();
-const restaurantId = user?.restaurantId;
+  const { user, token } = useAuth();
+  const restaurantId = user?.restaurantId ?? undefined;
+
+  const isEditMode = !!initialData?.id;
   const stepRef = useRef<any>(null);
-  const [form, setForm] = useState<any>({
-    name: "",
-    categoryId: "",
-    description: "",
-    basePrice: "",
-    imageUrl: "",
-    slug: "",
-    sizes: [],
-    addons: [],
-  });
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [form, setForm] = useState<any>(
+    getInitialForm(restaurantId, initialData)
+  );
+
+  const { mutate: createMenuItem, isPending: isCreating } =
+    useCreateMenuItem();
+  const { mutate: updateMenuItem, isPending: isUpdating } =
+    useUpdateMenuItem();
+
+  const isSubmitting = isCreating || isUpdating;
+
+  useEffect(() => {
+    if (!open) return;
+
+    setCurrentStep(1);
+    setForm(getInitialForm(restaurantId, initialData));
+  }, [open, restaurantId, initialData]);
 
   const nextStep = () => {
-  if (stepRef.current?.validateStep) {
-    const valid = stepRef.current.validateStep();
-
-    if (!valid) return;
-  }
-
-  if (currentStep < 3) {
-    setCurrentStep((p) => p + 1);
-  }
-};
-  const prevStep = () => currentStep > 1 && setCurrentStep((p) => p - 1);
-
-
-  /* ================= CREATE MENU ITEM ================= */
-
-  const handleCreate = async () => {
-    if (!form.name || !form.categoryId) {
-      toast.error("Name and Category required");
-      return;
+    if (stepRef.current?.validateStep) {
+      const valid = stepRef.current.validateStep();
+      if (!valid) return;
     }
 
-    try {
-      const payload = {
-        categoryId: form.categoryId,
-        name: form.name,
-        slug: form.slug || form.name.toLowerCase().replace(/\s+/g, "-"),
-        basePrice: Number(form.basePrice),
-        restaurantId,
-        description: form.description,
-        imageUrl: form.imageUrl,
-       prepTimeMinutes: Number(form.prepTimeMinutes || 10),
-sku: form.sku || "",
-      dietaryFlags: form.dietaryFlags
-  ? form.dietaryFlags.split(",").map((i: string) => i.trim())
-  : [],
-
-allergenFlags: form.allergenFlags
-  ? form.allergenFlags.split(",").map((i: string) => i.trim())
-  : [],
-        isActive: true,
-        // variations: form.sizes,
-        // addons: form.addons,
-      };
-
-      const res = await fetch(`${API_BASE_URL}/v1/menu/items`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.message);
-
-      toast.success("Menu item created");
-
-      setForm({});
-      setCurrentStep(1);
-      onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create menu item");
+    if (currentStep < 3) {
+      setCurrentStep((prev) => prev + 1);
     }
   };
 
+  const prevStep = () => {
+    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
+  };
+
+  const resetAndClose = () => {
+    setForm(getInitialForm(restaurantId));
+    setCurrentStep(1);
+    onOpenChange(false);
+  };
+
+  const parsedDietaryFlags = useMemo(() => {
+    if (!form.dietaryFlags) return [];
+    if (Array.isArray(form.dietaryFlags)) return form.dietaryFlags;
+    return String(form.dietaryFlags)
+      .split(",")
+      .map((i) => i.trim())
+      .filter(Boolean);
+  }, [form.dietaryFlags]);
+
+  const parsedAllergenFlags = useMemo(() => {
+    if (!form.allergenFlags) return [];
+    if (Array.isArray(form.allergenFlags)) return form.allergenFlags;
+    return String(form.allergenFlags)
+      .split(",")
+      .map((i) => i.trim())
+      .filter(Boolean);
+  }, [form.allergenFlags]);
+
+  const buildPayload = () => {
+    const generatedSlug =
+      form.slug ||
+      String(form.name || "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-");
+
+    return {
+      categoryId: form.categoryId || undefined,
+      name: form.name?.trim(),
+      slug: generatedSlug,
+      // price:
+      //   form.basePrice !== "" && form.basePrice !== undefined
+      //     ? Number(form.basePrice)
+      //     : undefined,
+      basePrice:
+        form.basePrice !== "" && form.basePrice !== undefined
+          ? Number(form.basePrice)
+          : undefined,
+      restaurantId,
+      description: form.description || "",
+      imageUrl: form.imageUrl || "",
+      prepTimeMinutes:
+        form.prepTimeMinutes !== "" &&
+        form.prepTimeMinutes !== null &&
+        form.prepTimeMinutes !== undefined
+          ? Number(form.prepTimeMinutes)
+          : undefined,
+      sku: form.sku || "",
+      dietaryFlags: parsedDietaryFlags,
+      allergenFlags: parsedAllergenFlags,
+      isActive: true,
+    };
+  };
+
+  const handleSubmit = () => {
+  if (!form.name?.trim() || !form.categoryId) {
+    toast.error("Name and Category are required");
+    return;
+  }
+
+  const payload = buildPayload();
+
+  if (isEditMode) {
+    // ❌ remove restaurantId only for update
+    const { restaurantId, ...updatePayload } = payload;
+
+    updateMenuItem(
+      {
+        id: initialData.id,
+        data: updatePayload,
+      },
+      {
+      onSuccess: () => {
+  onSuccess?.(); // 🔥 trigger parent refetch
+  resetAndClose();
+},
+        onError: (err: any) => {
+          toast.error(
+            err?.response?.data?.message || "Failed to update menu item"
+          );
+        },
+      }
+    );
+    return;
+  }
+
+  // ✅ still includes restaurantId for create
+  createMenuItem(payload as any, {
+   onSuccess: () => {
+  onSuccess?.(); // 🔥 trigger parent refetch
+  resetAndClose();
+},
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message || "Failed to create menu item"
+      );
+    },
+  });
+};
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[560px] rounded-[24px] p-8 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!isSubmitting) {
+          onOpenChange(value);
+        }
+      }}
+    >
+      <DialogContent className="max-h-[95vh] max-w-[560px] overflow-auto rounded-[24px] bg-[#F5F5F5] p-8">
         <DialogHeader>
           <DialogTitle className="text-[26px] font-semibold">
-            Create Item
+            {isEditMode ? "Edit Item" : "Create Item"}
           </DialogTitle>
 
           <p className="text-sm text-gray-500">
@@ -122,38 +231,60 @@ allergenFlags: form.allergenFlags
           <StepProgress currentStep={currentStep} />
         </DialogHeader>
 
-        <div className="mt-6 bg-white rounded-[20px] p-6">
-        {currentStep === 1 && (
-  <StepOne ref={stepRef} form={form} setForm={setForm} token={token} />
-)}
+        <div className="mt-6 rounded-[20px] bg-white p-6">
+          {currentStep === 1 && (
+            <StepOne
+              ref={stepRef}
+              form={form}
+              setForm={setForm}
+              token={token}
+            />
+          )}
 
-         {currentStep === 2 && (
-  <StepTwo ref={stepRef} form={form} setForm={setForm} />
-)}
-          {currentStep === 3 && <StepThree form={form} setForm={setForm} />}
+          {currentStep === 2 && (
+            <StepTwo ref={stepRef} form={form} setForm={setForm} />
+          )}
+
+          {currentStep === 3 && (
+            <StepThree form={form} setForm={setForm} />
+          )}
         </div>
 
         <div className="mt-6 flex items-center justify-between">
           <Button
             variant="ghost"
-            className="text-gray-700 text-[16px]"
-            onClick={() => onOpenChange(false)}
+            className="text-[16px] text-gray-700"
+            onClick={resetAndClose}
+            disabled={isSubmitting}
           >
             Reset
           </Button>
 
           <div className="flex gap-3">
             {currentStep > 1 && (
-              <Button variant="outline" onClick={prevStep}>
+              <Button
+                variant="outline"
+                onClick={prevStep}
+                disabled={isSubmitting}
+              >
                 Previous
               </Button>
             )}
 
             <Button
-              className="px-10 h-[44px] rounded-[12px] bg-primary hover:bg-primary/90 text-white"
-              onClick={currentStep < 3 ? nextStep : handleCreate}
+              className="h-[44px] rounded-[12px] bg-primary px-10 text-white hover:bg-primary/90"
+              onClick={currentStep < 3 ? nextStep : handleSubmit}
+              disabled={isSubmitting}
             >
-              {currentStep < 3 ? "Next" : "Save"}
+              {currentStep < 3
+                ? "Next"
+                : isSubmitting
+                ? isEditMode
+                  ? "Updating..."
+                  : "Saving..."
+                : isEditMode
+                ? "Update"
+                : "Save"}
             </Button>
           </div>
         </div>
@@ -170,19 +301,19 @@ function StepProgress({ currentStep }: { currentStep: number }) {
 
   const activeWidth =
     currentStep === 1
-      ? 100 / (totalSteps - 0) / 2
+      ? 100 / totalSteps / 2
       : ((currentStep - 1) / (totalSteps - 1)) * 100;
 
   return (
-    <div className="mt-6 w-full relative">
-      <div className="absolute top-2 left-0 w-full h-[2px] bg-gray-300 z-0" />
+    <div className="relative mt-6 w-full">
+      <div className="absolute left-0 top-2 z-0 h-[2px] w-full bg-gray-300" />
 
       <div
-        className="absolute top-2 left-0 h-[2px] bg-primary z-0 transition-all duration-300"
+        className="absolute left-0 top-2 z-0 h-[2px] bg-primary transition-all duration-300"
         style={{ width: `${activeWidth}%` }}
       />
 
-      <div className="flex justify-between relative z-10 px-14">
+      <div className="relative z-10 flex justify-between px-14">
         {steps.map((label, index) => {
           const step = index + 1;
           const isActive = currentStep >= step;

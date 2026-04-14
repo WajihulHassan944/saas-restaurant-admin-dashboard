@@ -59,6 +59,9 @@ const handleSave = async () => {
           ? branchData.settings.allowedPaymentMethods
           : ["COD"],
 
+           tableReservationsEnabled:
+    branchData.settings?.tableReservationsEnabled ?? false,
+    
       automation: {
         autoAcceptOrders: Boolean(
           branchData.settings?.automation?.autoAcceptOrders ?? false

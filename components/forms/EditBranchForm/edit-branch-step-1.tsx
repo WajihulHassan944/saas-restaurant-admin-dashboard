@@ -3,6 +3,7 @@
 import { Label } from "@/components/ui/label";
 import Section from "../Promotions/Section";
 import FormInput from "@/components/register/form/FormInput";
+import { Switch } from "@/components/ui/switch";
 
 export default function EditBranchStepOne({ data, setData }: any) {
   if (!data) return null;
@@ -213,6 +214,25 @@ export default function EditBranchStepOne({ data, setData }: any) {
           />
         </div>
       </Section>
+
+      <div className="flex items-center justify-between rounded-[12px] border p-4">
+  <div>
+    <p className="text-sm font-medium text-gray-900">
+      Enable Table Reservations
+    </p>
+    <p className="text-xs text-gray-500">
+      Allow customers to reserve tables for this branch
+    </p>
+  </div>
+
+  <Switch
+    checked={data.settings?.tableReservationsEnabled || false}
+    onCheckedChange={(val) =>
+      update(["settings", "tableReservationsEnabled"], val)
+    }
+  />
+</div>
+
     </div>
   );
 }
