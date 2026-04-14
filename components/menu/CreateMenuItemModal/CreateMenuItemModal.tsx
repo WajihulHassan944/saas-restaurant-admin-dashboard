@@ -39,6 +39,7 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => ({
         ""
     ) || "",
   imageUrl: initialData?.imageUrl || "",
+   imagePreview: initialData?.imageUrl || "", // ✅ NEW
   slug: initialData?.slug || "",
   sku: initialData?.sku || "",
   prepTimeMinutes:
@@ -73,41 +74,107 @@ export default function CreateMenuItemModal({
   const [form, setForm] = useState<any>(
     getInitialForm(restaurantId, initialData)
   );
-
+const [savedItem, setSavedItem] = useState<any>(initialData || null);
+const [isSavingStepTwo, setIsSavingStepTwo] = useState(false);
   const { mutate: createMenuItem, isPending: isCreating } =
     useCreateMenuItem();
   const { mutate: updateMenuItem, isPending: isUpdating } =
     useUpdateMenuItem();
+const isSubmitting = isCreating || isUpdating || isSavingStepTwo;
+useEffect(() => {
+  if (!open) return;
 
-  const isSubmitting = isCreating || isUpdating;
+  setCurrentStep(1);
+   setForm((prev: any) => ({
+    ...getInitialForm(restaurantId, initialData),
+    imagePreview: initialData?.imageUrl || "",
+  }));
+  setSavedItem(initialData || null);
+  setIsSavingStepTwo(false);
+}, [open, restaurantId, initialData]);
 
-  useEffect(() => {
-    if (!open) return;
 
-    setCurrentStep(1);
-    setForm(getInitialForm(restaurantId, initialData));
-  }, [open, restaurantId, initialData]);
+const nextStep = () => {
+  if (stepRef.current?.validateStep) {
+    const valid = stepRef.current.validateStep();
+    if (!valid) return;
+  }
 
-  const nextStep = () => {
-    if (stepRef.current?.validateStep) {
-      const valid = stepRef.current.validateStep();
-      if (!valid) return;
+  if (currentStep === 1) {
+    setCurrentStep(2);
+    return;
+  }
+
+  // STEP 2 => persist item first in create mode, then go to step 3
+  if (currentStep === 2) {
+    if (!form.name?.trim() || !form.categoryId) {
+      toast.error("Name and Category are required");
+      return;
     }
 
-    if (currentStep < 3) {
-      setCurrentStep((prev) => prev + 1);
+    // EDIT MODE: item already exists, just move to step 3
+    if (isEditMode) {
+      setSavedItem(initialData);
+      setCurrentStep(3);
+      return;
     }
-  };
+
+    // CREATE MODE: create item here, store returned id/data, then move to step 3
+    const payload = buildPayload();
+    setIsSavingStepTwo(true);
+
+    createMenuItem(payload as any, {
+      onSuccess: (res: any) => {
+        const createdItem =
+          res?.data?.data ||
+          res?.data ||
+          res;
+
+        if (!createdItem?.id) {
+          toast.error("Menu item created but item id was not returned");
+          setIsSavingStepTwo(false);
+          return;
+        }
+
+        setSavedItem(createdItem);
+
+        setForm((prev: any) => ({
+          ...prev,
+          id: createdItem.id,
+        }));
+
+        toast.success("Menu item saved. Now add variations and modifiers.");
+        setCurrentStep(3);
+        setIsSavingStepTwo(false);
+      },
+      onError: (err: any) => {
+        toast.error(
+          err?.response?.data?.message || "Failed to create menu item"
+        );
+        setIsSavingStepTwo(false);
+      },
+    });
+
+    return;
+  }
+
+  if (currentStep < 3) {
+    setCurrentStep((prev) => prev + 1);
+  }
+};
 
   const prevStep = () => {
     if (currentStep > 1) setCurrentStep((prev) => prev - 1);
   };
+const resetAndClose = () => {
+  setForm(getInitialForm(restaurantId));
+  setSavedItem(null);
+  setCurrentStep(1);
+  setIsSavingStepTwo(false);
+  onOpenChange(false);
+};
 
-  const resetAndClose = () => {
-    setForm(getInitialForm(restaurantId));
-    setCurrentStep(1);
-    onOpenChange(false);
-  };
+const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
 
   const parsedDietaryFlags = useMemo(() => {
     if (!form.dietaryFlags) return [];
@@ -163,6 +230,7 @@ export default function CreateMenuItemModal({
     };
   };
 
+
   const handleSubmit = () => {
   if (!form.name?.trim() || !form.categoryId) {
     toast.error("Name and Category are required");
@@ -172,7 +240,6 @@ export default function CreateMenuItemModal({
   const payload = buildPayload();
 
   if (isEditMode) {
-    // ❌ remove restaurantId only for update
     const { restaurantId, ...updatePayload } = payload;
 
     updateMenuItem(
@@ -181,10 +248,10 @@ export default function CreateMenuItemModal({
         data: updatePayload,
       },
       {
-      onSuccess: () => {
-  onSuccess?.(); // 🔥 trigger parent refetch
-  resetAndClose();
-},
+        onSuccess: () => {
+          onSuccess?.();
+          resetAndClose();
+        },
         onError: (err: any) => {
           toast.error(
             err?.response?.data?.message || "Failed to update menu item"
@@ -195,18 +262,16 @@ export default function CreateMenuItemModal({
     return;
   }
 
-  // ✅ still includes restaurantId for create
-  createMenuItem(payload as any, {
-   onSuccess: () => {
-  onSuccess?.(); // 🔥 trigger parent refetch
+  // CREATE MODE:
+  // item should already be created in step 2
+  if (!resolvedMenuItemId) {
+    toast.error("Please save the menu item details first");
+    return;
+  }
+
+  toast.success("Menu item setup completed");
+  onSuccess?.();
   resetAndClose();
-},
-    onError: (err: any) => {
-      toast.error(
-        err?.response?.data?.message || "Failed to create menu item"
-      );
-    },
-  });
 };
 
   return (
@@ -245,9 +310,14 @@ export default function CreateMenuItemModal({
             <StepTwo ref={stepRef} form={form} setForm={setForm} />
           )}
 
-          {currentStep === 3 && (
-            <StepThree form={form} setForm={setForm} />
-          )}
+        {currentStep === 3 && (
+  <StepThree
+    form={form}
+    setForm={setForm}
+    item={savedItem || initialData}
+    menuItemId={resolvedMenuItemId}
+  />
+)}
         </div>
 
         <div className="mt-6 flex items-center justify-between">
@@ -276,15 +346,19 @@ export default function CreateMenuItemModal({
               onClick={currentStep < 3 ? nextStep : handleSubmit}
               disabled={isSubmitting}
             >
-              {currentStep < 3
-                ? "Next"
-                : isSubmitting
-                ? isEditMode
-                  ? "Updating..."
-                  : "Saving..."
-                : isEditMode
-                ? "Update"
-                : "Save"}
+           {currentStep < 3
+  ? currentStep === 2
+    ? isSavingStepTwo
+      ? "Saving..."
+      : "Save & Continue"
+    : "Next"
+  : isSubmitting
+  ? isEditMode
+    ? "Updating..."
+    : "Finishing..."
+  : isEditMode
+  ? "Update"
+  : "Finish"}
             </Button>
           </div>
         </div>

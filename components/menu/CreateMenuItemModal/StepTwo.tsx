@@ -22,9 +22,24 @@ const { uploadFile, uploading } = useFileUpload();
     }));
   };
 const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  // ✅ instant blob preview
+  const previewUrl = URL.createObjectURL(file);
+
+  setForm((prev: any) => ({
+    ...prev,
+    imagePreview: previewUrl,
+  }));
+
   const result = await uploadFile(e);
+
   if (result?.fileUrl) {
-    update("imageUrl", result.fileUrl);
+    setForm((prev: any) => ({
+      ...prev,
+      imageUrl: result.fileUrl,
+    }));
   }
 };
 
@@ -92,17 +107,23 @@ const validateStep = () => {
 
   return (
     <div className="space-y-5">
-{form.imageUrl && (
+{form.imagePreview && (
   <div className="relative w-full">
     <img
-      src={form.imageUrl}
+      src={form.imagePreview}
       alt="Preview"
       className="h-40 w-full rounded-[14px] object-cover border"
     />
 
     <button
       type="button"
-      onClick={() => update("imageUrl", "")}
+      onClick={() =>
+        setForm((prev: any) => ({
+          ...prev,
+          imageUrl: "",
+          imagePreview: "",
+        }))
+      }
       className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
     >
       <X size={14} />
@@ -122,13 +143,7 @@ const validateStep = () => {
   {uploading && (
     <p className="text-xs text-gray-500">Uploading...</p>
   )}
-{/* 
-  <Input
-    value={form.imageUrl || ""}
-    onChange={(e) => update("imageUrl", e.target.value)}
-    placeholder="Uploaded image URL will appear here"
-    className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-  /> */}
+  
 </div>
 
       <div className="space-y-2">
