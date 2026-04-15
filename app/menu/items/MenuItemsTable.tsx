@@ -30,14 +30,18 @@ import {
   MoreHorizontal,
   PlusCircle,
   Eye,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import CreateMenuItemModal from "@/components/menu/CreateMenuItemModal/CreateMenuItemModal";
 import VariationModal from "@/components/menu/listing/VariationModal";
 import AddModifierToItem from "@/components/forms/AddModifierToItem";
+import useApi from "@/hooks/useApi";
 
 export default function MenuItemsTable({ refetchKey }: any) {
-  const { user } = useAuth();
+  const { user , token} = useAuth();
   const restaurantId = user?.restaurantId;
+  const { del } = useApi(token);
 
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
@@ -56,6 +60,9 @@ export default function MenuItemsTable({ refetchKey }: any) {
   const [openViewVariations, setOpenViewVariations] = useState(false);
   const [openViewModifiers, setOpenViewModifiers] = useState(false);
 
+const [deleteVariation, setDeleteVariation] = useState<any>(null);
+const [editingVariation, setEditingVariation] = useState<any>(null);
+const [openEditVariation, setOpenEditVariation] = useState(false);
   /* ================= DEBOUNCE ================= */
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -99,6 +106,34 @@ export default function MenuItemsTable({ refetchKey }: any) {
       []
     );
   }, [response]);
+
+
+  // ADD NEW HANDLER inside MenuItemsTable()
+
+const handleEditVariation = (variation: any, parentItem: any) => {
+  setActionItem(parentItem);
+  setEditingVariation(variation);
+  setOpenEditVariation(true);
+};
+// 5) ADD inside MenuItemsTable() handlers
+
+const handleDeleteVariation = (variation: any, parentItem: any) => {
+  setActionItem(parentItem);
+  setDeleteVariation(variation);
+};
+
+// UPDATE handler
+
+const handleEditVariationChange = (value: boolean) => {
+  setOpenEditVariation(value);
+
+  if (!value) {
+    setEditingVariation(null);
+    setOpenViewVariations(false); // close background variations modal
+    setActionItem(null);
+    refetch();
+  }
+};
 
   /* ================= PAGINATION ================= */
   const pagination = useMemo(() => {
@@ -410,11 +445,19 @@ export default function MenuItemsTable({ refetchKey }: any) {
                             {item.name}
                           </p>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
-                            <span>{variationCount} variations</span>
-                            <span>•</span>
-                            <span>{modifierCount} modifiers</span>
-                          </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+  <span>
+    {variationCount}{" "}
+    {variationCount === 1 ? "variation" : "variations"}
+  </span>
+
+  <span>•</span>
+
+  <span>
+    {modifierCount}{" "}
+    {modifierCount === 1 ? "modifier" : "modifiers"}
+  </span>
+</div>
                         </div>
                       </div>
                     </td>
@@ -607,12 +650,30 @@ export default function MenuItemsTable({ refetchKey }: any) {
       />
 
       {/* VIEW DIALOGS */}
-      <ViewVariationsDialog
-        open={openViewVariations}
-        onOpenChange={handleViewVariationsChange}
-        item={actionItem}
-      />
+    <ViewVariationsDialog
+  open={openViewVariations}
+  onOpenChange={handleViewVariationsChange}
+  item={actionItem}
+  onEdit={handleEditVariation}
+  onDelete={handleDeleteVariation}
+/>
 
+// UPDATE edit VariationModal call
+
+<VariationModal
+  open={openEditVariation}
+  onOpenChange={handleEditVariationChange}
+  item={actionItem}
+  initialData={editingVariation}
+  mode="edit"
+  onSuccess={() => {
+    setOpenEditVariation(false);
+    setOpenViewVariations(false);
+    setEditingVariation(null);
+    setActionItem(null);
+    refetch();
+  }}
+/>
       <ViewModifiersDialog
         open={openViewModifiers}
         onOpenChange={handleViewModifiersChange}
@@ -630,6 +691,29 @@ export default function MenuItemsTable({ refetchKey }: any) {
         title="Delete Menu Item"
         description="Are you sure you want to delete this menu item? This action cannot be undone."
       />
+
+    <DeleteDialog
+  open={!!deleteVariation}
+  onOpenChange={(value) => {
+    if (!value) setDeleteVariation(null);
+  }}
+  onConfirm={async () => {
+    if (!deleteVariation?.id) return;
+
+    const res = await del(
+      `/v1/menu/variations/${deleteVariation.id}`
+    );
+
+    if (res && !res.error && res.success !== false) {
+      setDeleteVariation(null);
+      refetch();
+    }
+  }}
+  isLoading={false}
+  title="Delete Variation"
+  description="Are you sure you want to delete this variation? This action cannot be undone."
+/>
+
     </div>
   );
 }
@@ -678,8 +762,7 @@ function normalizeModifierGroups(item: any) {
 
 function getVariationCount(item: any) {
   return Number(
-    item?._count?.variations ??
-      normalizeVariations(item)?.length ??
+    item?.variations.length ??
       0
   );
 }
@@ -763,15 +846,20 @@ function EmptyState({
     </div>
   );
 }
+// UPDATE ViewVariationsDialog PROPS
 
 function ViewVariationsDialog({
   open,
   onOpenChange,
   item,
+  onEdit,
+  onDelete,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
   item: any;
+  onEdit: (variation: any, item: any) => void;
+  onDelete?: (variation: any, item: any) => void;
 }) {
   const variations = useMemo(() => normalizeVariations(item), [item]);
 
@@ -812,21 +900,40 @@ function ViewVariationsDialog({
                   key={variation?.id || `${variation?.name}-${index}`}
                   className="rounded-[22px] border bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h4 className="truncate text-[17px] font-semibold text-gray-900">
-                        {variation?.name || "-"}
-                      </h4>
+                
+<div className="flex items-start justify-between gap-4">
+  <div className="min-w-0">
+    <h4 className="truncate text-[17px] font-semibold text-gray-900">
+      {variation?.name || "-"}
+    </h4>
 
-                      <p className="mt-1 text-sm text-gray-500">
-                        SKU: {variation?.sku || "—"}
-                      </p>
-                    </div>
+    <p className="mt-1 text-sm text-gray-500">
+      SKU: {variation?.sku || "—"}
+    </p>
+  </div>
 
-                    <span className="whitespace-nowrap rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
-                      {formatCurrency(variation?.price ?? 0)}
-                    </span>
-                  </div>
+  <div className="flex items-center gap-2">
+    <button
+      type="button"
+      title="Edit Variation"
+      onClick={() => onEdit(variation, item)}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all duration-200 hover:border-primary/20 hover:text-primary"
+    >
+      <Pencil size={15} />
+    </button>
+ <button
+      type="button"
+      title="Delete Variation"
+      onClick={() => onDelete?.(variation, item)}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all duration-200 hover:border-red-200 hover:text-red-500"
+    >
+      <Trash2 size={15} />
+    </button>
+    <span className="whitespace-nowrap rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
+      {formatCurrency(variation?.price ?? 0)}
+    </span>
+  </div>
+</div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
