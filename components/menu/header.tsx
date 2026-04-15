@@ -90,7 +90,7 @@ export default function BranchesHeader({ title, description }: HeaderProps) {
                onClick={() => router.push('/menu/items')}
         >
           <PlusCircle size={18} className="text-[#767676]"  />
-          Products
+          Items
         </Button>
 
 
