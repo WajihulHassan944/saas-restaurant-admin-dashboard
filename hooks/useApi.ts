@@ -41,10 +41,22 @@ export default function useApi(token: string | null) {
         response: data
       })
 
-      if (!res.ok) {
-        throw new Error(data?.message || "Request failed")
-      }
+   if (!res.ok) {
+  // 🔥 HANDLE UNAUTHORIZED
+  if (res.status === 401) {
+    toast.error("Session expired. Please login again.")
 
+    localStorage.removeItem("auth")
+
+    if (typeof window !== "undefined") {
+      window.location.href = "/login"
+    }
+
+    return null
+  }
+
+  throw new Error(data?.message || "Request failed")
+}
       return data
 
     } catch (err: any) {
