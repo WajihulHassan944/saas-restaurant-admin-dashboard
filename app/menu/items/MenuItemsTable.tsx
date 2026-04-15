@@ -53,7 +53,8 @@ export default function MenuItemsTable({ refetchKey }: any) {
   const [open, setOpen] = useState(false);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
+const [isDeletingVariation, setIsDeletingVariation] =
+  useState(false);
   const [actionItem, setActionItem] = useState<any>(null);
   const [openVariation, setOpenVariation] = useState(false);
   const [openModifier, setOpenModifier] = useState(false);
@@ -692,24 +693,37 @@ const handleEditVariationChange = (value: boolean) => {
         description="Are you sure you want to delete this menu item? This action cannot be undone."
       />
 
-    <DeleteDialog
+    
+    // UPDATE DeleteDialog for variation
+
+<DeleteDialog
   open={!!deleteVariation}
   onOpenChange={(value) => {
-    if (!value) setDeleteVariation(null);
+    if (!value && !isDeletingVariation) {
+      setDeleteVariation(null);
+    }
   }}
   onConfirm={async () => {
     if (!deleteVariation?.id) return;
 
-    const res = await del(
-      `/v1/menu/variations/${deleteVariation.id}`
-    );
+    try {
+      setIsDeletingVariation(true);
 
-    if (res && !res.error && res.success !== false) {
-      setDeleteVariation(null);
-      refetch();
+      const res = await del(
+        `/v1/menu/variations/${deleteVariation.id}`
+      );
+
+      if (res && !res.error && res.success !== false) {
+        setDeleteVariation(null);
+        setOpenViewVariations(false);
+        setActionItem(null);
+        refetch();
+      }
+    } finally {
+      setIsDeletingVariation(false);
     }
   }}
-  isLoading={false}
+  isLoading={isDeletingVariation}
   title="Delete Variation"
   description="Are you sure you want to delete this variation? This action cannot be undone."
 />
