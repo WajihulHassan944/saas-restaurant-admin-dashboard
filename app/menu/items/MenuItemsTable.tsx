@@ -109,21 +109,20 @@ const [openEditVariation, setOpenEditVariation] = useState(false);
   }, [response]);
 
 
-  // ADD NEW HANDLER inside MenuItemsTable()
 
 const handleEditVariation = (variation: any, parentItem: any) => {
   setActionItem(parentItem);
   setEditingVariation(variation);
   setOpenEditVariation(true);
 };
-// 5) ADD inside MenuItemsTable() handlers
+
 
 const handleDeleteVariation = (variation: any, parentItem: any) => {
   setActionItem(parentItem);
   setDeleteVariation(variation);
 };
 
-// UPDATE handler
+
 
 const handleEditVariationChange = (value: boolean) => {
   setOpenEditVariation(value);
@@ -659,7 +658,6 @@ const handleEditVariationChange = (value: boolean) => {
   onDelete={handleDeleteVariation}
 />
 
-// UPDATE edit VariationModal call
 
 <VariationModal
   open={openEditVariation}
@@ -694,7 +692,6 @@ const handleEditVariationChange = (value: boolean) => {
       />
 
     
-    // UPDATE DeleteDialog for variation
 
 <DeleteDialog
   open={!!deleteVariation}
@@ -860,7 +857,7 @@ function EmptyState({
     </div>
   );
 }
-// UPDATE ViewVariationsDialog PROPS
+
 
 function ViewVariationsDialog({
   open,
