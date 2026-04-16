@@ -118,7 +118,6 @@ const handleSave = async () => {
         lat: branchData.address?.lat,
         lng: branchData.address?.lng,
 
-        coverImage: branchData.coverImage,
         description: branchData.description,
 
         settings: fullSettings, // ✅ FIXED

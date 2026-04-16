@@ -95,7 +95,7 @@ export default function EditBranchStepOne({ data, setData }: any) {
       </Section>
 
       {/* ================= COVER IMAGE ================= */}
-      <Section label="Add Branch Logo">
+      {/* <Section label="Add Branch Logo">
         <div className="flex flex-col items-center text-center space-y-[12px]">
           <Label>Branch Cover Image</Label>
 
@@ -126,10 +126,10 @@ export default function EditBranchStepOne({ data, setData }: any) {
             Upload a new image to update your branch cover
           </p>
         </div>
-      </Section>
+      </Section> */}
 
       {/* ================= ADMIN ================= */}
-      <Section label="Branch Admin">
+      {/* <Section label="Branch Admin">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormInput
             label="First Name"
@@ -165,7 +165,7 @@ export default function EditBranchStepOne({ data, setData }: any) {
             }
           />
         </div>
-      </Section>
+      </Section> */}
 
       {/* ================= CONTACT ================= */}
       <Section label="Contact Info">

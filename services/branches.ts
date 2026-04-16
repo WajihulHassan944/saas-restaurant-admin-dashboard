@@ -101,17 +101,27 @@ export const activateBranch = async (id: string) => {
  * IMAGES
  * ==============================
  */
-
 export const updateBranchImages = async (
   id: string,
-  payload: FormData
+  payload: {
+    logoUrl?: string;
+    coverImage?: string;
+  } | FormData
 ) => {
-  const { data } = await api.patch(`/branches/${id}/images`, payload, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const isFormData = payload instanceof FormData;
+
+  const { data } = await api.patch(
+    `/branches/${id}/images`,
+    payload,
+    {
+      headers: isFormData
+        ? { "Content-Type": "multipart/form-data" }
+        : { "Content-Type": "application/json" },
+    }
+  );
+
   return data;
 };
-
 /**
  * ==============================
  * FORCE DELETE

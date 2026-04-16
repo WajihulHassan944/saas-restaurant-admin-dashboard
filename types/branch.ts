@@ -7,4 +7,6 @@ export interface BranchProps {
   openDialog?: (branchId: string) => void;
   openMenuDetails?: (branchId: string) => void;
    editMenu?: (id: string) => void;
+    coverImage?: string
+  logoUrl?: string
 }

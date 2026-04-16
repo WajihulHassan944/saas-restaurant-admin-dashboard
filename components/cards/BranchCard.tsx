@@ -37,7 +37,9 @@ export default function BranchCard({
   openDialog,
   openMenuDetails,
   editMenu,
-  loading, // ✅ NEW
+  loading,
+   coverImage,
+  logoUrl,
 }: BranchProps & { loading?: boolean }) {
   const [openingHoursOpen, setOpeningHoursOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -375,6 +377,8 @@ return (
       onOpenChange={setCoverModalOpen}
       branchId={id}
       branchName={name}
+       coverImage={coverImage}   // ✅ add this
+  logoUrl={logoUrl}
     />
   </div>
 );

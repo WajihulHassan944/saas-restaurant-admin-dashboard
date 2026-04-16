@@ -269,7 +269,12 @@ export const useUpdateBranchImages = () => {
       data,
     }: {
       id: string;
-      data: FormData;
+      data:
+        | {
+            logoUrl?: string;
+            coverImage?: string;
+          }
+        | FormData;
     }) => updateBranchImages(id, data),
 
     onSuccess: () => {

@@ -65,6 +65,8 @@ const openDialog = (branchId: string) => {
           isDefault={branch.isMain}
           itemsCount={0} 
           openDialog={openDialog}
+            coverImage={branch.coverImage}
+  logoUrl={branch.logoUrl}
         />
       ))}
 
