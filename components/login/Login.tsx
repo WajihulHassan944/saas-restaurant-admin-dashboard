@@ -61,7 +61,6 @@ const getStoredAuth = () => {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          // restaurantId: formData.restaurantId,
         }),
       });
 
@@ -71,7 +70,6 @@ const getStoredAuth = () => {
       if (!res.ok) {
         throw new Error(data?.message || "Login failed");
       }
-const stored = getStoredAuth();
 const allowedRoles = ["BUSINESS_ADMIN", "BRANCH_ADMIN"];
 const user = data?.data?.user;
 
@@ -83,11 +81,7 @@ if (!allowedRoles.includes(user.role)) {
   toast.error("You are not authorized to access this system");
   return;
 }
-setUser({
-  ...user,
-  restaurantId: stored?.user?.restaurantId ?? null,
-  branchId: stored?.user?.branchId ?? null,
-});
+
 login(data.data);
       toast.success("Login successful");
 
