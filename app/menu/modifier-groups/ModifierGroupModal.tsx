@@ -9,11 +9,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  useCreateModifierGroup,
+  useUpdateModifierGroup,
+} from "@/hooks/useMenus";
 
-/* ✅ TYPES */
+/* ================= TYPES ================= */
 interface ModifierGroupForm {
   name: string;
   description: string;
@@ -30,40 +33,48 @@ interface Props {
   refresh: () => void;
 }
 
+const getDefaultForm = (): ModifierGroupForm => ({
+  name: "",
+  description: "",
+  minSelect: 0,
+  maxSelect: 1,
+  isRequired: false,
+  sortOrder: 0,
+});
+
 export default function ModifierGroupModal({
   open,
   onOpenChange,
   initialData,
   refresh,
 }: Props) {
-  const { user, token } = useAuth();
-  const api = useApi(token);
+  const { user } = useAuth();
 
-  const [form, setForm] = useState<ModifierGroupForm>({
-    name: "",
-    description: "",
-    minSelect: 0,
-    maxSelect: 1,
-    isRequired: false,
-    sortOrder: 0,
-  });
+  const [form, setForm] = useState<ModifierGroupForm>(getDefaultForm());
+
+  const { mutate: createModifierGroup, isPending: isCreating } =
+    useCreateModifierGroup();
+
+  const { mutate: updateModifierGroup, isPending: isUpdating } =
+    useUpdateModifierGroup();
+
+  const isLoading = isCreating || isUpdating;
 
   useEffect(() => {
     if (initialData) {
-      setForm(initialData);
-    } else {
       setForm({
-        name: "",
-        description: "",
-        minSelect: 0,
-        maxSelect: 1,
-        isRequired: false,
-        sortOrder: 0,
+        name: initialData?.name || "",
+        description: initialData?.description || "",
+        minSelect: Number(initialData?.minSelect ?? 0),
+        maxSelect: Number(initialData?.maxSelect ?? 1),
+        isRequired: Boolean(initialData?.isRequired),
+        sortOrder: Number(initialData?.sortOrder ?? 0),
       });
+    } else {
+      setForm(getDefaultForm());
     }
-  }, [initialData]);
+  }, [initialData, open]);
 
-  /* ✅ FIXED TYPING */
   const handleChange = <K extends keyof ModifierGroupForm>(
     key: K,
     value: ModifierGroupForm[K]
@@ -71,50 +82,85 @@ export default function ModifierGroupModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-const handleSubmit = async () => {
-  if (!form.name) {
+  const handleClose = (value: boolean) => {
+    onOpenChange(value);
+    if (!value) {
+      setForm(getDefaultForm());
+    }
+  };
+
+
+ 
+  const handleSubmit = () => {
+  if (!form.name.trim()) {
     toast.error("Name required");
     return;
   }
 
-  // ✅ Only send allowed fields
-  const payload = {
-    name: form.name,
-    description: form.description,
-    minSelect: form.minSelect,
-    maxSelect: form.maxSelect,
+  if (form.minSelect < 0) {
+    toast.error("Min select cannot be negative");
+    return;
+  }
+
+  if (form.maxSelect < 0) {
+    toast.error("Max select cannot be negative");
+    return;
+  }
+
+  if (form.maxSelect < form.minSelect) {
+    toast.error("Max select cannot be less than min select");
+    return;
+  }
+
+  // Prepare payload, conditionally exclude restaurantId if editing
+  const payload: any = {
+    name: form.name.trim(),
+    description: form.description.trim(),
+    minSelect: Number(form.minSelect),
+    maxSelect: Number(form.maxSelect),
     isRequired: form.isRequired,
-    sortOrder: form.sortOrder,
+    sortOrder: Number(form.sortOrder),
   };
+
+  if (!initialData?.id) {
+    // Add restaurantId only when creating
+    payload.restaurantId = user?.restaurantId || "";
+  }
 
   let res;
 
   if (initialData?.id) {
-    res = await api.patch(
-      `/v1/menu/modifier-groups/${initialData.id}`,
-      payload
+    res = updateModifierGroup(
+      {
+        id: initialData.id,
+        data: payload,
+      },
+      {
+        onSuccess: () => {
+          refresh();
+          handleClose(false);
+        },
+      }
     );
   } else {
-    res = await api.post(`/v1/menu/modifier-groups`, {
-      ...payload,
-      restaurantId: user?.restaurantId, // ✅ only for create
+    res = createModifierGroup(payload, {
+      onSuccess: () => {
+        refresh();
+        handleClose(false);
+      },
     });
-  }
-
-  if (res?.error) {
-    toast.error(res.error);
-    return;
   }
 
   toast.success(initialData ? "Updated" : "Created");
 
   refresh();
-  onOpenChange(false);
+  handleClose(false);
 };
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5]">
 
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5]">
         {/* HEADER */}
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
@@ -128,7 +174,6 @@ const handleSubmit = async () => {
 
         {/* FORM */}
         <div className="mt-5 bg-white rounded-[16px] p-5 space-y-4">
-
           <InputField
             label="Group Name"
             value={form.name}
@@ -145,30 +190,23 @@ const handleSubmit = async () => {
             label="Min Select"
             type="number"
             value={form.minSelect}
-            onChange={(v: string) =>
-              handleChange("minSelect", Number(v))
-            }
+            onChange={(v: string) => handleChange("minSelect", Number(v))}
           />
 
           <InputField
             label="Max Select"
             type="number"
             value={form.maxSelect}
-            onChange={(v: string) =>
-              handleChange("maxSelect", Number(v))
-            }
+            onChange={(v: string) => handleChange("maxSelect", Number(v))}
           />
 
           <InputField
             label="Sort Order"
             type="number"
             value={form.sortOrder}
-            onChange={(v: string) =>
-              handleChange("sortOrder", Number(v))
-            }
+            onChange={(v: string) => handleChange("sortOrder", Number(v))}
           />
 
-          {/* CHECKBOX */}
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input
               type="checkbox"
@@ -181,13 +219,12 @@ const handleSubmit = async () => {
             Required
           </label>
 
-          {/* BUTTON */}
           <Button
             onClick={handleSubmit}
-            disabled={api.loading}
+            disabled={isLoading}
             className="w-full rounded-[10px] mt-2 py-4 bg-primary"
           >
-            {api.loading ? (
+            {isLoading ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="animate-spin" size={18} />
                 Saving...
@@ -198,14 +235,13 @@ const handleSubmit = async () => {
               "Create Modifier Group"
             )}
           </Button>
-
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-/* ✅ TYPED INPUT FIELD */
+/* ================= INPUT FIELD ================= */
 interface InputFieldProps {
   label: string;
   value: string | number;

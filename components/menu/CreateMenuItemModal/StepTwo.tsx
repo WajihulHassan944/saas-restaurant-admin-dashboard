@@ -146,7 +146,7 @@ const validateStep = () => {
   
 </div>
 
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <Label>Slug</Label>
 
         <Input
@@ -154,9 +154,9 @@ const validateStep = () => {
           onChange={(e) => update("slug", e.target.value)}
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
-      </div>
+      </div> */}
 
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <Label>SKU</Label>
 
         <Input
@@ -164,7 +164,7 @@ const validateStep = () => {
           onChange={(e) => update("sku", e.target.value)}
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
-      </div>
+      </div> */}
 
       <div className="space-y-2">
      <Label>Preparation Time (minutes) - Optional</Label>

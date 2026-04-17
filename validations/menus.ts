@@ -200,6 +200,7 @@ const modifierGroupShape = {
   maxSelect: optionalNumberFromInput({ min: 1, integer: true }),
   isRequired: optionalBoolean(false),
   isActive: optionalBoolean(true),
+  restaurantId: requiredString("Restaurant ID is required"), 
 };
 
 export const {

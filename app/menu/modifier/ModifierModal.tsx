@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import {
   useCreateModifier,
+  useGetModifierGroups,
   useUpdateModifier,
 } from "@/hooks/useMenus";
 
@@ -40,6 +41,17 @@ export default function ModifierModal({
     useUpdateModifier();
 
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
+const [groupSearch, setGroupSearch] = useState("");
+const [debouncedGroupSearch, setDebouncedGroupSearch] = useState("");
+const [groupPage, setGroupPage] = useState(1);
+useEffect(() => {
+  const timer = setTimeout(() => {
+    setDebouncedGroupSearch(groupSearch.trim());
+    setGroupPage(1);
+  }, 500);
+
+  return () => clearTimeout(timer);
+}, [groupSearch]);
 
   const [form, setForm] = useState<ModifierForm>({
     modifierGroupId: "",
@@ -84,6 +96,39 @@ export default function ModifierModal({
       setSelectedGroup(null);
     }
   }, [initialData, open]);
+
+const {
+  data: groupResponse,
+  isLoading: isGroupsLoading,
+} = useGetModifierGroups({
+  page: groupPage,
+  limit: 10,
+  search: debouncedGroupSearch,
+});
+  const groupItems = useMemo(() => {
+  if (!groupResponse) return [];
+
+  return (
+    groupResponse?.data?.items ||
+    groupResponse?.data?.modifierGroups ||
+    groupResponse?.data ||
+    groupResponse?.items ||
+    []
+  );
+}, [groupResponse]);
+
+const groupMeta = useMemo(() => {
+  const source =
+    groupResponse?.data?.pagination ||
+    groupResponse?.pagination ||
+    groupResponse?.meta ||
+    {};
+
+  return {
+    page: Number(source?.page ?? groupPage),
+    totalPages: Number(source?.totalPages ?? 1),
+  };
+}, [groupResponse, groupPage]);
 
   const fetchModifierGroups = async ({
     search = "",
