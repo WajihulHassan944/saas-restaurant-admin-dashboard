@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const mergedData = {
       ...data.data,
       user: {
-        ...stored.user, // ✅ preserve old user data
+        ...stored.user, 
       },
     };
 

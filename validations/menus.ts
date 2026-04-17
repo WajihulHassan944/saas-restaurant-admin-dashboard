@@ -160,7 +160,7 @@ export type BulkMenuItemsValues = z.infer<typeof bulkMenuItemsSchema>;
 
 const variationOptionSchema = z.object({
   name: requiredString("Option name is required"),
-  priceAdjustment: optionalNumberFromInput({ min: 0 }).default(0),
+  // priceAdjustment: optionalNumberFromInput({ min: 0 }).default(0),
   sku: optionalString(100),
   isDefault: optionalBoolean(false),
   isActive: optionalBoolean(true),
@@ -220,7 +220,7 @@ const modifierShape = {
   name: requiredString("Modifier name is required"),
   description: optionalString(300),
   modifierGroupId: optionalString(),
-  priceAdjustment: optionalNumberFromInput({ min: 0 }).default(0),
+  // priceAdjustment: optionalNumberFromInput({ min: 0 }).default(0),
   sku: optionalString(100),
   isDefault: optionalBoolean(false),
   isActive: optionalBoolean(true),

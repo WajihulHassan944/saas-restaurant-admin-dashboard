@@ -8,10 +8,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
+import AsyncSelect from "@/components/ui/AsyncSelect";
+import {
+  useCreateModifier,
+  useUpdateModifier,
+} from "@/hooks/useMenus";
 
 interface ModifierForm {
   modifierGroupId: string;
@@ -29,7 +34,12 @@ export default function ModifierModal({
   const { user, token } = useAuth();
   const api = useApi(token);
 
-  const [groups, setGroups] = useState<any[]>([]);
+  const { mutateAsync: createModifier, isPending: isCreating } =
+    useCreateModifier();
+  const { mutateAsync: updateModifier, isPending: isUpdating } =
+    useUpdateModifier();
+
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
 
   const [form, setForm] = useState<ModifierForm>({
     modifierGroupId: "",
@@ -38,16 +48,32 @@ export default function ModifierModal({
     sortOrder: 0,
   });
 
+  const isSubmitting = isCreating || isUpdating;
+
   useEffect(() => {
-    fetchGroups();
+    if (!open) return;
 
     if (initialData) {
       setForm({
-        modifierGroupId: initialData.modifierGroupId,
-        name: initialData.name,
-        priceDelta: Number(initialData.priceDelta),
-        sortOrder: initialData.sortOrder,
+        modifierGroupId: String(initialData.modifierGroupId || ""),
+        name: initialData.name || "",
+        priceDelta: Number(initialData.priceDelta || 0),
+        sortOrder: Number(initialData.sortOrder || 0),
       });
+
+      setSelectedGroup(
+        initialData.modifierGroup
+          ? {
+              id: initialData.modifierGroup.id,
+              name: initialData.modifierGroup.name,
+            }
+          : initialData.modifierGroupId
+          ? {
+              id: initialData.modifierGroupId,
+              name: initialData.modifierGroupName || "Selected Group",
+            }
+          : null
+      );
     } else {
       setForm({
         modifierGroupId: "",
@@ -55,71 +81,93 @@ export default function ModifierModal({
         priceDelta: 0,
         sortOrder: 0,
       });
+      setSelectedGroup(null);
     }
-  }, [initialData]);
+  }, [initialData, open]);
 
-  const fetchGroups = async () => {
-    const res = await api.get(
-      `/v1/menu/modifier-groups?restaurantId=${user?.restaurantId}`
-    );
+  const fetchModifierGroups = async ({
+    search = "",
+    page = 1,
+  }: {
+    search: string;
+    page: number;
+  }) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: "10",
+    });
 
-    if (!res?.error) {
-      setGroups(res.data || []);
+    if (search?.trim()) {
+      params.set("search", search.trim());
     }
+
+    if (user?.restaurantId) {
+      params.set("restaurantId", String(user.restaurantId));
+    }
+
+    const res = await api.get(`/v1/menu/modifier-groups?${params.toString()}`);
+
+    return {
+      data: res?.data || [],
+      meta: res?.meta || {},
+    };
   };
 
   const handleChange = (key: keyof ModifierForm, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-const handleSubmit = async () => {
-  if (!form.name || !form.modifierGroupId) {
-    toast.error("Required fields missing");
-    return;
-  }
+  const canSubmit = useMemo(() => {
+    return !!form.name?.trim() && !!form.modifierGroupId;
+  }, [form.name, form.modifierGroupId]);
 
-  let res;
+  const handleSubmit = async () => {
+    if (!canSubmit) {
+      toast.error("Required fields missing");
+      return;
+    }
 
-  if (initialData?.id) {
-    // ❌ REMOVE modifierGroupId for PATCH
-    const payload = {
-      name: form.name,
-      priceDelta: Number(form.priceDelta),
-      sortOrder: form.sortOrder,
-    };
+    try {
+      if (initialData?.id) {
+        const payload = {
+          name: form.name.trim(),
+          priceDelta: Number(form.priceDelta),
+          sortOrder: Number(form.sortOrder),
+        };
 
-    res = await api.patch(
-      `/v1/menu/modifiers/${initialData.id}`,
-      payload
-    );
-  } else {
-    // ✅ KEEP modifierGroupId for CREATE
-    const payload = {
-      modifierGroupId: form.modifierGroupId,
-      name: form.name,
-      priceDelta: Number(form.priceDelta),
-      sortOrder: form.sortOrder,
-    };
+        await updateModifier({
+          id: initialData.id,
+          data: payload,
+        });
 
-    res = await api.post(`/v1/menu/modifiers`, payload);
-  }
+        toast.success("Updated");
+      } else {
+        const payload = {
+          modifierGroupId: form.modifierGroupId,
+          name: form.name.trim(),
+          priceDelta: Number(form.priceDelta),
+          sortOrder: Number(form.sortOrder),
+        };
 
-  if (res?.error) {
-    toast.error(res.error);
-    return;
-  }
+        await createModifier(payload);
+        toast.success("Created");
+      }
 
-  toast.success(initialData ? "Updated" : "Created");
-
-  refresh();
-  onOpenChange(false);
-};
+      refresh?.();
+      onOpenChange(false);
+    } catch (error) {
+      // mutation hooks already handle error toast
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!isSubmitting) onOpenChange(value);
+      }}
+    >
       <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5]">
-
-        {/* HEADER */}
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
             {initialData ? "Edit" : "Add"} Modifier
@@ -130,27 +178,22 @@ const handleSubmit = async () => {
           </p>
         </DialogHeader>
 
-        {/* FORM CARD */}
         <div className="mt-5 bg-white rounded-[16px] p-5 space-y-4">
-
           {/* GROUP */}
           <div className="space-y-1">
             <p className="text-sm text-gray-600">Modifier Group</p>
-            <select
-              value={form.modifierGroupId}
-              disabled={!!initialData}
-              onChange={(e) =>
-                handleChange("modifierGroupId", e.target.value)
-              }
-              className="w-full h-[40px] rounded-[10px] border border-gray-300 px-3 focus:border-gray-400 outline-none bg-white"
-            >
-              <option value="">Select Group</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
+
+            <AsyncSelect
+              value={selectedGroup}
+              onChange={(group) => {
+                setSelectedGroup(group);
+                handleChange("modifierGroupId", String(group?.id || ""));
+              }}
+              placeholder="Select Group"
+              fetchOptions={fetchModifierGroups}
+              labelKey="name"
+              valueKey="id"
+            />
           </div>
 
           {/* NAME */}
@@ -183,10 +226,10 @@ const handleSubmit = async () => {
           {/* BUTTON */}
           <Button
             onClick={handleSubmit}
-            disabled={api.loading}
+            disabled={isSubmitting}
             className="w-full rounded-[10px] mt-2 py-4 bg-primary"
           >
-            {api.loading ? (
+            {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="animate-spin" size={18} />
                 Saving...
@@ -197,14 +240,12 @@ const handleSubmit = async () => {
               "Create Modifier"
             )}
           </Button>
-
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-/* ✅ INPUT FIELD (UNCHANGED DESIGN STYLE) */
 interface InputFieldProps {
   label: string;
   value: string | number;
