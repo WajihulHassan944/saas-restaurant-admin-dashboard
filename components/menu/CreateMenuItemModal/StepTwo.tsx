@@ -1,12 +1,13 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { ImagePlus, UploadCloud, X } from "lucide-react";
+
 type Field = keyof z.infer<typeof schema>;
 
 const schema = z.object({
@@ -14,6 +15,8 @@ const schema = z.object({
 });
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
+  const [isDragging, setIsDragging] = useState(false);
+const fileInputRef = useRef<HTMLInputElement | null>(null);
 const { uploadFile, uploading } = useFileUpload();
   const update = (key: string, value: string) => {
     setForm((prev: any) => ({
@@ -21,26 +24,75 @@ const { uploadFile, uploading } = useFileUpload();
       [key]: value,
     }));
   };
-const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
+
+
+  const processImageFile = async (file: File) => {
   if (!file) return;
 
-  // ✅ instant blob preview
+  if (!file.type.startsWith("image/")) {
+    toast.error("Please upload a valid image file");
+    return;
+  }
+
   const previewUrl = URL.createObjectURL(file);
 
-  setForm((prev: any) => ({
-    ...prev,
-    imagePreview: previewUrl,
-  }));
+  setForm((prev: any) => {
+    if (prev.imagePreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(prev.imagePreview);
+    }
 
-  const result = await uploadFile(e);
+    return {
+      ...prev,
+      imagePreview: previewUrl,
+    };
+  });
+
+  const syntheticEvent = {
+    target: {
+      files: [file],
+    },
+  } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+  const result = await uploadFile(syntheticEvent);
 
   if (result?.fileUrl) {
     setForm((prev: any) => ({
       ...prev,
       imageUrl: result.fileUrl,
     }));
+  } else {
+    toast.error("Image upload failed");
   }
+};
+
+const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  e.preventDefault();
+  setIsDragging(true);
+};
+
+const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  e.preventDefault();
+  setIsDragging(false);
+};
+
+const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+  e.preventDefault();
+  setIsDragging(false);
+
+  const file = e.dataTransfer.files?.[0];
+  if (!file) return;
+
+  await processImageFile(file);
+};
+
+const openFilePicker = () => {
+  fileInputRef.current?.click();
+};
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  await processImageFile(file);
 };
 
 const validateField = (field: Field, value: any) => {
@@ -107,43 +159,92 @@ const validateStep = () => {
 
   return (
     <div className="space-y-5">
-{form.imagePreview && (
-  <div className="relative w-full">
-    <img
-      src={form.imagePreview}
-      alt="Preview"
-      className="h-40 w-full rounded-[14px] object-cover border"
-    />
 
-    <button
-      type="button"
-      onClick={() =>
-        setForm((prev: any) => ({
-          ...prev,
-          imageUrl: "",
-          imagePreview: "",
-        }))
-      }
-      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
-    >
-      <X size={14} />
-    </button>
-  </div>
-)}
-   <div className="space-y-2">
+
+ 
+ <div className="space-y-3">
   <Label>Image</Label>
 
+  {form.imagePreview ? (
+    <div className="relative overflow-hidden rounded-[18px] border border-gray-200 bg-white shadow-sm">
+      <img
+        src={form.imagePreview}
+        alt="Preview"
+        className="h-52 w-full object-cover"
+      />
+
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 via-black/20 to-transparent px-4 py-3">
+        <div>
+          <p className="text-sm font-medium text-white">Image uploaded</p>
+          <p className="text-xs text-white/80">
+            Drag & drop another image to replace it
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            setForm((prev: any) => ({
+              ...prev,
+              imageUrl: "",
+              imagePreview: "",
+            }))
+          }
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      <div
+        onClick={openFilePicker}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`absolute inset-0 cursor-pointer transition ${
+          isDragging ? "bg-primary/10 ring-2 ring-primary ring-inset" : ""
+        }`}
+      />
+    </div>
+  ) : (
+    <div
+      onClick={openFilePicker}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`group relative overflow-hidden rounded-[18px] border border-dashed bg-white px-6 py-8 text-center transition-all duration-200 cursor-pointer ${
+        isDragging
+          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+          : "border-gray-300 hover:border-primary/50 hover:bg-gray-50"
+      }`}
+    >
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9FAFB] text-primary shadow-sm">
+        {isDragging ? <UploadCloud size={24} /> : <ImagePlus size={24} />}
+      </div>
+
+      <div className="mt-4 space-y-1">
+        <p className="text-sm font-semibold text-dark">
+          Drag & drop your image here
+        </p>
+        <p className="text-xs text-gray-500">
+          or <span className="text-primary font-medium">click to browse</span>
+        </p>
+        <p className="text-[11px] text-gray-400">
+          PNG, JPG, WEBP up to 10MB
+        </p>
+      </div>
+    </div>
+  )}
+
   <Input
+    ref={fileInputRef}
     type="file"
     accept="image/*"
     onChange={handleImageUpload}
-    className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400 pt-1"
+    className="hidden"
   />
 
-  {uploading && (
-    <p className="text-xs text-gray-500">Uploading...</p>
-  )}
-  
+  {uploading && <p className="text-xs text-gray-500">Uploading image...</p>}
 </div>
 
       {/* <div className="space-y-2">

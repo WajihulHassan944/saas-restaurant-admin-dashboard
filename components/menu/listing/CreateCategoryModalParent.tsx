@@ -228,12 +228,12 @@ const handleSubmit = () => {
             required
           />
 
-          <FormInput
+          {/* <FormInput
             label="Slug"
             placeholder="auto-generated"
             value={form.slug}
             onChange={(v) => updateForm("slug", v)}
-          />
+          /> */}
 
           <FormInput
             label="Description"

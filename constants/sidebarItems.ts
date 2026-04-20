@@ -12,16 +12,21 @@ import {
   Printer,
   BarChart3,
   Bell,
+  ShieldCheck,
+  ChevronRight,
+  FileText,
 } from "lucide-react";
 import { PiUsersThree } from "react-icons/pi";
+
 
 export type SidebarSection = "main" | "account";
 
 export interface MenuItem {
   title: string;
-  href: string;
+  href?: string;
   icon: any;
   section: SidebarSection;
+  children?: MenuItem[];
 }
 
 export const menuItems: MenuItem[] = [
@@ -81,6 +86,26 @@ export const menuItems: MenuItem[] = [
     section: "main",
   },
 
+  {
+  title: "Content Management",
+  href: "/content-management",
+  icon: FileText,
+  section: "main",
+  children: [
+    {
+      title: "Faqs",
+      href: "/faqs",
+      icon: FileText,
+      section: "main",
+    },
+    {
+      title: "Privacy Policy",
+      href: "/privacy-policy",
+      icon: ShieldCheck,
+      section: "main",
+    },
+  ],
+},
   // ACCOUNT SETTINGS
   {
     title: "Profile",
