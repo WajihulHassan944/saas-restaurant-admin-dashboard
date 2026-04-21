@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bold,
   Italic,
@@ -10,14 +10,122 @@ import {
   Lightbulb,
   RotateCcw,
 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/header";
+import { useAuth } from "@/hooks/useAuth";
+import { useCreateFaq, useGetFaq, useUpdateFaq } from "@/hooks/useFaqs";
+
+type VisibilityUI = "all" | "logged-in";
 
 export default function CreateFAQPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
+
+  const faqId = searchParams.get("id");
+  const isEditMode = !!faqId;
+
+  const restaurantId = useMemo(() => {
+    return (
+      user?.restaurantId ||
+      ""
+    );
+  }, [user]);
+
+  const { data: faqData, isLoading: isFaqLoading } = useGetFaq(
+    restaurantId,
+    faqId || ""
+  );
+
+  const createFaqMutation = useCreateFaq();
+  const updateFaqMutation = useUpdateFaq();
+
   const [question, setQuestion] = useState("");
   const [category, setCategory] = useState("");
   const [answer, setAnswer] = useState("");
   const [status, setStatus] = useState(false);
-  const [visibility, setVisibility] = useState<"all" | "logged-in">("all");
+  const [visibility, setVisibility] = useState<VisibilityUI>("all");
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      setInitialized(true);
+      return;
+    }
+
+    if (!faqData || initialized) return;
+
+    setQuestion(faqData?.question || "");
+    setCategory(faqData?.category || "");
+    setAnswer(faqData?.answer || "");
+    setStatus(faqData?.status === "PUBLISHED");
+    setVisibility(faqData?.visibility === "PRIVATE" ? "logged-in" : "all");
+    setInitialized(true);
+  }, [faqData, initialized, isEditMode]);
+
+  const isSubmitting =
+    createFaqMutation.isPending || updateFaqMutation.isPending;
+
+  const payload = {
+    question: question.trim(),
+    category: category.trim(),
+    answer: answer.trim(),
+    status: status ? ("PUBLISHED" as const) : ("DRAFT" as const),
+    visibility: visibility === "logged-in" ? ("PRIVATE" as const) : ("PUBLIC" as const),
+  };
+
+  const isFormValid =
+    !!restaurantId &&
+    payload.question.length >= 3 &&
+    !!payload.category &&
+    payload.answer.length >= 3;
+
+  const handleSubmit = async (publishOverride?: boolean) => {
+    if (!restaurantId) return;
+
+    const finalPayload = {
+      ...payload,
+      status: publishOverride ? ("PUBLISHED" as const) : payload.status,
+    };
+
+    try {
+      if (isEditMode && faqId) {
+        await updateFaqMutation.mutateAsync({
+          restaurantId,
+          faqId,
+          payload: finalPayload,
+        });
+      } else {
+        await createFaqMutation.mutateAsync({
+          restaurantId,
+          payload: finalPayload,
+        });
+      }
+
+      router.push("/faqs");
+    } catch {
+      // toast already handled in hooks
+    }
+  };
+
+  const handlePrimaryAction = () => {
+    handleSubmit(true);
+  };
+
+  if (isEditMode && isFaqLoading && !initialized) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FB] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1400px]">
+          <Header
+            title="FAQ Manager"
+            description="Loading FAQ details..."
+            titleClassName="text-[24px] sm:text-[28px] font-semibold text-[#101828] leading-tight"
+            descriptionClassName="mt-1 max-w-[760px] text-sm text-[#667085] leading-6"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] px-4 py-5 sm:px-6 lg:px-8">
@@ -33,9 +141,17 @@ export default function CreateFAQPage() {
 
           <button
             type="button"
-            className="inline-flex h-10 items-center justify-center rounded-full bg-[#C1121F] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#a50f1a]"
+            onClick={handlePrimaryAction}
+            disabled={!isFormValid || isSubmitting}
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#C1121F] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#a50f1a] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            + Publish FAQ
+            {isSubmitting
+              ? isEditMode
+                ? "Updating..."
+                : "Publishing..."
+              : isEditMode
+              ? "+ Update FAQ"
+              : "+ Publish FAQ"}
           </button>
         </div>
 
@@ -248,10 +364,10 @@ export default function CreateFAQPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#98A2B3]">
-                      Created By
+                      Mode
                     </p>
                     <p className="text-xs font-semibold uppercase text-[#344054]">
-                      Admin_Sarah
+                      {isEditMode ? "Editing" : "Creating"}
                     </p>
                   </div>
 
@@ -260,10 +376,34 @@ export default function CreateFAQPage() {
                       Last Sync
                     </p>
                     <p className="text-xs font-semibold uppercase text-[#344054]">
-                      Just Now
+                      {isEditMode ? "Loaded" : "New Draft"}
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Secondary Actions */}
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleSubmit(false)}
+                  disabled={!isFormValid || isSubmitting}
+                  className="w-full rounded-xl border border-[#EAECF0] bg-white px-4 py-3 text-sm font-semibold text-[#344054] transition hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmitting
+                    ? "Please wait..."
+                    : isEditMode
+                    ? "Save Changes"
+                    : "Save as Draft"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => router.push("/faqs")}
+                  className="w-full rounded-xl border border-transparent bg-transparent px-4 py-3 text-sm font-semibold text-[#667085] transition hover:bg-white"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -296,12 +436,12 @@ export default function CreateFAQPage() {
 
               <div>
                 <p className="text-sm font-semibold text-[#344054]">
-                  Auto-Save Enabled
+                  Draft Handling
                 </p>
                 <p className="mt-1 text-sm leading-6 text-[#667085]">
-                  Your changes are automatically saved as a local draft every 30
-                  seconds to prevent data loss. Check your draft history in the
-                  sidebar.
+                  Use draft mode while preparing content, then publish once the FAQ
+                  is reviewed. Edit mode is automatically enabled when the page URL
+                  contains an FAQ id.
                 </p>
               </div>
             </div>

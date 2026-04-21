@@ -32,6 +32,8 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => ({
     initialData?.category?.id ||
     "",
   description: initialData?.description || "",
+  ingredients: initialData?.ingredients || "",
+  nutritionalInformation: initialData?.nutritionalInformation || "",
   basePrice:
     String(
       initialData?.basePrice ??
@@ -39,7 +41,7 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => ({
         ""
     ) || "",
   imageUrl: initialData?.imageUrl || "",
-   imagePreview: initialData?.imageUrl || "", // ✅ NEW
+  imagePreview: initialData?.imageUrl || "",
   slug: initialData?.slug || "",
   sku: initialData?.sku || "",
   prepTimeMinutes:
@@ -55,6 +57,7 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => ({
     : initialData?.allergenFlags || "",
   sizes: initialData?.sizes || [],
   addons: initialData?.addons || [],
+  modifierPriceOverrides: initialData?.modifierPriceOverrides || [],
   restaurantId: restaurantId || initialData?.restaurantId || "",
 });
 
@@ -194,7 +197,7 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
       .filter(Boolean);
   }, [form.allergenFlags]);
 
-  const buildPayload = () => {
+    const buildPayload = () => {
     const generatedSlug =
       form.slug ||
       String(form.name || "")
@@ -206,16 +209,14 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
       categoryId: form.categoryId || undefined,
       name: form.name?.trim(),
       slug: generatedSlug,
-      // price:
-      //   form.basePrice !== "" && form.basePrice !== undefined
-      //     ? Number(form.basePrice)
-      //     : undefined,
       basePrice:
         form.basePrice !== "" && form.basePrice !== undefined
           ? Number(form.basePrice)
           : undefined,
       restaurantId,
       description: form.description || "",
+      ingredients: form.ingredients || "",
+      nutritionalInformation: form.nutritionalInformation || "",
       imageUrl: form.imageUrl || "",
       prepTimeMinutes:
         form.prepTimeMinutes !== "" &&
@@ -226,6 +227,12 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
       sku: form.sku || "",
       dietaryFlags: parsedDietaryFlags,
       allergenFlags: parsedAllergenFlags,
+      modifierPriceOverrides: Array.isArray(form.modifierPriceOverrides)
+        ? form.modifierPriceOverrides.map((item: any) => ({
+            modifierId: String(item.modifierId),
+            priceDelta: Number(item.priceDelta || 0),
+          }))
+        : [],
       isActive: true,
     };
   };

@@ -8,9 +8,12 @@ import { Loader2, PlusCircle, Trash2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
+import { useGetModifiers } from "@/hooks/useMenus";
 
 type VariationForm = {
   name: string;
+  description: string;
+  requiredModifierId: string;
   price: string;
   sku: string;
   sortOrder: number;
@@ -27,6 +30,8 @@ type Props = {
 
 const getInitialVariationForm = (): VariationForm => ({
   name: "",
+  description: "",
+  requiredModifierId: "",
   price: "",
   sku: "",
   sortOrder: 0,
@@ -42,7 +47,9 @@ export default function StepThree({
 }: Props) {
   const { token, user } = useAuth();
   const api = useApi(token);
-console.log("item is", item);
+
+  console.log("item is", item);
+
   const resolvedItemId = menuItemId || item?.id || form?.id;
 
   const [variationForm, setVariationForm] = useState<VariationForm>(
@@ -60,36 +67,80 @@ console.log("item is", item);
   const [localModifierGroups, setLocalModifierGroups] = useState<any[]>([]);
 
   const attachedModifierIds = useMemo(() => {
-    return new Set(
-      (localModifierGroups || []).map((g: any) => String(g.id))
+    return new Set((localModifierGroups || []).map((g: any) => String(g.id)));
+  }, [localModifierGroups]);
+
+  const attachedGroupIds = useMemo(() => {
+    return (localModifierGroups || []).map((g: any) =>
+      String(g?.id || g?.modifierGroupId || "")
     );
   }, [localModifierGroups]);
+
+  const [modifierPage] = useState(1);
+  const [modifierLimit] = useState(100);
+  const [modifierSearch] = useState("");
+
+  const {
+    data: modifiersResponse,
+    isLoading: loadingRequiredModifiers,
+    isFetching: fetchingRequiredModifiers,
+    refetch: refetchModifiers,
+  } = useGetModifiers({
+    page: modifierPage,
+    limit: modifierLimit,
+    search: modifierSearch,
+  });
 useEffect(() => {
-  const initialVariations =
-    item?.variations ||
-    item?.menuVariations ||
-    item?.sizes ||
-    [];
+  if (resolvedItemId) {
+    refetchModifiers();
+  }
+}, [resolvedItemId, refetchModifiers]);
 
-  const initialModifierGroups =
-    item?.modifierGroups ||
-    item?.attachedModifierGroups ||
-    item?.modifier_groups ||
-    item?.modifierLinks?.map((link: any) => ({
-      ...(link?.modifierGroup || {}),
-      linkId: link?.id,
-      modifierGroupId: link?.modifierGroupId,
-      sortOrder: link?.sortOrder ?? link?.modifierGroup?.sortOrder ?? 0,
-      menuItemId: link?.menuItemId,
-      isAttached: true,
-    })) ||
-    [];
+  const modifierItems = useMemo(() => {
+    if (!modifiersResponse) return [];
 
-  setLocalVariations(Array.isArray(initialVariations) ? initialVariations : []);
-  setLocalModifierGroups(
-    Array.isArray(initialModifierGroups) ? initialModifierGroups : []
-  );
-}, [item]);
+    return (
+      modifiersResponse?.data?.items ||
+      modifiersResponse?.data?.modifiers ||
+      modifiersResponse?.data?.data ||
+      modifiersResponse?.items ||
+      modifiersResponse?.modifiers ||
+      modifiersResponse?.data ||
+      []
+    );
+  }, [modifiersResponse]);
+
+const availableRequiredModifiers = useMemo(() => {
+  if (!Array.isArray(modifierItems) || modifierItems.length === 0) return [];
+
+  return modifierItems.map((modifier: any) => ({
+    ...modifier,
+    groupName: modifier?.modifierGroup?.name || "",
+  }));
+}, [modifierItems]);
+  useEffect(() => {
+    const initialVariations =
+      item?.variations || item?.menuVariations || item?.sizes || [];
+
+    const initialModifierGroups =
+      item?.modifierGroups ||
+      item?.attachedModifierGroups ||
+      item?.modifier_groups ||
+      item?.modifierLinks?.map((link: any) => ({
+        ...(link?.modifierGroup || {}),
+        linkId: link?.id,
+        modifierGroupId: link?.modifierGroupId,
+        sortOrder: link?.sortOrder ?? link?.modifierGroup?.sortOrder ?? 0,
+        menuItemId: link?.menuItemId,
+        isAttached: true,
+      })) ||
+      [];
+
+    setLocalVariations(Array.isArray(initialVariations) ? initialVariations : []);
+    setLocalModifierGroups(
+      Array.isArray(initialModifierGroups) ? initialModifierGroups : []
+    );
+  }, [item]);
 
   useEffect(() => {
     if (!user?.restaurantId || !token) return;
@@ -156,8 +207,10 @@ useEffect(() => {
     const payload = {
       menuItemId: resolvedItemId,
       name: variationForm.name.trim(),
-      price: Number(variationForm.price),
+      description: variationForm.description?.trim() || "",
+      requiredModifierId: variationForm.requiredModifierId || "",
       sku: variationForm.sku?.trim() || "",
+      price: Number(variationForm.price),
       sortOrder: Number(variationForm.sortOrder || 0),
       isDefault: variationForm.isDefault,
       isActive: variationForm.isActive,
@@ -177,10 +230,7 @@ useEffect(() => {
       return;
     }
 
-    const createdVariation =
-      res?.data?.data ||
-      res?.data ||
-      payload;
+    const createdVariation = res?.data?.data || res?.data || payload;
 
     setLocalVariations((prev) => [createdVariation, ...prev]);
 
@@ -235,23 +285,16 @@ useEffect(() => {
     );
 
     if (selectedGroupData) {
-      setLocalModifierGroups((prev) => [
-        {
-          ...selectedGroupData,
-          sortOrder: Number(modifierSortOrder || 0),
-        },
-        ...prev,
-      ]);
+      const attachedGroup = {
+        ...selectedGroupData,
+        sortOrder: Number(modifierSortOrder || 0),
+      };
+
+      setLocalModifierGroups((prev) => [attachedGroup, ...prev]);
 
       setForm((prev: any) => ({
         ...prev,
-        addons: [
-          {
-            ...selectedGroupData,
-            sortOrder: Number(modifierSortOrder || 0),
-          },
-          ...(prev?.addons || []),
-        ],
+        addons: [attachedGroup, ...(prev?.addons || [])],
       }));
     }
 
@@ -270,23 +313,40 @@ useEffect(() => {
 
   const handleRemoveLocalModifier = (groupId: string | number) => {
     setLocalModifierGroups((prev) =>
-      prev.filter((g) => String(g.id) !== String(groupId))
+      prev.filter(
+        (g) =>
+          String(g?.id || g?.modifierGroupId || "") !== String(groupId)
+      )
     );
 
     setForm((prev: any) => ({
       ...prev,
       addons: (prev?.addons || []).filter(
-        (g: any) => String(g.id) !== String(groupId)
+        (g: any) =>
+          String(g?.id || g?.modifierGroupId || "") !== String(groupId)
       ),
     }));
+
+    setVariationForm((prev) => {
+      const selectedModifierStillExists = availableRequiredModifiers.some(
+        (modifier: any) =>
+          String(modifier.id) === String(prev.requiredModifierId) &&
+          String(modifier?.modifierGroupId || modifier?.modifierGroup?.id || "") !==
+            String(groupId)
+      );
+
+      return selectedModifierStillExists
+        ? prev
+        : { ...prev, requiredModifierId: "" };
+    });
   };
 
   const availableGroups = useMemo(() => {
     return groups.filter(
-      (g) => !attachedModifierIds.has(String(g.id))
+      (g) =>
+        !attachedModifierIds.has(String(g?.id || g?.modifierGroupId || ""))
     );
   }, [groups, attachedModifierIds]);
-
   return (
     <div className="mt-4 space-y-6">
       {!resolvedItemId && (
@@ -315,9 +375,7 @@ useEffect(() => {
             <Input
               placeholder="e.g. Small, Medium, Large"
               value={variationForm.name}
-              onChange={(e) =>
-                handleVariationChange("name", e.target.value)
-              }
+              onChange={(e) => handleVariationChange("name", e.target.value)}
             />
           </div>
 
@@ -327,19 +385,17 @@ useEffect(() => {
               type="number"
               placeholder="Enter price"
               value={variationForm.price}
-              onChange={(e) =>
-                handleVariationChange("price", e.target.value)
-              }
+              onChange={(e) => handleVariationChange("price", e.target.value)}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>SKU (Optional)</Label>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Description</Label>
             <Input
-              placeholder="Unique SKU"
-              value={variationForm.sku}
+              placeholder="Enter variation description"
+              value={variationForm.description}
               onChange={(e) =>
-                handleVariationChange("sku", e.target.value)
+                handleVariationChange("description", e.target.value)
               }
             />
           </div>
@@ -353,6 +409,43 @@ useEffect(() => {
               onChange={(e) =>
                 handleVariationChange("sortOrder", Number(e.target.value))
               }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Required Modifier</Label>
+            <select
+              value={variationForm.requiredModifierId}
+              onChange={(e) =>
+                handleVariationChange("requiredModifierId", e.target.value)
+              }
+              className="h-[40px] w-full rounded-[10px] border border-gray-300 bg-white px-3 outline-none focus:border-gray-400"
+              disabled={!resolvedItemId || loadingRequiredModifiers}
+            >
+          <option value="">
+  {loadingRequiredModifiers || fetchingRequiredModifiers
+    ? "Loading modifiers..."
+    : availableRequiredModifiers.length === 0
+    ? "No modifiers found"
+    : "Select required modifier"}
+</option>
+
+              {availableRequiredModifiers.map((modifier: any) => (
+                <option key={modifier.id} value={modifier.id}>
+                  {modifier.groupName
+                    ? `${modifier.groupName} - ${modifier.name}`
+                    : modifier.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>SKU (Optional)</Label>
+            <Input
+              placeholder="Unique SKU"
+              value={variationForm.sku}
+              onChange={(e) => handleVariationChange("sku", e.target.value)}
             />
           </div>
         </div>
@@ -421,10 +514,20 @@ useEffect(() => {
                   </p>
                   <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
                     <span>Price: {variation?.price ?? 0}</span>
+                    {variation?.description ? (
+                      <span>Description: {variation.description}</span>
+                    ) : null}
+                    {variation?.requiredModifierId ? (
+                      <span>
+                        Required Modifier: {variation.requiredModifierId}
+                      </span>
+                    ) : null}
                     {variation?.sku ? <span>SKU: {variation.sku}</span> : null}
                     <span>Sort: {variation?.sortOrder ?? 0}</span>
                     {variation?.isDefault ? <span>Default</span> : null}
-                    {variation?.isActive === false ? <span>Inactive</span> : null}
+                    {variation?.isActive === false ? (
+                      <span>Inactive</span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -495,7 +598,10 @@ useEffect(() => {
             type="button"
             onClick={handleAttachModifierGroup}
             disabled={
-              addingModifier || loadingGroups || !resolvedItemId || !selectedGroup
+              addingModifier ||
+              loadingGroups ||
+              !resolvedItemId ||
+              !selectedGroup
             }
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 text-white hover:bg-primary/90"
           >

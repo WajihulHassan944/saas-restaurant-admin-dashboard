@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import FormInput from "@/components/register/form/FormInput";
+import { Label } from "@/components/ui/label";
 
 type Props = {
   open: boolean;
@@ -22,6 +23,7 @@ type Props = {
   initialData?: any;
   onSuccess?: () => void;
 };
+
 export default function VariationModal({
   open,
   onOpenChange,
@@ -31,10 +33,15 @@ export default function VariationModal({
   onSuccess,
 }: Props) {
   const { token } = useAuth();
-  const { post, patch, loading } = useApi(token);
+  const { post, patch, get, loading } = useApi(token);
+
+  const [loadingModifiers, setLoadingModifiers] = useState(false);
+  const [modifiers, setModifiers] = useState<any[]>([]);
 
   const [form, setForm] = useState({
     name: "",
+    description: "",
+    requiredModifierId: "",
     price: "",
     sku: "",
     sortOrder: 0,
@@ -42,21 +49,81 @@ export default function VariationModal({
     isActive: true,
   });
 
+  const attachedGroupIds = useMemo(() => {
+  const rawGroups =
+    item?.modifierGroups ||
+    item?.attachedModifierGroups ||
+    item?.modifier_groups ||
+    item?.addons ||
+    item?.modifierLinks?.map((link: any) => ({
+      id: link?.modifierGroupId || link?.modifierGroup?.id,
+      name: link?.modifierGroup?.name,
+    })) ||
+    [];
+
+  if (!Array.isArray(rawGroups)) return [];
+
+  return rawGroups
+    .map((group: any) => String(group?.id || group?.modifierGroupId || ""))
+    .filter(Boolean);
+}, [item]);
+
+
+const fetchModifiers = async () => {
+  setLoadingModifiers(true);
+
+  const res = await get(`/v1/menu/modifiers?page=1&limit=100`);
+
+  setLoadingModifiers(false);
+
+  if (!res) {
+    toast.error("Failed to load modifiers");
+    setModifiers([]);
+    return;
+  }
+
+  if (res.error) {
+    toast.error(res.error || "Failed to load modifiers");
+    setModifiers([]);
+    return;
+  }
+
+  const modifierItems = Array.isArray(res?.data) ? res.data : [];
+
+  console.log("raw modifiers response =>", res);
+  console.log("modifierItems =>", modifierItems);
+  console.log("attachedGroupIds =>", attachedGroupIds);
+  console.log("item =>", item);
+
+  if (!modifierItems.length) {
+    setModifiers([]);
+    return;
+  }
+
+  setModifiers(modifierItems);
+};
+console.log("variation modal item =>", item);
+console.log("attachedGroupIds =>", attachedGroupIds);
+console.log("modifiers =>", modifiers);
+
   useEffect(() => {
     if (open) {
       if (mode === "edit" && initialData) {
         setForm({
           name: initialData?.name || "",
+          description: initialData?.description || "",
+          requiredModifierId: initialData?.requiredModifierId || "",
           price: String(initialData?.price ?? ""),
           sku: initialData?.sku || "",
           sortOrder: Number(initialData?.sortOrder ?? 0),
           isDefault: !!initialData?.isDefault,
-          isActive:
-            initialData?.isActive === false ? false : true,
+          isActive: initialData?.isActive === false ? false : true,
         });
       } else {
         setForm({
           name: "",
+          description: "",
+          requiredModifierId: "",
           price: "",
           sku: "",
           sortOrder: 0,
@@ -66,6 +133,11 @@ export default function VariationModal({
       }
     }
   }, [open, mode, initialData]);
+
+  useEffect(() => {
+    if (!open || !token) return;
+    fetchModifiers();
+  }, [open, token, attachedGroupIds.join(",")]);
 
   const handleChange = (key: string, value: any) => {
     setForm((prev) => ({
@@ -82,6 +154,8 @@ export default function VariationModal({
 
     const payload = {
       name: form.name,
+      description: form.description,
+      requiredModifierId: form.requiredModifierId || "",
       sku: form.sku,
       price: Number(form.price),
       sortOrder: Number(form.sortOrder),
@@ -92,10 +166,7 @@ export default function VariationModal({
     let res: any;
 
     if (mode === "edit") {
-      res = await patch(
-        `/v1/menu/variations/${initialData?.id}`,
-        payload
-      );
+      res = await patch(`/v1/menu/variations/${initialData?.id}`, payload);
     } else {
       res = await post("/v1/menu/variations", {
         menuItemId: item?.id,
@@ -128,19 +199,16 @@ export default function VariationModal({
         ? "Variation updated successfully"
         : "Variation added successfully"
     );
-onSuccess?.();
+    onSuccess?.();
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] rounded-[20px] bg-[#F5F5F5] p-6 max-h-[95vh] overflow-auto">
-        {/* HEADER */}
         <DialogHeader className="space-y-1">
           <DialogTitle className="text-2xl font-semibold">
-            {mode === "edit"
-              ? "Edit Variation"
-              : "Add Variation"}
+            {mode === "edit" ? "Edit Variation" : "Add Variation"}
           </DialogTitle>
 
           <p className="text-sm text-gray-500">
@@ -150,7 +218,6 @@ onSuccess?.();
           </p>
         </DialogHeader>
 
-        {/* FORM */}
         <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
           <FormInput
             label="Variation Name"
@@ -159,6 +226,40 @@ onSuccess?.();
             onChange={(v) => handleChange("name", v)}
             required
           />
+
+          <FormInput
+            label="Description"
+            placeholder="Enter variation description"
+            value={form.description}
+            onChange={(v) => handleChange("description", v)}
+          />
+
+          <div className="space-y-2">
+            <Label>Required Modifier</Label>
+            <select
+              value={form.requiredModifierId}
+              onChange={(e) =>
+                handleChange("requiredModifierId", e.target.value)
+              }
+              disabled={loadingModifiers}
+              className="h-[44px] w-full rounded-[12px] border border-gray-300 bg-white px-3 outline-none focus:border-gray-400"
+            >
+             <option value="">
+  {loadingModifiers
+    ? "Loading modifiers..."
+    : modifiers.length === 0
+    ? "No modifiers found"
+    : "Select required modifier"}
+</option>
+              {modifiers.map((modifier: any) => (
+                <option key={modifier.id} value={modifier.id}>
+                  {modifier?.modifierGroup?.name
+                    ? `${modifier.modifierGroup.name} - ${modifier.name}`
+                    : modifier.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <FormInput
             label="Price"
@@ -180,24 +281,16 @@ onSuccess?.();
             label="Sort Order"
             placeholder="0"
             value={String(form.sortOrder)}
-            onChange={(v) =>
-              handleChange("sortOrder", Number(v))
-            }
+            onChange={(v) => handleChange("sortOrder", Number(v))}
             type="number"
           />
 
-          {/* CHECKBOXES */}
           <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 checked={form.isDefault}
-                onChange={(e) =>
-                  handleChange(
-                    "isDefault",
-                    e.target.checked
-                  )
-                }
+                onChange={(e) => handleChange("isDefault", e.target.checked)}
                 className="accent-primary"
               />
               Default
@@ -207,33 +300,22 @@ onSuccess?.();
               <input
                 type="checkbox"
                 checked={form.isActive}
-                onChange={(e) =>
-                  handleChange(
-                    "isActive",
-                    e.target.checked
-                  )
-                }
+                onChange={(e) => handleChange("isActive", e.target.checked)}
                 className="accent-primary"
               />
               Active
             </label>
           </div>
 
-          {/* BUTTON */}
           <Button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || loadingModifiers}
             className="mt-2 w-full rounded-[10px] bg-primary py-4 hover:bg-primary/90"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <Loader2
-                  className="animate-spin"
-                  size={18}
-                />
-                {mode === "edit"
-                  ? "Updating..."
-                  : "Saving..."}
+                <Loader2 className="animate-spin" size={18} />
+                {mode === "edit" ? "Updating..." : "Saving..."}
               </span>
             ) : mode === "edit" ? (
               "Update Variation"

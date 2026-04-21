@@ -112,10 +112,14 @@ const menuItemShape = {
 
   categoryId: optionalString(),
   menuId: optionalString(),
+  restaurantId: optionalString(),
 
-  price: optionalNumberFromInput({ min: 0 }),
+  basePrice: optionalNumberFromInput({ min: 0 }),
   compareAtPrice: optionalNumberFromInput({ min: 0 }),
   costPrice: optionalNumberFromInput({ min: 0 }),
+
+  ingredients: optionalString(),
+  nutritionalInformation: optionalString(),
 
   prepTimeMinutes: optionalNumberFromInput({
     min: 0,
@@ -133,6 +137,16 @@ const menuItemShape = {
 
   variationIds: z.array(idSchema).optional().default([]),
   modifierGroupIds: z.array(idSchema).optional().default([]),
+
+  modifierPriceOverrides: z
+    .array(
+      z.object({
+        modifierId: idSchema,
+        priceDelta: optionalNumberFromInput({}).default(0),
+      })
+    )
+    .optional()
+    .default([]),
 };
 
 export const {

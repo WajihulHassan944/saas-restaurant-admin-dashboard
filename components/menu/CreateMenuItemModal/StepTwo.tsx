@@ -7,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { toast } from "sonner";
 import { ImagePlus, UploadCloud, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 type Field = keyof z.infer<typeof schema>;
-
 const schema = z.object({
   prepTimeMinutes: z.string().optional(),
+  ingredients: z.string().optional(),
+  nutritionalInformation: z.string().optional(),
 });
+
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
   const [isDragging, setIsDragging] = useState(false);
@@ -282,7 +285,50 @@ const validateStep = () => {
           <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
         )}
       </div>
+      {/* INGREDIENTS */}
+      <div className="space-y-2">
+        <Label>Ingredients</Label>
 
+        <Textarea
+          value={form.ingredients || ""}
+          placeholder="e.g. Chicken patty, lettuce, cheese, mayo"
+          onChange={(e) =>
+            setForm({ ...form, ingredients: e.target.value })
+          }
+          onBlur={(e) => validateField("ingredients", e.target.value)}
+          className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+
+        {errors.ingredients && (
+          <p className="text-xs text-red-500">{errors.ingredients}</p>
+        )}
+      </div>
+
+      {/* NUTRITIONAL INFORMATION */}
+      <div className="space-y-2">
+        <Label>Nutritional Information</Label>
+
+        <Textarea
+          value={form.nutritionalInformation || ""}
+          placeholder="e.g. 450 kcal, 20g protein, 15g fat"
+          onChange={(e) =>
+            setForm({
+              ...form,
+              nutritionalInformation: e.target.value,
+            })
+          }
+          onBlur={(e) =>
+            validateField("nutritionalInformation", e.target.value)
+          }
+          className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+
+        {errors.nutritionalInformation && (
+          <p className="text-xs text-red-500">
+            {errors.nutritionalInformation}
+          </p>
+        )}
+      </div>
       <div className="space-y-2">
         <Label>Dietary Flags</Label>
 

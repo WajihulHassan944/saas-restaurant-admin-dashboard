@@ -11,7 +11,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import SortableHeader from "@/components/shared/sortable-head";
-import { Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ClipboardList, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import EmptyState from "../shared/EmptyState";
 import DeliveryManDetails from "./DeliveryManDetails";
 import { useState, useRef, useEffect } from "react";
@@ -23,6 +23,7 @@ import {
   useUpdateDeliverymanStatus,
   useDeleteDeliveryman,
 } from "@/hooks/useDeliverymen";
+import AssignOrderModal from "./AssignOrderModal";
 
 interface Props {
   data: any[];
@@ -41,7 +42,8 @@ const DeliveryManTable = ({
 }: Props) => {
   const [openDetails, setOpenDetails] = useState(false);
   const [selected, setSelected] = useState<any>(null);
-
+const [openAssignOrder, setOpenAssignOrder] = useState(false);
+const [selectedDeliveryman, setSelectedDeliveryman] = useState<any>(null);
   const [menu, setMenu] = useState<{
     id: string | null;
     x: number;
@@ -55,7 +57,11 @@ const DeliveryManTable = ({
   /* ================= MUTATIONS ================= */
   const statusMutation = useUpdateDeliverymanStatus();
   const deleteMutation = useDeleteDeliveryman();
-
+const handleAssignOrderClick = (dm: any) => {
+  setSelectedDeliveryman(dm);
+  setOpenAssignOrder(true);
+  setMenu({ id: null, x: 0, y: 0 });
+};
   /* ================= CLOSE ON OUTSIDE CLICK ================= */
   useEffect(() => {
     const handleClick = (e: any) => {
@@ -228,44 +234,57 @@ const DeliveryManTable = ({
       </div>
 
       {/* ================= DROPDOWN ================= */}
-      {menu.id &&
-        createPortal(
-          <div
-            ref={menuRef}
-            style={{
-              position: "fixed",
-              top: menu.y,
-              left: menu.x,
-              zIndex: 99999,
-            }}
-            className="w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-2"
-          >
-            <button
-              onClick={() => {
-                handleEdit(menu.id!);
-                setMenu({ id: null, x: 0, y: 0 });
-              }}
-              className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-gray-100"
-            >
-              <Pencil size={16} />
-              Edit
-            </button>
+     {menu.id &&
+  createPortal(
+    <div
+      ref={menuRef}
+      style={{
+        position: "fixed",
+        top: menu.y,
+        left: menu.x,
+        zIndex: 99999,
+      }}
+      className="w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-2"
+    >
+      <button
+        onClick={() => {
+          const dm = data.find((item) => item.id === menu.id);
+          if (dm) handleAssignOrderClick(dm);
+        }}
+        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-gray-100"
+      >
+        <ClipboardList size={16} />
+        Assign Order
+      </button>
 
-            <div className="h-px bg-gray-200 my-1" />
+      <div className="h-px bg-gray-200 my-1" />
 
-            <button
-              onClick={() => {
-                handleDelete(menu.id!);
-                setMenu({ id: null, x: 0, y: 0 });
-              }}
-              className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
-            >
-              <Trash2 size={16} />
-              Delete
-            </button>
-          </div>,
-          document.body
-        )}
+      <button
+        onClick={() => {
+          handleEdit(menu.id!);
+          setMenu({ id: null, x: 0, y: 0 });
+        }}
+        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-gray-100"
+      >
+        <Pencil size={16} />
+        Edit
+      </button>
+
+      <div className="h-px bg-gray-200 my-1" />
+
+      <button
+        onClick={() => {
+          handleDelete(menu.id!);
+          setMenu({ id: null, x: 0, y: 0 });
+        }}
+        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+      >
+        <Trash2 size={16} />
+        Delete
+      </button>
+    </div>,
+    document.body
+  )}
 
       {/* ================= MOBILE ================= */}
       <div className="flex flex-col gap-4 md:hidden">
@@ -315,6 +334,17 @@ const DeliveryManTable = ({
           onOpenChange={setOpenDetails}
           data={selected}
         />
+
+        <AssignOrderModal
+  open={openAssignOrder}
+  onOpenChange={setOpenAssignOrder}
+  deliveryman={selectedDeliveryman}
+  onSuccess={() => {
+    refresh?.();
+    setOpenAssignOrder(false);
+  }}
+/>
+
       </div>
     </>
   );
