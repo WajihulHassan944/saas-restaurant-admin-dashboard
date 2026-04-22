@@ -9,12 +9,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import AsyncSelect from "@/components/ui/AsyncSelect";
 import {
+  useAttachModifierGroupToCategory,
   useCreateModifierGroup,
   useUpdateModifierGroup,
 } from "@/hooks/useMenus";
+import { useGetMenuCategories } from "@/hooks/useMenuCategories";
+import { getMenuCategories } from "@/services/categories";
 
 /* ================= TYPES ================= */
 interface ModifierGroupForm {
@@ -49,16 +54,23 @@ export default function ModifierGroupModal({
   refresh,
 }: Props) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState<ModifierGroupForm>(getDefaultForm());
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
 
-  const { mutate: createModifierGroup, isPending: isCreating } =
+  const { mutateAsync: createModifierGroup, isPending: isCreating } =
     useCreateModifierGroup();
 
-  const { mutate: updateModifierGroup, isPending: isUpdating } =
+  const { mutateAsync: updateModifierGroup, isPending: isUpdating } =
     useUpdateModifierGroup();
 
-  const isLoading = isCreating || isUpdating;
+  const {
+    mutateAsync: attachModifierGroupToCategory,
+    isPending: isAttaching,
+  } = useAttachModifierGroupToCategory();
+
+  const isLoading = isCreating || isUpdating || isAttaching;
 
   useEffect(() => {
     if (initialData) {
@@ -70,8 +82,13 @@ export default function ModifierGroupModal({
         isRequired: Boolean(initialData?.isRequired),
         sortOrder: Number(initialData?.sortOrder ?? 0),
       });
+
+      setSelectedCategory(
+        initialData?.category || initialData?.menuCategory || null
+      );
     } else {
       setForm(getDefaultForm());
+      setSelectedCategory(null);
     }
   }, [initialData, open]);
 
@@ -84,84 +101,126 @@ export default function ModifierGroupModal({
 
   const handleClose = (value: boolean) => {
     onOpenChange(value);
+
     if (!value) {
       setForm(getDefaultForm());
+      setSelectedCategory(null);
     }
   };
 
+ const fetchCategoryOptions = async ({
+  search,
+  page,
+}: {
+  search: string;
+  page: number;
+}): Promise<{ data: any[]; meta?: any }> => {
+  const res = await getMenuCategories({
+    page,
+    limit: 10,
+    search,
+    restaurantId: user?.restaurantId ?? undefined,
+    
+  });
 
- 
-  const handleSubmit = () => {
-  if (!form.name.trim()) {
-    toast.error("Name required");
-    return;
-  }
-
-  if (form.minSelect < 0) {
-    toast.error("Min select cannot be negative");
-    return;
-  }
-
-  if (form.maxSelect < 0) {
-    toast.error("Max select cannot be negative");
-    return;
-  }
-
-  if (form.maxSelect < form.minSelect) {
-    toast.error("Max select cannot be less than min select");
-    return;
-  }
-
-  // Prepare payload, conditionally exclude restaurantId if editing
-  const payload: any = {
-    name: form.name.trim(),
-    description: form.description.trim(),
-    minSelect: Number(form.minSelect),
-    maxSelect: Number(form.maxSelect),
-    isRequired: form.isRequired,
-    sortOrder: Number(form.sortOrder),
+  return {
+    data: Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.data)
+      ? res.data.data
+      : [],
+    meta: res?.meta || res?.data?.meta,
   };
-
-  if (!initialData?.id) {
-    // Add restaurantId only when creating
-    payload.restaurantId = user?.restaurantId || "";
-  }
-
-  let res;
-
-  if (initialData?.id) {
-    res = updateModifierGroup(
-      {
-        id: initialData.id,
-        data: payload,
-      },
-      {
-        onSuccess: () => {
-          refresh();
-          handleClose(false);
-        },
-      }
-    );
-  } else {
-    res = createModifierGroup(payload, {
-      onSuccess: () => {
-        refresh();
-        handleClose(false);
-      },
-    });
-  }
-
-  toast.success(initialData ? "Updated" : "Created");
-
-  refresh();
-  handleClose(false);
 };
 
+  const extractCreatedGroupId = (res: any) => {
+    return (
+      res?.id ||
+      res?.data?.id ||
+      res?.data?.data?.id ||
+      res?.modifierGroup?.id ||
+      null
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) {
+      toast.error("Name required");
+      return;
+    }
+
+    if (form.minSelect < 0) {
+      toast.error("Min select cannot be negative");
+      return;
+    }
+
+    if (form.maxSelect < 0) {
+      toast.error("Max select cannot be negative");
+      return;
+    }
+
+    if (form.maxSelect < form.minSelect) {
+      toast.error("Max select cannot be less than min select");
+      return;
+    }
+
+    if (!selectedCategory?.id) {
+      toast.error("Category is required");
+      return;
+    }
+
+    const payload: any = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      minSelect: Number(form.minSelect),
+      maxSelect: Number(form.maxSelect),
+      isRequired: form.isRequired,
+      sortOrder: Number(form.sortOrder),
+    };
+
+    if (!initialData?.id) {
+      payload.restaurantId = user?.restaurantId || "";
+    }
+
+    try {
+      if (initialData?.id) {
+        await updateModifierGroup({
+          id: initialData.id,
+          data: payload,
+        });
+
+        // toast.success("Modifier group updated successfully");
+      } else {
+        const createdRes = await createModifierGroup(payload);
+        const groupId = extractCreatedGroupId(createdRes);
+
+        if (!groupId) {
+          throw new Error("Modifier group created but no group id was returned");
+        }
+
+        await attachModifierGroupToCategory({
+          categoryId: selectedCategory.id,
+          groupId,
+          sortOrder: 0,
+        });
+
+        // toast.success("Modifier group created successfully");
+      }
+
+      refresh();
+      handleClose(false);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          `Failed to ${initialData?.id ? "update" : "create"} modifier group`
+      );
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5]">
-        {/* HEADER */}
+      <DialogContent className="max-w-[420px] rounded-[20px] bg-[#F5F5F5] p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
             {initialData ? "Edit" : "Add"} Modifier Group
@@ -172,8 +231,18 @@ export default function ModifierGroupModal({
           </p>
         </DialogHeader>
 
-        {/* FORM */}
-        <div className="mt-5 bg-white rounded-[16px] p-5 space-y-4">
+        <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
+         <div className="space-y-1">
+  <p className="text-sm text-gray-600">Category</p>
+  <AsyncSelect
+    value={selectedCategory}
+    onChange={setSelectedCategory}
+    placeholder="Select category"
+    fetchOptions={fetchCategoryOptions}
+    labelKey="name"
+    valueKey="id"
+  />
+</div>
           <InputField
             label="Group Name"
             value={form.name}
@@ -222,7 +291,7 @@ export default function ModifierGroupModal({
           <Button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="w-full rounded-[10px] mt-2 py-4 bg-primary"
+            className="mt-2 w-full rounded-[10px] bg-primary py-4"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
@@ -264,7 +333,7 @@ function InputField({
         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           onChange(e.target.value)
         }
-        className="w-full h-[40px] rounded-[10px] border border-gray-300 px-3 focus:border-gray-400 outline-none"
+        className="h-[40px] w-full rounded-[10px] border border-gray-300 px-3 outline-none focus:border-gray-400"
       />
     </div>
   );

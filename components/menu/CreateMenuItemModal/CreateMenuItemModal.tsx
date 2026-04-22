@@ -11,7 +11,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import StepOne from "./StepOne";
 import StepTwo from "./StepTwo";
-import StepThree from "./StepThree";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useCreateMenuItem,
@@ -27,23 +26,31 @@ interface CreateMenuItemModalProps {
 
 const getInitialForm = (restaurantId?: string, initialData?: any) => ({
   name: initialData?.name || "",
-  categoryId:
-    initialData?.categoryId ||
-    initialData?.category?.id ||
-    "",
+  categoryId: initialData?.categoryId || initialData?.category?.id || "",
   description: initialData?.description || "",
   ingredients: initialData?.ingredients || "",
   nutritionalInformation: initialData?.nutritionalInformation || "",
-  basePrice:
-    String(
-      initialData?.basePrice ??
-        initialData?.price ??
-        ""
-    ) || "",
   imageUrl: initialData?.imageUrl || "",
   imagePreview: initialData?.imageUrl || "",
   slug: initialData?.slug || "",
   sku: initialData?.sku || "",
+  pricingMode: initialData?.pricingMode || "SINGLE",
+  basePrice:
+    initialData?.basePrice !== undefined && initialData?.basePrice !== null
+      ? String(initialData.basePrice)
+      : initialData?.price !== undefined && initialData?.price !== null
+      ? String(initialData.price)
+      : "",
+  deliveryPriceAdjustment:
+    initialData?.deliveryPriceAdjustment !== undefined &&
+    initialData?.deliveryPriceAdjustment !== null
+      ? String(initialData.deliveryPriceAdjustment)
+      : "",
+  takeawayPriceAdjustment:
+    initialData?.takeawayPriceAdjustment !== undefined &&
+    initialData?.takeawayPriceAdjustment !== null
+      ? String(initialData.takeawayPriceAdjustment)
+      : "",
   prepTimeMinutes:
     initialData?.prepTimeMinutes !== undefined &&
     initialData?.prepTimeMinutes !== null
@@ -55,10 +62,17 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => ({
   allergenFlags: Array.isArray(initialData?.allergenFlags)
     ? initialData.allergenFlags.join(", ")
     : initialData?.allergenFlags || "",
-  sizes: initialData?.sizes || [],
-  addons: initialData?.addons || [],
-  modifierPriceOverrides: initialData?.modifierPriceOverrides || [],
+  depositAmount:
+    initialData?.depositAmount !== undefined &&
+    initialData?.depositAmount !== null
+      ? String(initialData.depositAmount)
+      : "",
+  modifierPriceOverrides: Array.isArray(initialData?.modifierPriceOverrides)
+    ? initialData.modifierPriceOverrides
+    : [],
   restaurantId: restaurantId || initialData?.restaurantId || "",
+  isActive:
+    typeof initialData?.isActive === "boolean" ? initialData.isActive : true,
 });
 
 export default function CreateMenuItemModal({
@@ -77,107 +91,23 @@ export default function CreateMenuItemModal({
   const [form, setForm] = useState<any>(
     getInitialForm(restaurantId, initialData)
   );
-const [savedItem, setSavedItem] = useState<any>(initialData || null);
-const [isSavingStepTwo, setIsSavingStepTwo] = useState(false);
+
   const { mutate: createMenuItem, isPending: isCreating } =
     useCreateMenuItem();
   const { mutate: updateMenuItem, isPending: isUpdating } =
     useUpdateMenuItem();
-const isSubmitting = isCreating || isUpdating || isSavingStepTwo;
-useEffect(() => {
-  if (!open) return;
 
-  setCurrentStep(1);
-   setForm((prev: any) => ({
-    ...getInitialForm(restaurantId, initialData),
-    imagePreview: initialData?.imageUrl || "",
-  }));
-  setSavedItem(initialData || null);
-  setIsSavingStepTwo(false);
-}, [open, restaurantId, initialData]);
+  const isSubmitting = isCreating || isUpdating;
 
+  useEffect(() => {
+    if (!open) return;
 
-const nextStep = () => {
-  if (stepRef.current?.validateStep) {
-    const valid = stepRef.current.validateStep();
-    if (!valid) return;
-  }
-
-  if (currentStep === 1) {
-    setCurrentStep(2);
-    return;
-  }
-
-  // STEP 2 => persist item first in create mode, then go to step 3
-  if (currentStep === 2) {
-    if (!form.name?.trim() || !form.categoryId) {
-      toast.error("Name and Category are required");
-      return;
-    }
-
-    // EDIT MODE: item already exists, just move to step 3
-    if (isEditMode) {
-      setSavedItem(initialData);
-      setCurrentStep(3);
-      return;
-    }
-
-    // CREATE MODE: create item here, store returned id/data, then move to step 3
-    const payload = buildPayload();
-    setIsSavingStepTwo(true);
-
-    createMenuItem(payload as any, {
-      onSuccess: (res: any) => {
-        const createdItem =
-          res?.data?.data ||
-          res?.data ||
-          res;
-
-        if (!createdItem?.id) {
-          toast.error("Menu item created but item id was not returned");
-          setIsSavingStepTwo(false);
-          return;
-        }
-
-        setSavedItem(createdItem);
-
-        setForm((prev: any) => ({
-          ...prev,
-          id: createdItem.id,
-        }));
-
-        toast.success("Menu item saved. Now add variations and modifiers.");
-        setCurrentStep(3);
-        setIsSavingStepTwo(false);
-      },
-      onError: (err: any) => {
-        toast.error(
-          err?.response?.data?.message || "Failed to create menu item"
-        );
-        setIsSavingStepTwo(false);
-      },
+    setCurrentStep(1);
+    setForm({
+      ...getInitialForm(restaurantId, initialData),
+      imagePreview: initialData?.imageUrl || "",
     });
-
-    return;
-  }
-
-  if (currentStep < 3) {
-    setCurrentStep((prev) => prev + 1);
-  }
-};
-
-  const prevStep = () => {
-    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
-  };
-const resetAndClose = () => {
-  setForm(getInitialForm(restaurantId));
-  setSavedItem(null);
-  setCurrentStep(1);
-  setIsSavingStepTwo(false);
-  onOpenChange(false);
-};
-
-const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
+  }, [open, restaurantId, initialData]);
 
   const parsedDietaryFlags = useMemo(() => {
     if (!form.dietaryFlags) return [];
@@ -197,7 +127,7 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
       .filter(Boolean);
   }, [form.allergenFlags]);
 
-    const buildPayload = () => {
+  const buildPayload = () => {
     const generatedSlug =
       form.slug ||
       String(form.name || "")
@@ -206,80 +136,127 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
         .replace(/\s+/g, "-");
 
     return {
+      restaurantId: restaurantId || form.restaurantId || undefined,
       categoryId: form.categoryId || undefined,
       name: form.name?.trim(),
       slug: generatedSlug,
-      basePrice:
-        form.basePrice !== "" && form.basePrice !== undefined
-          ? Number(form.basePrice)
-          : undefined,
-      restaurantId,
       description: form.description || "",
       ingredients: form.ingredients || "",
       nutritionalInformation: form.nutritionalInformation || "",
       imageUrl: form.imageUrl || "",
+      sku: form.sku || "",
+      pricingMode: form.pricingMode || "SINGLE",
+      basePrice:
+        form.basePrice !== "" &&
+        form.basePrice !== undefined &&
+        form.basePrice !== null
+          ? Number(form.basePrice)
+          : 0,
+      deliveryPriceAdjustment:
+        form.deliveryPriceAdjustment !== "" &&
+        form.deliveryPriceAdjustment !== undefined &&
+        form.deliveryPriceAdjustment !== null
+          ? Number(form.deliveryPriceAdjustment)
+          : 0,
+      takeawayPriceAdjustment:
+        form.takeawayPriceAdjustment !== "" &&
+        form.takeawayPriceAdjustment !== undefined &&
+        form.takeawayPriceAdjustment !== null
+          ? Number(form.takeawayPriceAdjustment)
+          : 0,
       prepTimeMinutes:
         form.prepTimeMinutes !== "" &&
-        form.prepTimeMinutes !== null &&
-        form.prepTimeMinutes !== undefined
+        form.prepTimeMinutes !== undefined &&
+        form.prepTimeMinutes !== null
           ? Number(form.prepTimeMinutes)
-          : undefined,
-      sku: form.sku || "",
+          : 0,
       dietaryFlags: parsedDietaryFlags,
       allergenFlags: parsedAllergenFlags,
+      depositAmount:
+        form.depositAmount !== "" &&
+        form.depositAmount !== undefined &&
+        form.depositAmount !== null
+          ? Number(form.depositAmount)
+          : 0,
+      isActive:
+        typeof form.isActive === "boolean" ? form.isActive : true,
       modifierPriceOverrides: Array.isArray(form.modifierPriceOverrides)
-        ? form.modifierPriceOverrides.map((item: any) => ({
-            modifierId: String(item.modifierId),
-            priceDelta: Number(item.priceDelta || 0),
-          }))
+        ? form.modifierPriceOverrides
+            .filter((item: any) => item?.modifierId)
+            .map((item: any) => ({
+              modifierId: String(item.modifierId),
+              priceDelta: Number(item.priceDelta || 0),
+            }))
         : [],
-      isActive: true,
     };
   };
 
+  const nextStep = () => {
+    if (stepRef.current?.validateStep) {
+      const valid = stepRef.current.validateStep();
+      if (!valid) return;
+    }
+
+    if (currentStep < 2) {
+      setCurrentStep((prev) => prev + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
+  };
+
+  const resetAndClose = () => {
+    setForm(getInitialForm(restaurantId));
+    setCurrentStep(1);
+    onOpenChange(false);
+  };
 
   const handleSubmit = () => {
-  if (!form.name?.trim() || !form.categoryId) {
-    toast.error("Name and Category are required");
-    return;
-  }
+    if (!form.name?.trim() || !form.categoryId) {
+      toast.error("Name and Category are required");
+      return;
+    }
 
-  const payload = buildPayload();
+    const payload = buildPayload();
 
-  if (isEditMode) {
-    const { restaurantId, ...updatePayload } = payload;
+    if (isEditMode) {
+      const { restaurantId, ...updatePayload } = payload;
 
-    updateMenuItem(
-      {
-        id: initialData.id,
-        data: updatePayload,
+      updateMenuItem(
+        {
+          id: initialData.id,
+          data: updatePayload,
+        },
+        {
+          onSuccess: () => {
+            toast.success("Menu item updated successfully");
+            onSuccess?.();
+            resetAndClose();
+          },
+          onError: (err: any) => {
+            toast.error(
+              err?.response?.data?.message || "Failed to update menu item"
+            );
+          },
+        }
+      );
+      return;
+    }
+
+    createMenuItem(payload as any, {
+      onSuccess: () => {
+        toast.success("Menu item created successfully");
+        onSuccess?.();
+        resetAndClose();
       },
-      {
-        onSuccess: () => {
-          onSuccess?.();
-          resetAndClose();
-        },
-        onError: (err: any) => {
-          toast.error(
-            err?.response?.data?.message || "Failed to update menu item"
-          );
-        },
-      }
-    );
-    return;
-  }
-
-  // CREATE MODE:
-  // item should already be created in step 2
-  if (!resolvedMenuItemId) {
-    toast.error("Please save the menu item details first");
-    return;
-  }
-
-  toast.success("Menu item setup completed");
-  onSuccess?.();
-  resetAndClose();
-};
+      onError: (err: any) => {
+        toast.error(
+          err?.response?.data?.message || "Failed to create menu item"
+        );
+      },
+    });
+  };
 
   return (
     <Dialog
@@ -316,15 +293,6 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
           {currentStep === 2 && (
             <StepTwo ref={stepRef} form={form} setForm={setForm} />
           )}
-
-        {currentStep === 3 && (
-  <StepThree
-    form={form}
-    setForm={setForm}
-    item={savedItem || initialData}
-    menuItemId={resolvedMenuItemId}
-  />
-)}
         </div>
 
         <div className="mt-6 flex items-center justify-between">
@@ -350,22 +318,18 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
 
             <Button
               className="h-[44px] rounded-[12px] bg-primary px-10 text-white hover:bg-primary/90"
-              onClick={currentStep < 3 ? nextStep : handleSubmit}
+              onClick={currentStep < 2 ? nextStep : handleSubmit}
               disabled={isSubmitting}
             >
-           {currentStep < 3
-  ? currentStep === 2
-    ? isSavingStepTwo
-      ? "Saving..."
-      : "Save & Continue"
-    : "Next"
-  : isSubmitting
-  ? isEditMode
-    ? "Updating..."
-    : "Finishing..."
-  : isEditMode
-  ? "Update"
-  : "Finish"}
+              {currentStep < 2
+                ? "Next"
+                : isSubmitting
+                ? isEditMode
+                  ? "Updating..."
+                  : "Creating..."
+                : isEditMode
+                ? "Update"
+                : "Create"}
             </Button>
           </div>
         </div>
@@ -377,7 +341,7 @@ const resolvedMenuItemId = savedItem?.id || initialData?.id || null;
 /* ---------- Step Progress ---------- */
 
 function StepProgress({ currentStep }: { currentStep: number }) {
-  const steps = ["Step 1", "Step 2", "Step 3"];
+  const steps = ["Step 1", "Step 2"];
   const totalSteps = steps.length;
 
   const activeWidth =

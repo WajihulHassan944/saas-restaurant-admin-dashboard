@@ -34,7 +34,6 @@ import {
   Trash2,
 } from "lucide-react";
 import CreateMenuItemModal from "@/components/menu/CreateMenuItemModal/CreateMenuItemModal";
-import VariationModal from "@/components/menu/listing/VariationModal";
 import AddModifierToItem from "@/components/forms/AddModifierToItem";
 import useApi from "@/hooks/useApi";
 
@@ -53,17 +52,11 @@ export default function MenuItemsTable({ refetchKey }: any) {
   const [open, setOpen] = useState(false);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
-const [isDeletingVariation, setIsDeletingVariation] =
-  useState(false);
   const [actionItem, setActionItem] = useState<any>(null);
-  const [openVariation, setOpenVariation] = useState(false);
   const [openModifier, setOpenModifier] = useState(false);
   const [openViewVariations, setOpenViewVariations] = useState(false);
   const [openViewModifiers, setOpenViewModifiers] = useState(false);
 
-const [deleteVariation, setDeleteVariation] = useState<any>(null);
-const [editingVariation, setEditingVariation] = useState<any>(null);
-const [openEditVariation, setOpenEditVariation] = useState(false);
   /* ================= DEBOUNCE ================= */
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -109,31 +102,6 @@ const [openEditVariation, setOpenEditVariation] = useState(false);
   }, [response]);
 
 
-
-const handleEditVariation = (variation: any, parentItem: any) => {
-  setActionItem(parentItem);
-  setEditingVariation(variation);
-  setOpenEditVariation(true);
-};
-
-
-const handleDeleteVariation = (variation: any, parentItem: any) => {
-  setActionItem(parentItem);
-  setDeleteVariation(variation);
-};
-
-
-
-const handleEditVariationChange = (value: boolean) => {
-  setOpenEditVariation(value);
-
-  if (!value) {
-    setEditingVariation(null);
-    setOpenViewVariations(false); // close background variations modal
-    setActionItem(null);
-    refetch();
-  }
-};
 
   /* ================= PAGINATION ================= */
   const pagination = useMemo(() => {
@@ -187,11 +155,6 @@ const handleEditVariationChange = (value: boolean) => {
   ) => {
     setActionItem(item);
 
-    if (type === "add-variation") {
-      setOpenVariation(true);
-      return;
-    }
-
     if (type === "view-variations") {
       setOpenViewVariations(true);
       return;
@@ -204,15 +167,6 @@ const handleEditVariationChange = (value: boolean) => {
 
     if (type === "view-modifiers") {
       setOpenViewModifiers(true);
-    }
-  };
-
-  const handleVariationModalChange = (value: boolean) => {
-    setOpenVariation(value);
-
-    if (!value) {
-      setActionItem(null);
-      refetch();
     }
   };
 
@@ -306,23 +260,6 @@ const handleEditVariationChange = (value: boolean) => {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem
-            onClick={() => handleAction("add-variation", item)}
-            className="cursor-pointer rounded-xl px-3 py-3 focus:bg-gray-50"
-          >
-            <div className="flex w-full items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <PlusCircle size={16} className="text-primary" />
-                <span className="font-medium text-gray-800">
-                  Add Variations
-                </span>
-              </div>
-
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                Create
-              </span>
-            </div>
-          </DropdownMenuItem>
 
           <DropdownMenuItem
             onClick={() => handleAction("view-variations", item)}
@@ -636,12 +573,7 @@ const handleEditVariationChange = (value: boolean) => {
         onSuccess={() => refetch()}
       />
 
-      {/* REUSE EXISTING CREATE POPUPS */}
-      <VariationModal
-        open={openVariation}
-        onOpenChange={handleVariationModalChange}
-        item={actionItem}
-      />
+     
 
       <AddModifierToItem
         open={openModifier}
@@ -654,25 +586,9 @@ const handleEditVariationChange = (value: boolean) => {
   open={openViewVariations}
   onOpenChange={handleViewVariationsChange}
   item={actionItem}
-  onEdit={handleEditVariation}
-  onDelete={handleDeleteVariation}
 />
 
 
-<VariationModal
-  open={openEditVariation}
-  onOpenChange={handleEditVariationChange}
-  item={actionItem}
-  initialData={editingVariation}
-  mode="edit"
-  onSuccess={() => {
-    setOpenEditVariation(false);
-    setOpenViewVariations(false);
-    setEditingVariation(null);
-    setActionItem(null);
-    refetch();
-  }}
-/>
       <ViewModifiersDialog
         open={openViewModifiers}
         onOpenChange={handleViewModifiersChange}
@@ -692,38 +608,6 @@ const handleEditVariationChange = (value: boolean) => {
       />
 
     
-
-<DeleteDialog
-  open={!!deleteVariation}
-  onOpenChange={(value) => {
-    if (!value && !isDeletingVariation) {
-      setDeleteVariation(null);
-    }
-  }}
-  onConfirm={async () => {
-    if (!deleteVariation?.id) return;
-
-    try {
-      setIsDeletingVariation(true);
-
-      const res = await del(
-        `/v1/menu/variations/${deleteVariation.id}`
-      );
-
-      if (res && !res.error && res.success !== false) {
-        setDeleteVariation(null);
-        setOpenViewVariations(false);
-        setActionItem(null);
-        refetch();
-      }
-    } finally {
-      setIsDeletingVariation(false);
-    }
-  }}
-  isLoading={isDeletingVariation}
-  title="Delete Variation"
-  description="Are you sure you want to delete this variation? This action cannot be undone."
-/>
 
     </div>
   );
@@ -863,14 +747,10 @@ function ViewVariationsDialog({
   open,
   onOpenChange,
   item,
-  onEdit,
-  onDelete,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
   item: any;
-  onEdit: (variation: any, item: any) => void;
-  onDelete?: (variation: any, item: any) => void;
 }) {
   const variations = useMemo(() => normalizeVariations(item), [item]);
 
@@ -924,22 +804,6 @@ function ViewVariationsDialog({
   </div>
 
   <div className="flex items-center gap-2">
-    <button
-      type="button"
-      title="Edit Variation"
-      onClick={() => onEdit(variation, item)}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all duration-200 hover:border-primary/20 hover:text-primary"
-    >
-      <Pencil size={15} />
-    </button>
- <button
-      type="button"
-      title="Delete Variation"
-      onClick={() => onDelete?.(variation, item)}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all duration-200 hover:border-red-200 hover:text-red-500"
-    >
-      <Trash2 size={15} />
-    </button>
     <span className="whitespace-nowrap rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
       {formatCurrency(variation?.price ?? 0)}
     </span>

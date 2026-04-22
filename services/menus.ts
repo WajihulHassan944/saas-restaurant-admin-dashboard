@@ -249,3 +249,16 @@ export const deleteMenuItemLink = async (menuId: string, linkId: string) => {
   const { data } = await api.delete(`/menus/${menuId}/items/${linkId}`);
   return data;
 };
+
+
+export const attachModifierGroupToCategory = async (
+  categoryId: string,
+  groupId: string,
+  body: { sortOrder: number }
+) => {
+  const { data } = await api.post(
+    `/menu/categories/${categoryId}/modifier-groups/${groupId}`,
+    body
+  );
+  return data;
+};

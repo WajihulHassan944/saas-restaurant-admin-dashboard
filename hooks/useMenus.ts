@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   addItemToMenu,
+  attachModifierGroupToCategory,
   attachModifierGroupToItem,
   bulkCreateMenuItems,
   createMenuItem,
@@ -592,6 +593,42 @@ export const useDeleteMenuItemLink = () => {
     onError: (err: any) => {
       toast.error(
         err?.response?.data?.message || "Failed to remove item from menu"
+      );
+    },
+  });
+};
+
+export const useAttachModifierGroupToCategory = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      categoryId,
+      groupId,
+      sortOrder = 0,
+    }: {
+      categoryId: string;
+      groupId: string;
+      sortOrder?: number;
+    }) =>
+      attachModifierGroupToCategory(categoryId, groupId, {
+        sortOrder,
+      }),
+
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["menus"] });
+      queryClient.invalidateQueries({
+        queryKey: ["modifier-groups-by-category", variables.categoryId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["menu-categories"],
+      });
+    },
+
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message ||
+          "Failed to attach modifier group to category"
       );
     },
   });

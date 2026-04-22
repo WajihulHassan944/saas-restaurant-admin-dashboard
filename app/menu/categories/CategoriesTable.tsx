@@ -12,6 +12,7 @@ import PaginationSection from "@/components/shared/pagination";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
 import { Search } from "lucide-react";
 import CreateCategoryModalParent from "@/components/menu/listing/CreateCategoryModalParent";
+import VariationModal from "@/components/menu/listing/VariationModal";
 
 export default function CategoriesTable({ refetchKey }: any) {
   const { user } = useAuth();
@@ -25,7 +26,9 @@ export default function CategoriesTable({ refetchKey }: any) {
 
   const [selected, setSelected] = useState<any>(null);
   const [open, setOpen] = useState(false);
-
+const [variationOpen, setVariationOpen] = useState(false);
+const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
+  useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   /* ================= DEBOUNCE ================= */
@@ -243,7 +246,15 @@ export default function CategoriesTable({ refetchKey }: any) {
                       >
                         <FaPen size={14} />
                       </button>
-
+<button
+  onClick={() => {
+    setSelectedCategoryForVariation(item);
+    setVariationOpen(true);
+  }}
+  className="text-gray-500 hover:text-primary text-xs font-medium"
+>
+  Variation
+</button>
                       <button
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
@@ -324,7 +335,15 @@ export default function CategoriesTable({ refetchKey }: any) {
                       >
                         <FaPen size={14} />
                       </button>
-
+<button
+  onClick={() => {
+    setSelectedCategoryForVariation(item);
+    setVariationOpen(true);
+  }}
+  className="text-gray-500 hover:text-primary text-xs font-medium"
+>
+  Variation
+</button>
                       <button
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
@@ -364,6 +383,21 @@ export default function CategoriesTable({ refetchKey }: any) {
         title="Delete Category"
         description="Are you sure you want to delete this category? This action cannot be undone."
       />
+
+
+      <VariationModal
+  open={variationOpen}
+  onOpenChange={(val) => {
+    setVariationOpen(val);
+    if (!val) setSelectedCategoryForVariation(null);
+  }}
+  item={selectedCategoryForVariation}
+  mode="create"
+  onSuccess={() => {
+    refetch();
+  }}
+/>
+
     </div>
   );
 }

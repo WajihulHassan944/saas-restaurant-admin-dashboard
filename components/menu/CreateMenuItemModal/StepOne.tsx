@@ -107,14 +107,29 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
     const res = await get(`/v1/menu/categories?${params.toString()}`);
 
+    const normalizedData = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.data)
+      ? res.data.data
+      : Array.isArray(res?.data?.items)
+      ? res.data.items
+      : [];
+
     return {
-      data: res?.data || [],
-      meta: res?.meta || {},
+      data: normalizedData,
+      meta: res?.meta || res?.data?.meta || res?.data?.pagination || {},
     };
   };
 
   useEffect(() => {
-    if (!form?.categoryId || selectedCategory) return;
+    if (!form?.categoryId) {
+      setSelectedCategory(null);
+      return;
+    }
+
+    if (selectedCategory?.id && String(selectedCategory.id) === String(form.categoryId)) {
+      return;
+    }
 
     const loadSelectedCategory = async () => {
       try {
@@ -129,6 +144,11 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
         if (matched) {
           setSelectedCategory(matched);
+        } else if (form?.categoryId) {
+          setSelectedCategory({
+            id: form.categoryId,
+            name: form?.category?.name || "Selected Category",
+          });
         }
       } catch (error) {
         console.error("Failed to load selected category", error);
@@ -136,11 +156,10 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
     };
 
     loadSelectedCategory();
-  }, [form?.categoryId, selectedCategory]);
+  }, [form?.categoryId]);
 
   return (
     <div className="space-y-5">
-      {/* NAME */}
       <div className="space-y-2">
         <Label>Item Name</Label>
 
@@ -152,12 +171,9 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
 
-        {errors.name && (
-          <p className="text-xs text-red-500">{errors.name}</p>
-        )}
+        {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
       </div>
 
-      {/* CATEGORY */}
       <div className="space-y-2">
         <Label>Select Category</Label>
 
@@ -182,29 +198,23 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         )}
       </div>
 
-      {/* DESCRIPTION */}
       <div className="space-y-2">
         <Label>Description</Label>
 
         <Textarea
           value={form.description}
-          onChange={(e) =>
-            setForm({ ...form, description: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
           className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
       </div>
 
-      {/* PRICE */}
       <div className="space-y-2">
-        <Label>Price</Label>
+        <Label>Base Price</Label>
 
         <Input
           type="number"
           value={form.basePrice}
-          onChange={(e) =>
-            setForm({ ...form, basePrice: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
           onBlur={(e) => validateField("basePrice", e.target.value)}
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />

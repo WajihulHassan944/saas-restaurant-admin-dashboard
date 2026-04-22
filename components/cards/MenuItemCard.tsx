@@ -1,10 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Star, Plus, Heart, X, SlidersHorizontal } from "lucide-react";
+import { Star, Plus, X } from "lucide-react";
 import { useState } from "react";
 import AddToCartModal from "../shared/AddToCartModal";
-import VariationModal from "../menu/listing/VariationModal";
 import AddModifierToItem from "../forms/AddModifierToItem";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
@@ -19,7 +18,6 @@ type Props = {
 
 export default function MenuItemCard({ item, editing, onDelete }: Props) {
   const [open, setOpen] = useState(false);
-const [openVariation, setOpenVariation] = useState(false);
 const [openModifier, setOpenModifier] = useState(false);
 const [openDelete, setOpenDelete] = useState(false);
 const [isDeleting, setIsDeleting] = useState(false);
@@ -54,7 +52,7 @@ const { del } = useApi(token);
   }
 };
       return (
-    <div className="relative w-full bg-white rounded-[22px] flex flex-col sm:max-w-[280px] mb-5">
+  <div className="relative w-full bg-white rounded-[22px] flex flex-col">
       
       {/* Delete */}
       {editing && (
@@ -67,31 +65,24 @@ const { del } = useApi(token);
       )}
 
       {/* Image */}
-      <div className="relative flex-1 flex items-center justify-center pt-7 pb-3">
-      <div className="absolute top-5 right-3 flex items-center gap-2">
-  {/* Variation Icon */}
-  <button
-    onClick={() => setOpenVariation(true)}
-    className="bg-white rounded-full p-2 shadow hover:bg-gray-100"
-  >
-    <SlidersHorizontal size={16} />
-  </button>
+   {/* Image */}
+<div className="relative h-[200px] w-full flex items-center justify-center pb-3">
+  <div className="absolute top-5 right-3 flex items-center gap-2">
+    {/* Add Modifier */}
+    <button
+      onClick={() => setOpenModifier(true)}
+      className="bg-white rounded-full p-2 shadow hover:bg-gray-100"
+    >
+      <Plus size={18} className="text-primary" />
+    </button>
+  </div>
 
- {/* Add Modifier */}
-<button
-  onClick={() => setOpenModifier(true)}
-  className="bg-white rounded-full p-2 shadow hover:bg-gray-100"
->
-  <Plus size={18} className="text-primary" />
-</button>
+  <img
+    src={image}
+    alt={item.name}
+    className="h-full w-full object-cover rounded-[14px]"
+  />
 </div>
-
-        <img
-          src={image}
-          alt={item.name}
-          className="w-full object-contain"
-        />
-      </div>
 
       {/* Content */}
       <div className="px-4 pb-4">
@@ -130,11 +121,7 @@ const { del } = useApi(token);
       </div>
 
       <AddToCartModal open={open} onOpenChange={setOpen}  item={item} />
-      <VariationModal
-  open={openVariation}
-  onOpenChange={setOpenVariation}
-  item={item}
-/>
+     
 <AddModifierToItem 
   open={openModifier}
   onOpenChange={setOpenModifier}

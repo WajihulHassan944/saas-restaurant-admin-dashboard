@@ -10,151 +10,154 @@ import { ImagePlus, UploadCloud, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 type Field = keyof z.infer<typeof schema>;
+
 const schema = z.object({
   prepTimeMinutes: z.string().optional(),
   ingredients: z.string().optional(),
   nutritionalInformation: z.string().optional(),
+  deliveryPriceAdjustment: z.string().optional(),
+  takeawayPriceAdjustment: z.string().optional(),
+  depositAmount: z.string().optional(),
 });
 
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
   const [isDragging, setIsDragging] = useState(false);
-const fileInputRef = useRef<HTMLInputElement | null>(null);
-const { uploadFile, uploading } = useFileUpload();
-  const update = (key: string, value: string) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { uploadFile, uploading } = useFileUpload();
+
+  const update = (key: string, value: string | boolean) => {
     setForm((prev: any) => ({
       ...prev,
       [key]: value,
     }));
   };
 
-
   const processImageFile = async (file: File) => {
-  if (!file) return;
+    if (!file) return;
 
-  if (!file.type.startsWith("image/")) {
-    toast.error("Please upload a valid image file");
-    return;
-  }
-
-  const previewUrl = URL.createObjectURL(file);
-
-  setForm((prev: any) => {
-    if (prev.imagePreview?.startsWith("blob:")) {
-      URL.revokeObjectURL(prev.imagePreview);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file");
+      return;
     }
 
-    return {
-      ...prev,
-      imagePreview: previewUrl,
-    };
-  });
+    const previewUrl = URL.createObjectURL(file);
 
-  const syntheticEvent = {
-    target: {
-      files: [file],
-    },
-  } as unknown as React.ChangeEvent<HTMLInputElement>;
+    setForm((prev: any) => {
+      if (prev.imagePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(prev.imagePreview);
+      }
 
-  const result = await uploadFile(syntheticEvent);
+      return {
+        ...prev,
+        imagePreview: previewUrl,
+      };
+    });
 
-  if (result?.fileUrl) {
-    setForm((prev: any) => ({
-      ...prev,
-      imageUrl: result.fileUrl,
-    }));
-  } else {
-    toast.error("Image upload failed");
-  }
-};
+    const syntheticEvent = {
+      target: {
+        files: [file],
+      },
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
 
-const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-  e.preventDefault();
-  setIsDragging(true);
-};
+    const result = await uploadFile(syntheticEvent);
 
-const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-  e.preventDefault();
-  setIsDragging(false);
-};
+    if (result?.fileUrl) {
+      setForm((prev: any) => ({
+        ...prev,
+        imageUrl: result.fileUrl,
+      }));
+    } else {
+      toast.error("Image upload failed");
+    }
+  };
 
-const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-  e.preventDefault();
-  setIsDragging(false);
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
 
-  const file = e.dataTransfer.files?.[0];
-  if (!file) return;
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
 
-  await processImageFile(file);
-};
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
 
-const openFilePicker = () => {
-  fileInputRef.current?.click();
-};
-const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
 
-  await processImageFile(file);
-};
+    await processImageFile(file);
+  };
 
-const validateField = (field: Field, value: any) => {
-  try {
-    if (field === "prepTimeMinutes" && (value === "" || value === null || value === undefined)) {
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    await processImageFile(file);
+  };
+
+  const validateField = (field: Field, value: any) => {
+    try {
+      if (
+        [
+          "prepTimeMinutes",
+          "deliveryPriceAdjustment",
+          "takeawayPriceAdjustment",
+          "depositAmount",
+        ].includes(field) &&
+        (value === "" || value === null || value === undefined)
+      ) {
+        setErrors((prev: any) => {
+          const copy = { ...prev };
+          delete copy[field];
+          return copy;
+        });
+        return;
+      }
+
+      schema.shape[field].parse(value);
+
       setErrors((prev: any) => {
         const copy = { ...prev };
         delete copy[field];
         return copy;
       });
-      return;
+    } catch (err: any) {
+      setErrors((prev: any) => ({
+        ...prev,
+        [field]: err.errors?.[0]?.message || "Invalid value",
+      }));
+    }
+  };
+
+  const validateStep = () => {
+    if (uploading) {
+      toast.error("Please wait until image upload is complete");
+      return false;
     }
 
-    schema.shape[field].parse(value);
+    const result = schema.safeParse(form);
 
-    setErrors((prev: any) => {
-      const copy = { ...prev };
-      delete copy[field];
-      return copy;
-    });
-  } catch (err: any) {
-    setErrors((prev: any) => ({
-      ...prev,
-      [field]: err.errors?.[0]?.message || "Invalid value",
-    }));
-  }
-};
+    if (!result.success) {
+      const fieldErrors: any = {};
+      result.error.issues.forEach((err) => {
+        fieldErrors[err.path[0]] = err.message;
+      });
 
-const validateStep = () => {
-  // ❌ block navigation while uploading
-  if (uploading) {
-    toast.error("Please wait until image upload is complete");
-    return false;
-  }
+      setErrors(fieldErrors);
+      return false;
+    }
 
-  if (!form.prepTimeMinutes || String(form.prepTimeMinutes).trim() === "") {
-    setErrors((prev: any) => {
-      const copy = { ...prev };
-      delete copy.prepTimeMinutes;
-      return copy;
-    });
+    setErrors({});
     return true;
-  }
-
-  const result = schema.safeParse(form);
-
-  if (!result.success) {
-    const fieldErrors: any = {};
-    result.error.issues.forEach((err) => {
-      fieldErrors[err.path[0]] = err.message;
-    });
-
-    setErrors(fieldErrors);
-    return false;
-  }
-
-  setErrors({});
-  return true;
-};
+  };
 
   useImperativeHandle(ref, () => ({
     validateStep,
@@ -162,139 +165,174 @@ const validateStep = () => {
 
   return (
     <div className="space-y-5">
+      <div className="space-y-3">
+        <Label>Image</Label>
 
+        {form.imagePreview ? (
+          <div className="relative overflow-hidden rounded-[18px] border border-gray-200 bg-white shadow-sm">
+            <img
+              src={form.imagePreview}
+              alt="Preview"
+              className="h-52 w-full object-cover"
+            />
 
- 
- <div className="space-y-3">
-  <Label>Image</Label>
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 via-black/20 to-transparent px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-white">Image uploaded</p>
+                <p className="text-xs text-white/80">
+                  Drag & drop another image to replace it
+                </p>
+              </div>
 
-  {form.imagePreview ? (
-    <div className="relative overflow-hidden rounded-[18px] border border-gray-200 bg-white shadow-sm">
-      <img
-        src={form.imagePreview}
-        alt="Preview"
-        className="h-52 w-full object-cover"
-      />
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    imageUrl: "",
+                    imagePreview: "",
+                  }))
+                }
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
+              >
+                <X size={14} />
+              </button>
+            </div>
 
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 via-black/20 to-transparent px-4 py-3">
-        <div>
-          <p className="text-sm font-medium text-white">Image uploaded</p>
-          <p className="text-xs text-white/80">
-            Drag & drop another image to replace it
-          </p>
-        </div>
+            <div
+              onClick={openFilePicker}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`absolute inset-0 cursor-pointer transition ${
+                isDragging ? "bg-primary/10 ring-2 ring-primary ring-inset" : ""
+              }`}
+            />
+          </div>
+        ) : (
+          <div
+            onClick={openFilePicker}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`group relative cursor-pointer overflow-hidden rounded-[18px] border border-dashed bg-white px-6 py-8 text-center transition-all duration-200 ${
+              isDragging
+                ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                : "border-gray-300 hover:border-primary/50 hover:bg-gray-50"
+            }`}
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9FAFB] text-primary shadow-sm">
+              {isDragging ? <UploadCloud size={24} /> : <ImagePlus size={24} />}
+            </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            setForm((prev: any) => ({
-              ...prev,
-              imageUrl: "",
-              imagePreview: "",
-            }))
-          }
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
-      <div
-        onClick={openFilePicker}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`absolute inset-0 cursor-pointer transition ${
-          isDragging ? "bg-primary/10 ring-2 ring-primary ring-inset" : ""
-        }`}
-      />
-    </div>
-  ) : (
-    <div
-      onClick={openFilePicker}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`group relative overflow-hidden rounded-[18px] border border-dashed bg-white px-6 py-8 text-center transition-all duration-200 cursor-pointer ${
-        isDragging
-          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-          : "border-gray-300 hover:border-primary/50 hover:bg-gray-50"
-      }`}
-    >
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9FAFB] text-primary shadow-sm">
-        {isDragging ? <UploadCloud size={24} /> : <ImagePlus size={24} />}
-      </div>
-
-      <div className="mt-4 space-y-1">
-        <p className="text-sm font-semibold text-dark">
-          Drag & drop your image here
-        </p>
-        <p className="text-xs text-gray-500">
-          or <span className="text-primary font-medium">click to browse</span>
-        </p>
-        <p className="text-[11px] text-gray-400">
-          PNG, JPG, WEBP up to 10MB
-        </p>
-      </div>
-    </div>
-  )}
-
-  <Input
-    ref={fileInputRef}
-    type="file"
-    accept="image/*"
-    onChange={handleImageUpload}
-    className="hidden"
-  />
-
-  {uploading && <p className="text-xs text-gray-500">Uploading image...</p>}
-</div>
-
-      {/* <div className="space-y-2">
-        <Label>Slug</Label>
+            <div className="mt-4 space-y-1">
+              <p className="text-sm font-semibold text-dark">
+                Drag & drop your image here
+              </p>
+              <p className="text-xs text-gray-500">
+                or <span className="font-medium text-primary">click to browse</span>
+              </p>
+              <p className="text-[11px] text-gray-400">
+                PNG, JPG, WEBP up to 10MB
+              </p>
+            </div>
+          </div>
+        )}
 
         <Input
-          value={form.slug || ""}
-          onChange={(e) => update("slug", e.target.value)}
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          className="hidden"
         />
-      </div> */}
 
-      {/* <div className="space-y-2">
-        <Label>SKU</Label>
-
-        <Input
-          value={form.sku || ""}
-          onChange={(e) => update("sku", e.target.value)}
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
-      </div> */}
+        {uploading && <p className="text-xs text-gray-500">Uploading image...</p>}
+      </div>
 
       <div className="space-y-2">
-     <Label>Preparation Time (minutes) - Optional</Label>
+        <Label>Preparation Time (minutes) - Optional</Label>
 
-<Input
-  type="number"
-  value={form.prepTimeMinutes || ""}
-  onChange={(e) => update("prepTimeMinutes", e.target.value)}
-  onBlur={(e) => validateField("prepTimeMinutes", e.target.value)}
-  placeholder="Enter preparation time if applicable"
-  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-/>
+        <Input
+          type="number"
+          value={form.prepTimeMinutes || ""}
+          onChange={(e) => update("prepTimeMinutes", e.target.value)}
+          onBlur={(e) => validateField("prepTimeMinutes", e.target.value)}
+          placeholder="Enter preparation time if applicable"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+
         {errors.prepTimeMinutes && (
           <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
         )}
       </div>
-      {/* INGREDIENTS */}
+
+      <div className="space-y-2">
+        <Label>Delivery Price Adjustment</Label>
+
+        <Input
+          type="number"
+          value={form.deliveryPriceAdjustment || ""}
+          onChange={(e) => update("deliveryPriceAdjustment", e.target.value)}
+          onBlur={(e) =>
+            validateField("deliveryPriceAdjustment", e.target.value)
+          }
+          placeholder="0"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+
+        {errors.deliveryPriceAdjustment && (
+          <p className="text-xs text-red-500">
+            {errors.deliveryPriceAdjustment}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Takeaway Price Adjustment</Label>
+
+        <Input
+          type="number"
+          value={form.takeawayPriceAdjustment || ""}
+          onChange={(e) => update("takeawayPriceAdjustment", e.target.value)}
+          onBlur={(e) =>
+            validateField("takeawayPriceAdjustment", e.target.value)
+          }
+          placeholder="0"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+
+        {errors.takeawayPriceAdjustment && (
+          <p className="text-xs text-red-500">
+            {errors.takeawayPriceAdjustment}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Deposit Amount</Label>
+
+        <Input
+          type="number"
+          value={form.depositAmount || ""}
+          onChange={(e) => update("depositAmount", e.target.value)}
+          onBlur={(e) => validateField("depositAmount", e.target.value)}
+          placeholder="0"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+
+        {errors.depositAmount && (
+          <p className="text-xs text-red-500">{errors.depositAmount}</p>
+        )}
+      </div>
+
       <div className="space-y-2">
         <Label>Ingredients</Label>
 
         <Textarea
           value={form.ingredients || ""}
           placeholder="e.g. Chicken patty, lettuce, cheese, mayo"
-          onChange={(e) =>
-            setForm({ ...form, ingredients: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, ingredients: e.target.value })}
           onBlur={(e) => validateField("ingredients", e.target.value)}
           className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
@@ -304,7 +342,6 @@ const validateStep = () => {
         )}
       </div>
 
-      {/* NUTRITIONAL INFORMATION */}
       <div className="space-y-2">
         <Label>Nutritional Information</Label>
 
@@ -329,12 +366,14 @@ const validateStep = () => {
           </p>
         )}
       </div>
+
       <div className="space-y-2">
         <Label>Dietary Flags</Label>
 
         <Input
           value={form.dietaryFlags || ""}
           onChange={(e) => update("dietaryFlags", e.target.value)}
+          placeholder="e.g. halal, vegan, gluten-free"
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
       </div>
@@ -345,12 +384,26 @@ const validateStep = () => {
         <Input
           value={form.allergenFlags || ""}
           onChange={(e) => update("allergenFlags", e.target.value)}
+          placeholder="e.g. nuts, dairy, soy"
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
       </div>
 
+      <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.isActive !== false}
+            onChange={(e) => update("isActive", e.target.checked)}
+            className="accent-primary"
+          />
+          Active
+        </label>
+      </div>
     </div>
   );
 });
+
+StepTwo.displayName = "StepTwo";
 
 export default StepTwo;
