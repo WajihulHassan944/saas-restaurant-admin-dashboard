@@ -241,7 +241,7 @@ export const useGetModifierGroups = (params?: {
   page?: number;
   limit?: number;
   search?: string;
-  isActive?: boolean;
+  restaurantId?: string;
 }) => {
   return useQuery({
     queryKey: [
@@ -249,9 +249,10 @@ export const useGetModifierGroups = (params?: {
       params?.page,
       params?.limit,
       params?.search,
-      params?.isActive,
+      params?.restaurantId,
     ],
     queryFn: () => getModifierGroups(params),
+    enabled: !!params?.restaurantId, // 🔥 prevent call without restaurant
   });
 };
 
@@ -314,12 +315,13 @@ export const useCreateModifier = () => {
   });
 };
 
+
 export const useGetModifiers = (params?: {
   page?: number;
   limit?: number;
   search?: string;
   modifierGroupId?: string;
-  isActive?: boolean;
+  restaurantId?: string;
 }) => {
   return useQuery({
     queryKey: [
@@ -328,12 +330,12 @@ export const useGetModifiers = (params?: {
       params?.limit,
       params?.search,
       params?.modifierGroupId,
-      params?.isActive,
+      params?.restaurantId,
     ],
     queryFn: () => getModifiers(params),
+    enabled: !!params?.restaurantId, // 🔥 prevents call without restaurant
   });
 };
-
 export const useUpdateModifier = () => {
   const queryClient = useQueryClient();
 

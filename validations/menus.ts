@@ -233,11 +233,14 @@ export type UpdateModifierGroupValues = z.infer<typeof updateModifierGroupSchema
 
 const modifierShape = {
   name: requiredString("Modifier name is required"),
-  description: optionalString(300),
-  modifierGroupId: optionalString(),
-  // priceAdjustment: optionalNumberFromInput({ min: 0 }).default(0),
-  sku: optionalString(100),
-  isDefault: optionalBoolean(false),
+  priceDelta: optionalNumberFromInput({ min: 0 }).default(0),
+  sortOrder: optionalNumberFromInput({
+    min: 0,
+    integer: true,
+    nonnegative: true,
+  }).default(0),
+  modifierGroupIds: z.array(idSchema).min(1, "At least one modifier group is required"),
+
   isActive: optionalBoolean(true),
 };
 

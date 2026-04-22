@@ -11,11 +11,12 @@ import {
   useGetModifierGroups,
   useDeleteModifierGroup,
 } from "@/hooks/useMenus";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ModifierGroupsTable() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-
+const { restaurantId } = useAuth();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -37,16 +38,16 @@ export default function ModifierGroupsTable() {
 
   /* ================= FETCH ================= */
   const {
-    data: response,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useGetModifierGroups({
-    page,
-    limit,
-    search: debouncedSearch,
-  });
-
+  data: response,
+  isLoading,
+  isFetching,
+  refetch,
+} = useGetModifierGroups({
+  page,
+  limit,
+  search: debouncedSearch,
+  ...(restaurantId ? { restaurantId } : {}),
+});
   useEffect(() => {
     if (refreshKey) {
       refetch();

@@ -12,15 +12,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
-import AsyncSelect from "@/components/ui/AsyncSelect";
+import AsyncMultiSelect from "@/components/ui/AsyncMultiSelect";
 import {
   useCreateModifier,
-  useGetModifierGroups,
   useUpdateModifier,
 } from "@/hooks/useMenus";
 
 interface ModifierForm {
-  modifierGroupId: string;
+  modifierGroupIds: string[];
   name: string;
   priceDelta: number;
   sortOrder: number;
@@ -40,21 +39,9 @@ export default function ModifierModal({
   const { mutateAsync: updateModifier, isPending: isUpdating } =
     useUpdateModifier();
 
-  const [selectedGroup, setSelectedGroup] = useState<any>(null);
-const [groupSearch, setGroupSearch] = useState("");
-const [debouncedGroupSearch, setDebouncedGroupSearch] = useState("");
-const [groupPage, setGroupPage] = useState(1);
-useEffect(() => {
-  const timer = setTimeout(() => {
-    setDebouncedGroupSearch(groupSearch.trim());
-    setGroupPage(1);
-  }, 500);
-
-  return () => clearTimeout(timer);
-}, [groupSearch]);
-
+  const [selectedGroups, setSelectedGroups] = useState<any[]>([]);
   const [form, setForm] = useState<ModifierForm>({
-    modifierGroupId: "",
+    modifierGroupIds: [],
     name: "",
     priceDelta: 0,
     sortOrder: 0,
@@ -66,69 +53,47 @@ useEffect(() => {
     if (!open) return;
 
     if (initialData) {
+      const resolvedGroups = Array.isArray(initialData?.modifierGroups)
+        ? initialData.modifierGroups
+        : initialData?.modifierGroup
+        ? [initialData.modifierGroup]
+        : Array.isArray(initialData?.modifierGroupIds)
+        ? initialData.modifierGroupIds.map((id: string) => ({
+            id,
+            name: "Selected Group",
+          }))
+        : initialData?.modifierGroupId
+        ? [
+            {
+              id: initialData.modifierGroupId,
+              name: initialData.modifierGroupName || "Selected Group",
+            },
+          ]
+        : [];
+
       setForm({
-        modifierGroupId: String(initialData.modifierGroupId || ""),
+        modifierGroupIds: resolvedGroups.map((group: any) => String(group?.id || "")),
         name: initialData.name || "",
         priceDelta: Number(initialData.priceDelta || 0),
         sortOrder: Number(initialData.sortOrder || 0),
       });
 
-      setSelectedGroup(
-        initialData.modifierGroup
-          ? {
-              id: initialData.modifierGroup.id,
-              name: initialData.modifierGroup.name,
-            }
-          : initialData.modifierGroupId
-          ? {
-              id: initialData.modifierGroupId,
-              name: initialData.modifierGroupName || "Selected Group",
-            }
-          : null
+      setSelectedGroups(
+        resolvedGroups.map((group: any) => ({
+          id: String(group?.id || ""),
+          name: group?.name || "Selected Group",
+        }))
       );
     } else {
       setForm({
-        modifierGroupId: "",
+        modifierGroupIds: [],
         name: "",
         priceDelta: 0,
         sortOrder: 0,
       });
-      setSelectedGroup(null);
+      setSelectedGroups([]);
     }
   }, [initialData, open]);
-
-const {
-  data: groupResponse,
-  isLoading: isGroupsLoading,
-} = useGetModifierGroups({
-  page: groupPage,
-  limit: 10,
-  search: debouncedGroupSearch,
-});
-  const groupItems = useMemo(() => {
-  if (!groupResponse) return [];
-
-  return (
-    groupResponse?.data?.items ||
-    groupResponse?.data?.modifierGroups ||
-    groupResponse?.data ||
-    groupResponse?.items ||
-    []
-  );
-}, [groupResponse]);
-
-const groupMeta = useMemo(() => {
-  const source =
-    groupResponse?.data?.pagination ||
-    groupResponse?.pagination ||
-    groupResponse?.meta ||
-    {};
-
-  return {
-    page: Number(source?.page ?? groupPage),
-    totalPages: Number(source?.totalPages ?? 1),
-  };
-}, [groupResponse, groupPage]);
 
   const fetchModifierGroups = async ({
     search = "",
@@ -152,9 +117,19 @@ const groupMeta = useMemo(() => {
 
     const res = await api.get(`/v1/menu/modifier-groups?${params.toString()}`);
 
+    const normalizedData = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.data)
+      ? res.data.data
+      : Array.isArray(res?.data?.items)
+      ? res.data.items
+      : Array.isArray(res?.data?.modifierGroups)
+      ? res.data.modifierGroups
+      : [];
+
     return {
-      data: res?.data || [],
-      meta: res?.meta || {},
+      data: normalizedData,
+      meta: res?.meta || res?.data?.meta || res?.data?.pagination || {},
     };
   };
 
@@ -163,8 +138,8 @@ const groupMeta = useMemo(() => {
   };
 
   const canSubmit = useMemo(() => {
-    return !!form.name?.trim() && !!form.modifierGroupId;
-  }, [form.name, form.modifierGroupId]);
+    return !!form.name?.trim() && form.modifierGroupIds.length > 0;
+  }, [form.name, form.modifierGroupIds]);
 
   const handleSubmit = async () => {
     if (!canSubmit) {
@@ -178,6 +153,7 @@ const groupMeta = useMemo(() => {
           name: form.name.trim(),
           priceDelta: Number(form.priceDelta),
           sortOrder: Number(form.sortOrder),
+          modifierGroupIds: form.modifierGroupIds,
         };
 
         await updateModifier({
@@ -188,10 +164,10 @@ const groupMeta = useMemo(() => {
         toast.success("Updated");
       } else {
         const payload = {
-          modifierGroupId: form.modifierGroupId,
           name: form.name.trim(),
           priceDelta: Number(form.priceDelta),
           sortOrder: Number(form.sortOrder),
+          modifierGroupIds: form.modifierGroupIds,
         };
 
         await createModifier(payload);
@@ -212,7 +188,7 @@ const groupMeta = useMemo(() => {
         if (!isSubmitting) onOpenChange(value);
       }}
     >
-      <DialogContent className="max-w-[420px] rounded-[20px] p-6 bg-[#F5F5F5]">
+      <DialogContent className="max-w-[420px] rounded-[20px] bg-[#F5F5F5] p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
             {initialData ? "Edit" : "Add"} Modifier
@@ -223,56 +199,50 @@ const groupMeta = useMemo(() => {
           </p>
         </DialogHeader>
 
-        <div className="mt-5 bg-white rounded-[16px] p-5 space-y-4">
-          {/* GROUP */}
+        <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
           <div className="space-y-1">
-            <p className="text-sm text-gray-600">Modifier Group</p>
+            <p className="text-sm text-gray-600">Modifier Groups</p>
 
-            <AsyncSelect
-              value={selectedGroup}
-              onChange={(group) => {
-                setSelectedGroup(group);
-                handleChange("modifierGroupId", String(group?.id || ""));
+            <AsyncMultiSelect
+              value={selectedGroups}
+              onChange={(groups) => {
+                setSelectedGroups(groups);
+                handleChange(
+                  "modifierGroupIds",
+                  groups.map((group: any) => String(group?.id || ""))
+                );
               }}
-              placeholder="Select Group"
+              placeholder="Select Groups"
               fetchOptions={fetchModifierGroups}
               labelKey="name"
               valueKey="id"
             />
           </div>
 
-          {/* NAME */}
           <InputField
             label="Modifier Name"
             value={form.name}
             onChange={(v: string) => handleChange("name", v)}
           />
 
-          {/* PRICE */}
           <InputField
             label="Price Delta"
             type="number"
             value={form.priceDelta}
-            onChange={(v: string) =>
-              handleChange("priceDelta", Number(v))
-            }
+            onChange={(v: string) => handleChange("priceDelta", Number(v))}
           />
 
-          {/* SORT */}
           <InputField
             label="Sort Order"
             type="number"
             value={form.sortOrder}
-            onChange={(v: string) =>
-              handleChange("sortOrder", Number(v))
-            }
+            onChange={(v: string) => handleChange("sortOrder", Number(v))}
           />
 
-          {/* BUTTON */}
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full rounded-[10px] mt-2 py-4 bg-primary"
+            className="mt-2 w-full rounded-[10px] bg-primary py-4"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -311,7 +281,7 @@ function InputField({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-[40px] rounded-[10px] border border-gray-300 px-3 focus:border-gray-400 outline-none"
+        className="h-[40px] w-full rounded-[10px] border border-gray-300 px-3 outline-none focus:border-gray-400"
       />
     </div>
   );
