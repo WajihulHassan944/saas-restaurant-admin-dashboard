@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import StatsSection from "@/components/shared/stats-section";
 import Header from "@/components/orders/header";
-import { statsData } from "@/constants/orders";
 import Container from "@/components/container";
 import Table from "@/components/orders/table";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,7 @@ import { useAuthContext } from "@/context/AuthContext";
 import { toast } from "sonner";
 import PaginationSection from "@/components/shared/pagination";
 import { sortData } from "@/utils/sort-data";
+import { useGetOrdersStats } from "@/hooks/useDashboard";
 
 type OrderTab = "delivery" | "pickup" | "reservations" | "group";
 
@@ -23,8 +23,6 @@ interface Order {
   totalAmount?: number;
   createdAt?: string;
   isReservation?: boolean;
-
-  // reservation fields
   guestCount?: number;
   reservationDate?: string;
   customerName?: string;
@@ -53,13 +51,94 @@ export default function Orders() {
 
   const { get, loading } = useApi(token);
 
-  // ✅ FETCH DATA
+  const {
+    data: orderStatsResponse,
+    isLoading: isOrderStatsLoading,
+    isFetching: isOrderStatsFetching,
+    refetch: refetchOrderStats,
+  } = useGetOrdersStats(
+    restaurantId
+      ? {
+          restaurantId,
+        }
+      : undefined
+  );
+
+  const orderStats = orderStatsResponse?.data;
+
+  const paidOrders =
+    orderStats?.paymentStatusBreakdown?.find(
+      (item: any) => item.status?.toUpperCase() === "PAID"
+    )?.count ?? 0;
+
+  const dynamicStats = [
+    {
+      _id: "total-orders",
+      title: "Total Orders",
+      value: orderStats?.totalOrders ?? 0,
+      icon: "orders",
+      iconStyle: "default",
+      trend: {
+        direction: "up",
+        percentage: `${orderStats?.totalOrders ?? 0}`,
+      },
+    },
+    {
+      _id: "total-revenue",
+      title: "Total Revenue",
+      value: `${Number(orderStats?.totalRevenue ?? 0).toLocaleString()}`,
+      icon: "revenue",
+      iconStyle: "default",
+      trend: {
+        direction: "up",
+        percentage: `Avg: ${Number(
+          orderStats?.averageOrderValue ?? 0
+        ).toLocaleString()}`,
+      },
+    },
+    {
+      _id: "average-order-value",
+      title: "Average Order Value",
+      value: `${Number(orderStats?.averageOrderValue ?? 0).toLocaleString()}`,
+      icon: "completed",
+      iconStyle: "default",
+      trend: {
+        direction: "up",
+        percentage: `${paidOrders} Paid`,
+      },
+    },
+    {
+      _id: "cancelled-orders",
+      title: "Cancelled Orders",
+      value:
+        orderStats?.statusBreakdown?.find(
+          (item: any) => item.status?.toUpperCase() === "CANCELLED"
+        )?.count ?? 0,
+      icon: "cancelled",
+      iconStyle: "danger",
+      trend: {
+        direction:
+          (
+            orderStats?.statusBreakdown?.find(
+              (item: any) => item.status?.toUpperCase() === "CANCELLED"
+            )?.count ?? 0
+          ) > 0
+            ? "down"
+            : "up",
+        percentage: `${
+          orderStats?.statusBreakdown?.find(
+            (item: any) => item.status?.toUpperCase() === "CANCELLED"
+          )?.count ?? 0
+        } Cancelled`,
+      },
+    },
+  ] as any;
+
   useEffect(() => {
     if (!restaurantId) return;
 
     const fetchData = async () => {
       try {
-        // ✅ RESERVATIONS API
         if (activeTab === "reservations") {
           const res = await get(
             `/v1/customer-app/admin/table-reservations?restaurantId=${restaurantId}&page=${page}&limit=${limit}`
@@ -77,7 +156,9 @@ export default function Orders() {
             reservationDate: r.reservationDate,
             guestCount: r.guestCount,
             isReservation: true,
-            customerName: `${r.customer?.firstName || ""} ${r.customer?.lastName || ""}`,
+            customerName: `${r.customer?.firstName || ""} ${
+              r.customer?.lastName || ""
+            }`.trim(),
           }));
 
           setOrders(mapped);
@@ -90,7 +171,6 @@ export default function Orders() {
           return;
         }
 
-        // ✅ ORDERS API
         const queryParams: Record<string, string> = {
           restaurantId,
           ...(search && { search }),
@@ -100,15 +180,12 @@ export default function Orders() {
           limit: String(limit),
         };
 
-        // 🔥 backend filtering
         if (activeTab === "delivery") queryParams.orderType = "DELIVERY";
         if (activeTab === "pickup") queryParams.orderType = "TAKEAWAY";
 
-        queryParams.kind =
-          activeTab === "group" ? "group-orders" : "order";
+        queryParams.kind = activeTab === "group" ? "group-orders" : "order";
 
         const query = new URLSearchParams(queryParams).toString();
-
         const res = await get(`/v1/orders?${query}`);
 
         if (res?.error) {
@@ -117,7 +194,6 @@ export default function Orders() {
         }
 
         setOrders(res?.data || []);
-
         setTotalPages(res?.meta?.totalPages || 1);
         setTotal(res?.meta?.total || 0);
         setHasNext(res?.meta?.hasNext || false);
@@ -134,7 +210,6 @@ export default function Orders() {
     setPage(1);
   }, [search, sortOrder, status, activeTab]);
 
-  // ✅ SORT
   const handleSort = (key: any) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -144,20 +219,30 @@ export default function Orders() {
     }
   };
 
-  const sortedOrders = sortKey
-    ? sortData(orders, sortKey, sortDir)
-    : orders;
+  const sortedOrders = sortKey ? sortData(orders, sortKey, sortDir) : orders;
 
   const getHeaderContent = (tab: OrderTab) => {
     switch (tab) {
       case "delivery":
-        return { title: "Delivery Orders", description: "View all delivery orders here" };
+        return {
+          title: "Delivery Orders",
+          description: "View all delivery orders here",
+        };
       case "pickup":
-        return { title: "Pick Up Orders", description: "View all pick up orders here" };
+        return {
+          title: "Pick Up Orders",
+          description: "View all pick up orders here",
+        };
       case "reservations":
-        return { title: "Reservations", description: "View all reservations here" };
+        return {
+          title: "Reservations",
+          description: "View all reservations here",
+        };
       case "group":
-        return { title: "Group Order Summary", description: "View all group orders here" };
+        return {
+          title: "Group Order Summary",
+          description: "View all group orders here",
+        };
       default:
         return { title: "Order List", description: "View orders here" };
     }
@@ -165,28 +250,48 @@ export default function Orders() {
 
   const { title, description } = getHeaderContent(activeTab);
 
+  const handleRefresh = () => {
+    refetchOrderStats();
+    setPage((prev) => prev);
+  };
+
   return (
     <Container>
       <Header title={title} description={description} orders={sortedOrders} />
 
       <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm space-y-6">
-        <StatsSection stats={statsData} className="xl:grid-cols-4" />
+        <StatsSection
+          stats={dynamicStats}
+          loading={isOrderStatsLoading || isOrderStatsFetching}
+          className="xl:grid-cols-4"
+        />
 
-        {/* Tabs */}
         <div className="flex items-center gap-0 flex-wrap text-sm lg:text-base">
-          <TabButton active={activeTab === "delivery"} onClick={() => setActiveTab("delivery")}>
+          <TabButton
+            active={activeTab === "delivery"}
+            onClick={() => setActiveTab("delivery")}
+          >
             Delivery Orders
           </TabButton>
 
-          <TabButton active={activeTab === "pickup"} onClick={() => setActiveTab("pickup")}>
+          <TabButton
+            active={activeTab === "pickup"}
+            onClick={() => setActiveTab("pickup")}
+          >
             Pick up Orders
           </TabButton>
 
-          <TabButton active={activeTab === "reservations"} onClick={() => setActiveTab("reservations")}>
+          <TabButton
+            active={activeTab === "reservations"}
+            onClick={() => setActiveTab("reservations")}
+          >
             Reservations
           </TabButton>
 
-          <TabButton active={activeTab === "group"} onClick={() => setActiveTab("group")}>
+          <TabButton
+            active={activeTab === "group"}
+            onClick={() => setActiveTab("group")}
+          >
             Group Orders
           </TabButton>
         </div>
@@ -203,7 +308,7 @@ export default function Orders() {
           sortKey={sortKey}
           sortDir={sortDir}
           onSort={handleSort}
-          activeTab={activeTab} // ✅ NEW
+          activeTab={activeTab}
         />
 
         <PaginationSection

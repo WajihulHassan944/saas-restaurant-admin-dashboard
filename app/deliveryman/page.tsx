@@ -8,18 +8,17 @@ import Header from "@/components/deliveryman/header";
 import BranchFilters from "@/components/branches/BranchFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeliverymen } from "@/hooks/useDeliverymen";
+import { useGetDeliverymenStats } from "@/hooks/useDashboard";
 
 const Deliveryman = () => {
   const { restaurantId, loading } = useAuth();
 
-  /* ================= FILTERS ================= */
   const [filters, setFilters] = useState({
     search: "",
     page: 1,
     limit: 10,
   });
 
-  /* ================= QUERY ================= */
   const {
     data,
     isLoading,
@@ -28,28 +27,44 @@ const Deliveryman = () => {
   } = useDeliverymen({
     search: filters.search,
     page: filters.page,
-    // ✅ safe fallback
     branchId: undefined,
     status: undefined,
-    // 👇 important
     restaurantId: restaurantId ?? undefined,
   } as any);
 
-  /* ================= DATA NORMALIZATION ================= */
+  const {
+    data: deliverymanStatsResponse,
+    isLoading: isStatsLoading,
+    isFetching: isStatsFetching,
+    refetch: refetchDeliverymanStats,
+  } = useGetDeliverymenStats(
+    restaurantId
+      ? {
+          restaurantId,
+        }
+      : undefined
+  );
+
+  const deliverymanStats = deliverymanStatsResponse?.data;
+
   const deliverymen = data?.data || [];
   const meta = data?.meta || null;
 
-  /* ================= FILTER CHANGE ================= */
   const handleFilterChange = (newFilters: any) => {
     setFilters((prev) => ({
       ...prev,
       ...newFilters,
-      page: 1, // ✅ reset pagination on filter change
+      page: 1,
     }));
   };
 
-  /* ================= LOADING STATE ================= */
+  const handleRefresh = () => {
+    refetch();
+    refetchDeliverymanStats();
+  };
+
   const isTableLoading = isLoading || isFetching || loading;
+  const isCardLoading = isStatsLoading || isStatsFetching || loading;
 
   return (
     <Container>
@@ -59,7 +74,10 @@ const Deliveryman = () => {
       />
 
       <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm space-y-6">
-        <StatsSection />
+        <StatsSection
+          stats={deliverymanStats}
+          loading={isCardLoading}
+        />
 
         <BranchFilters
           branches={deliverymen}
@@ -70,10 +88,11 @@ const Deliveryman = () => {
         <Table
           data={deliverymen}
           meta={meta}
+          loading={isTableLoading}
           onPageChange={(page: number) =>
             setFilters((prev) => ({ ...prev, page }))
           }
-          refresh={refetch} // ✅ React Query refetch
+          refresh={handleRefresh}
         />
       </div>
     </Container>

@@ -5,7 +5,9 @@ import {
   attachModifierGroupToCategory,
   attachModifierGroupToItem,
   bulkCreateMenuItems,
+  createMenu,
   createMenuItem,
+  CreateMenuPayload,
   createMenuVariation,
   createModifier,
   createModifierGroup,
@@ -16,6 +18,7 @@ import {
   deleteModifier,
   deleteModifierGroup,
   deleteRestaurantMenu,
+  getMenuById,
   getMenuItems,
   getMenuItemsByMenu,
   getMenuVariations,
@@ -23,8 +26,10 @@ import {
   getModifiers,
   getRestaurantMenu,
   getRestaurantMenus,
+  updateMenu,
   updateMenuItem,
   updateMenuItemLink,
+  UpdateMenuPayload,
   updateMenuVariation,
   updateModifier,
   updateModifierGroup,
@@ -632,6 +637,54 @@ export const useAttachModifierGroupToCategory = () => {
         err?.response?.data?.message ||
           "Failed to attach modifier group to category"
       );
+    },
+  });
+};
+
+/* =========================
+   GET SINGLE MENU
+========================= */
+export const useGetMenuById = (menuId?: string) => {
+  return useQuery({
+    queryKey: ["menu", menuId],
+    queryFn: () => getMenuById(menuId as string),
+    enabled: !!menuId,
+  });
+};
+
+/* =========================
+   CREATE MENU
+========================= */
+export const useCreateMenu = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateMenuPayload) => createMenu(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menus"] });
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+    },
+  });
+};
+
+/* =========================
+   UPDATE MENU
+========================= */
+export const useUpdateMenu = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      menuId,
+      payload,
+    }: {
+      menuId: string;
+      payload: UpdateMenuPayload;
+    }) => updateMenu({ menuId, payload }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["menus"] });
+      queryClient.invalidateQueries({ queryKey: ["menu", variables.menuId] });
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
     },
   });
 };

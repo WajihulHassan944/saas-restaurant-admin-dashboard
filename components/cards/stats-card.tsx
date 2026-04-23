@@ -24,7 +24,13 @@ const ICON_MAP: Record<StatIcon, React.ElementType> = {
   ongoing: Loader,
 };
 
-const StatsCard = ({ data }: { data: StatItem }) => {
+const StatsCard = ({
+  data,
+  loading = false,
+}: {
+  data: StatItem;
+  loading?: boolean;
+}) => {
   const pathname = usePathname();
   const isOrdersPage = pathname === "/orders" || pathname === "/reports";
 
@@ -40,38 +46,50 @@ const StatsCard = ({ data }: { data: StatItem }) => {
         sm:p-[20px] md:p-[24px]
       `}
     >
-      <div className="flex  sm:flex-row items-start sm:items-center gap-4">
-        {/* Icon */}
+      <div className="flex sm:flex-row items-start sm:items-center gap-4">
         <div
           className={`flex items-center justify-center size-[44px] rounded-full p-2 ${
             isDanger ? "bg-primary/10" : "bg-gray-100 text-gray-500"
           }`}
         >
-          <Icon size={20} className="text-primary" />
+          {loading ? (
+            <div className="h-5 w-5 animate-pulse rounded-full bg-gray-200" />
+          ) : (
+            <Icon size={20} className="text-primary" />
+          )}
         </div>
 
-        {/* Right content */}
         <div className="flex flex-col">
-          <div className="text-[16px] sm:text-[32px] font-semibold text-black leading-none">
-            {data.value}
-          </div>
+          {loading ? (
+            <>
+              <div className="h-8 sm:h-10 w-20 rounded-md bg-gray-200 animate-pulse" />
+              <div className="mt-2 h-4 w-28 rounded-md bg-gray-200 animate-pulse" />
+              <div className="mt-2 h-4 w-20 rounded-md bg-gray-200 animate-pulse" />
+            </>
+          ) : (
+            <>
+              <div className="text-[16px] sm:text-[22px] font-semibold text-black leading-none">
+                {data.value}
+              </div>
 
-          <p className="mt-1 text-[11px] sm:text-[15px] text-gray-400">
-            {data.title}
-          </p>
+              <p className="mt-1 text-[11px] sm:text-[15px] text-gray-400">
+                {data.title}
+              </p>
 
-          <div
-            className={`mt-2 flex items-center gap-1 text-xs sm:text-sm font-medium ${
-              isUp ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {isUp ? (
-              <ArrowUpRight size={16} strokeWidth={2.5} />
-            ) : (
-              <ArrowDownRight size={16} strokeWidth={2.5} />
-            )}
-            {data.trend?.percentage}
-          </div>
+              <div
+                className={`mt-2 flex items-center gap-1 text-xs sm:text-sm font-medium ${
+                  isUp ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {isUp ? (
+                  <ArrowUpRight size={16} strokeWidth={2.5} />
+                ) : (
+                  <ArrowDownRight size={16} strokeWidth={2.5} />
+                )}
+                {data.trend?.percentage}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </Card>

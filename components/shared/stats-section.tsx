@@ -5,9 +5,11 @@ import { cn } from "@/lib/utils";
 export default function StatsSection({
   stats,
   className,
+  loading = false,
 }: {
   stats: StatItem[];
   className?: string;
+  loading?: boolean;
 }) {
   return (
     <div
@@ -17,7 +19,7 @@ export default function StatsSection({
       )}
     >
       {stats.map((stat) => (
-        <StatsCard key={stat._id} data={stat} />
+        <StatsCard key={stat._id} data={stat} loading={loading} />
       ))}
     </div>
   );

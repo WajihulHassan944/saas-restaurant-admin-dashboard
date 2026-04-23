@@ -6,8 +6,9 @@ import StatsSection from "@/components/customer-settings/stats-section";
 import Table from "@/components/customer-settings/table";
 import Header from "@/components/customer-settings/header";
 import BranchFilters from "@/components/branches/BranchFilters";
-import { useAuthContext } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useGetCustomersList } from "@/hooks/useCustomers";
+import { useGetCustomersStats } from "@/hooks/useDashboard";
 
 interface Customer {
   id: string;
@@ -26,8 +27,7 @@ interface Customer {
 }
 
 export default function CustomerSettingsPage() {
-  const { user } = useAuthContext();
-  const restaurantId = user?.restaurantId;
+  const { restaurantId } = useAuth();
 
   const [filters, setFilters] = useState({
     page: 1,
@@ -54,6 +54,21 @@ export default function CustomerSettingsPage() {
         }
       : undefined
   );
+
+  const {
+    data: customerStatsResponse,
+    isLoading: isStatsLoading,
+    isFetching: isStatsFetching,
+    refetch: refetchCustomerStats,
+  } = useGetCustomersStats(
+    restaurantId
+      ? {
+          restaurantId,
+        }
+      : undefined
+  );
+
+  const customerStats = customerStatsResponse?.data;
 
   const customers: Customer[] = useMemo(() => {
     return data?.data || [];
@@ -92,16 +107,24 @@ export default function CustomerSettingsPage() {
     }));
   }, [customers]);
 
+  const handleRefresh = () => {
+    refetch();
+    refetchCustomerStats();
+  };
+
   return (
     <Container>
       <Header
         title="Customer List"
         description="View and manage all customers from here"
-        onRefresh={() => refetch()}
+        onRefresh={handleRefresh}
       />
 
       <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm space-y-6">
-        <StatsSection />
+        <StatsSection
+          stats={customerStats}
+          loading={isStatsLoading || isStatsFetching}
+        />
 
         <BranchFilters
           branches={customerFilterData}
@@ -114,7 +137,7 @@ export default function CustomerSettingsPage() {
           loading={isLoading || isFetching}
           meta={meta}
           onPageChange={handlePageChange}
-          onRefresh={() => refetch()}
+          onRefresh={handleRefresh}
         />
       </div>
     </Container>

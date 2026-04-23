@@ -262,3 +262,54 @@ export const attachModifierGroupToCategory = async (
   );
   return data;
 };
+
+
+
+/* =========================
+   GET SINGLE MENU
+========================= */
+export const getMenuById = async (menuId: string) => {
+  const { data } = await api.get(`/menus/${menuId}`);
+  return data;
+};
+
+/* =========================
+   CREATE MENU
+========================= */
+export interface CreateMenuPayload {
+  restaurantId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  sortOrder?: number;
+  itemIds?: string[];
+  isActive?: boolean;
+}
+
+export const createMenu = async (payload: CreateMenuPayload) => {
+  const { data } = await api.post("/menus", payload);
+  return data;
+};
+
+/* =========================
+   UPDATE MENU
+========================= */
+export interface UpdateMenuPayload {
+  name?: string;
+  slug?: string;
+  description?: string;
+  sortOrder?: number;
+  itemIds?: string[];
+  isActive?: boolean;
+}
+
+export const updateMenu = async ({
+  menuId,
+  payload,
+}: {
+  menuId: string;
+  payload: UpdateMenuPayload;
+}) => {
+  const { data } = await api.patch(`/menus/${menuId}`, payload);
+  return data;
+};
