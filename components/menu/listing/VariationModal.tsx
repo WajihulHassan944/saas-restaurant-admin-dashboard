@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react";
 import FormInput from "@/components/register/form/FormInput";
 import { Label } from "@/components/ui/label";
 import AsyncSelect from "@/components/ui/AsyncSelect";
+
+type PricingMode = "FLAT_ADJUSTMENT" | "PERCENTAGE_ADJUSTMENT";
 
 type Props = {
   open: boolean;
@@ -35,6 +37,8 @@ const getEmptyForm = (categoryId = "") => ({
   name: "",
   description: "",
   price: "",
+  pricingMode: "FLAT_ADJUSTMENT" as PricingMode,
+  adjustmentValue: "",
   sortOrder: 0,
   isDefault: false,
   isActive: true,
@@ -66,9 +70,9 @@ export default function VariationModal({
   );
 
   const [form, setForm] = useState(getEmptyForm(resolvedCategoryId));
-  const [modifierOverrides, setModifierOverrides] = useState<
-    ModifierOverride[]
-  >([{ modifier: null, priceDelta: "" }]);
+  const [modifierOverrides, setModifierOverrides] = useState<ModifierOverride[]>(
+    [{ modifier: null, priceDelta: "" }]
+  );
 
   const [variations, setVariations] = useState<any[]>([]);
   const [loadingVariations, setLoadingVariations] = useState(false);
@@ -104,7 +108,10 @@ export default function VariationModal({
       return item;
     }
 
-    if (item?.category?.id && String(item.category.id) === String(form.categoryId)) {
+    if (
+      item?.category?.id &&
+      String(item.category.id) === String(form.categoryId)
+    ) {
       return item.category;
     }
 
@@ -142,6 +149,8 @@ export default function VariationModal({
       name: variation?.name || "",
       description: variation?.description || "",
       price: String(variation?.price ?? ""),
+      pricingMode: variation?.pricingMode || "FLAT_ADJUSTMENT",
+      adjustmentValue: String(variation?.adjustmentValue ?? ""),
       sortOrder: Number(variation?.sortOrder ?? 0),
       isDefault: !!variation?.isDefault,
       isActive: variation?.isActive === false ? false : true,
@@ -312,6 +321,31 @@ export default function VariationModal({
       return;
     }
 
+    if (!form.pricingMode) {
+      toast.error("Pricing mode is required");
+      return;
+    }
+
+    if (form.adjustmentValue === "") {
+      toast.error("Adjustment value is required");
+      return;
+    }
+
+    const adjustmentValue = Number(form.adjustmentValue);
+
+    if (Number.isNaN(adjustmentValue)) {
+      toast.error("Adjustment value must be a valid number");
+      return;
+    }
+
+    if (
+      form.pricingMode === "PERCENTAGE_ADJUSTMENT" &&
+      (adjustmentValue < 0 || adjustmentValue > 100)
+    ) {
+      toast.error("Percentage adjustment must be between 0 and 100");
+      return;
+    }
+
     const duplicateModifierIds = normalizedModifierPayload.map((entry) =>
       String(entry.modifierId)
     );
@@ -321,31 +355,34 @@ export default function VariationModal({
       return;
     }
 
-    const createPayload = {
-      categoryId: form.categoryId,
+    const basePayload = {
       name: form.name.trim(),
       description: form.description.trim(),
       price: Number(form.price),
+      pricingMode: form.pricingMode,
+      adjustmentValue,
       sortOrder: Number(form.sortOrder),
       isDefault: form.isDefault,
       isActive: form.isActive,
       modifierPriceOverrides: normalizedModifierPayload,
     };
 
+    const createPayload = {
+      categoryId: form.categoryId,
+      ...basePayload,
+    };
+
     const updatePayload = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      price: Number(form.price),
-      sortOrder: Number(form.sortOrder),
-      isDefault: form.isDefault,
-      isActive: form.isActive,
-      modifierPriceOverrides: normalizedModifierPayload,
+      ...basePayload,
     };
 
     let res: any;
 
     if (editMode === "edit" && editingVariation?.id) {
-      res = await patch(`/v1/menu/variations/${editingVariation.id}`, updatePayload);
+      res = await patch(
+        `/v1/menu/variations/${editingVariation.id}`,
+        updatePayload
+      );
     } else {
       res = await post("/v1/menu/variations", createPayload);
     }
@@ -466,9 +503,49 @@ export default function VariationModal({
 
             <FormInput
               label="Price"
-              placeholder="Enter price"
+              placeholder="Enter base price"
               value={form.price}
               onChange={(v) => handleChange("price", v)}
+              type="number"
+              required
+            />
+
+            <div className="space-y-2">
+              <Label>Pricing Mode</Label>
+
+              <div className="relative">
+                <select
+                  value={form.pricingMode}
+                  onChange={(e) =>
+                    handleChange("pricingMode", e.target.value as PricingMode)
+                  }
+                  className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] px-4 pr-12 text-sm text-gray-500 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                >
+                  <option value="FLAT_ADJUSTMENT">Flat Adjustment</option>
+                  <option value="PERCENTAGE_ADJUSTMENT">
+                    Percentage Adjustment
+                  </option>
+                </select>
+
+                <div className="pointer-events-none absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-[10px] bg-primary">
+                  <ChevronDown size={16} className="text-white" />
+                </div>
+              </div>
+            </div>
+
+            <FormInput
+              label={
+                form.pricingMode === "PERCENTAGE_ADJUSTMENT"
+                  ? "Adjustment Percentage"
+                  : "Adjustment Amount"
+              }
+              placeholder={
+                form.pricingMode === "PERCENTAGE_ADJUSTMENT"
+                  ? "e.g 10"
+                  : "e.g 5"
+              }
+              value={form.adjustmentValue}
+              onChange={(v) => handleChange("adjustmentValue", v)}
               type="number"
               required
             />
@@ -592,15 +669,13 @@ export default function VariationModal({
           </div>
 
           <div className="rounded-[16px] bg-white p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Category Variations
-                </h3>
-                <p className="text-sm text-gray-500">
-                  View, edit, and delete variations for this category
-                </p>
-              </div>
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Category Variations
+              </h3>
+              <p className="text-sm text-gray-500">
+                View, edit, and delete variations for this category
+              </p>
             </div>
 
             {loadingVariations ? (
@@ -620,7 +695,7 @@ export default function VariationModal({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-semibold text-gray-900">
                             {variation?.name || "-"}
                           </h4>
@@ -648,6 +723,13 @@ export default function VariationModal({
 
                         <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
                           <span>Price: {variation?.price ?? 0}</span>
+                          <span>
+                            Pricing:{" "}
+                            {variation?.pricingMode ===
+                            "PERCENTAGE_ADJUSTMENT"
+                              ? `${variation?.adjustmentValue ?? 0}%`
+                              : variation?.adjustmentValue ?? 0}
+                          </span>
                           <span>Sort Order: {variation?.sortOrder ?? 0}</span>
                           <span>
                             Overrides:{" "}
