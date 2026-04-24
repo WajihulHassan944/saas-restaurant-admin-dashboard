@@ -1,151 +1,482 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import FormInput from "../register/form/FormInput";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  useGetAdminPrintingSettings,
+  useGetAdminPrintingStatus,
+  useUpdateAdminPrintingSettings,
+} from "@/hooks/usePrinting";
+import { toast } from "sonner";
 
-export default function AutoPrintingSettings() {
-  const [autoPrint, setAutoPrint] = useState(true);
+type ConnectionType = "USB" | "NETWORK" | "QUEUE" | "";
+
+type AutoPrintingSettingsProps = {
+  branchId?: string | null;
+};
+
+type PrintingSettings = {
+  enabled: boolean;
+  autoPrintOnNewOrder: boolean;
+  autoPrintOnStatusChange: boolean;
+  printCustomerReceipt: boolean;
+  printKitchenTicket: boolean;
+  connectionType: ConnectionType;
+  printerName: string;
+  printerTarget: string;
+  deviceId: string;
+  ipAddress: string;
+  queueName: string;
+};
+
+const defaultSettings: PrintingSettings = {
+  enabled: false,
+  autoPrintOnNewOrder: false,
+  autoPrintOnStatusChange: false,
+  printCustomerReceipt: false,
+  printKitchenTicket: false,
+  connectionType: "",
+  printerName: "",
+  printerTarget: "",
+  deviceId: "",
+  ipAddress: "",
+  queueName: "",
+};
+
+const normalizeStatus = (status?: string) => {
+  if (!status) return "Tracking Pending";
+
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
+const getStatusClass = (status?: string) => {
+  const value = status?.toLowerCase();
+
+  if (value === "connected" || value === "online" || value === "healthy") {
+    return "text-green-600";
+  }
+
+  if (value === "offline" || value === "failed" || value === "error") {
+    return "text-red-600";
+  }
+
+  return "text-yellow-600";
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "No recent activity";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString();
+};
+
+export default function AutoPrintingSettings({
+  branchId,
+}: AutoPrintingSettingsProps) {
+  const { restaurantId, loading: authLoading } = useAuth();
+
+  const queryParams = useMemo(() => {
+    if (!restaurantId) return undefined;
+
+    return {
+      restaurantId,
+      branchId: branchId || undefined,
+    };
+  }, [restaurantId, branchId]);
+
+  const {
+    data: settingsResponse,
+    isLoading: settingsLoading,
+    isFetching: settingsFetching,
+    refetch: refetchSettings,
+  } = useGetAdminPrintingSettings(queryParams);
+
+  const {
+    data: statusResponse,
+    isLoading: statusLoading,
+    isFetching: statusFetching,
+    refetch: refetchStatus,
+  } = useGetAdminPrintingStatus(queryParams);
+
+  const { mutateAsync: updateSettings, isPending: updating } =
+    useUpdateAdminPrintingSettings();
+
+  const apiSettings = settingsResponse?.data?.settings;
+  const source = settingsResponse?.data?.source;
+  const inheritedFromRestaurant =
+    settingsResponse?.data?.inheritedFromRestaurant;
+
+  const health = statusResponse?.data?.health;
+
+  const [form, setForm] = useState<PrintingSettings>(defaultSettings);
+
+  const loading = authLoading || settingsLoading || statusLoading;
+  const refreshing = settingsFetching || statusFetching;
+
+  useEffect(() => {
+    if (!apiSettings) return;
+
+    setForm({
+      enabled: Boolean(apiSettings.enabled),
+      autoPrintOnNewOrder: Boolean(apiSettings.autoPrintOnNewOrder),
+      autoPrintOnStatusChange: Boolean(apiSettings.autoPrintOnStatusChange),
+      printCustomerReceipt: Boolean(apiSettings.printCustomerReceipt),
+      printKitchenTicket: Boolean(apiSettings.printKitchenTicket),
+      connectionType: apiSettings.connectionType || "",
+      printerName: apiSettings.printerName || "",
+      printerTarget: apiSettings.printerTarget || "",
+      deviceId: apiSettings.deviceId || "",
+      ipAddress: apiSettings.ipAddress || "",
+      queueName: apiSettings.queueName || "",
+    });
+  }, [apiSettings]);
+
+  const updateField = <K extends keyof PrintingSettings>(
+    key: K,
+    value: PrintingSettings[K]
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const toggleCheckbox = (
+    key:
+      | "printKitchenTicket"
+      | "printCustomerReceipt"
+      | "autoPrintOnNewOrder"
+      | "autoPrintOnStatusChange"
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([refetchSettings(), refetchStatus()]);
+  };
+
+  const handleSave = async () => {
+    if (!restaurantId) {
+      toast.error("Restaurant ID is missing.");
+      return;
+    }
+
+    try {
+      await updateSettings({
+        restaurantId,
+        branchId: branchId || undefined,
+
+        enabled: form.enabled,
+        autoPrintOnNewOrder: form.autoPrintOnNewOrder,
+        autoPrintOnStatusChange: form.autoPrintOnStatusChange,
+        printCustomerReceipt: form.printCustomerReceipt,
+        printKitchenTicket: form.printKitchenTicket,
+        connectionType: form.connectionType || undefined,
+        printerName: form.printerName || undefined,
+        printerTarget: form.printerTarget || undefined,
+        deviceId: form.deviceId || undefined,
+        ipAddress: form.ipAddress || undefined,
+        queueName: form.queueName || undefined,
+      } as any);
+
+      toast.success("Printing settings updated successfully.");
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || "Failed to update printing settings."
+      );
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mt-6 rounded-xl bg-white p-8">
+        <div className="h-[420px] w-full animate-pulse rounded-xl bg-gray-100" />
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl p-8 mt-6">
+    <div className="mt-6 rounded-xl bg-white p-8">
       {/* ================= PRINTER STATUS ================= */}
-      <div className="flex items-start justify-between mb-12">
+      <div className="mb-12 flex items-start justify-between gap-6">
         <div>
           <h3 className="text-2xl font-semibold">Printer Status</h3>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Source:{" "}
+            <span className="font-medium capitalize text-gray-700">
+              {source || "restaurant"}
+            </span>
+            {inheritedFromRestaurant ? " · Inherited from restaurant" : ""}
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-600 md:grid-cols-4">
+            <div className="rounded-lg border border-gray-100 p-3">
+              <p className="text-xs text-gray-400">Total Events</p>
+              <p className="font-semibold text-gray-800">
+                {health?.totalEvents ?? 0}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-gray-100 p-3">
+              <p className="text-xs text-gray-400">Success</p>
+              <p className="font-semibold text-green-600">
+                {health?.successCount ?? 0}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-gray-100 p-3">
+              <p className="text-xs text-gray-400">Failed</p>
+              <p className="font-semibold text-red-600">
+                {health?.failedCount ?? 0}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-gray-100 p-3">
+              <p className="text-xs text-gray-400">Warnings</p>
+              <p className="font-semibold text-yellow-600">
+                {health?.warningCount ?? 0}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="text-right">
-          <p className="text-m font-medium text-green-600">Connected</p>
-          <p className="text-xs text-gray-600">
-            Last Print: 2 minutes ago
+          <p
+            className={`text-m font-medium ${getStatusClass(health?.status)}`}
+          >
+            {normalizeStatus(health?.status)}
           </p>
+
+          <p className="text-xs text-gray-600">
+            Latest: {formatDateTime(health?.latest)}
+          </p>
+
+          {health?.latestErrorMessage ? (
+            <p className="mt-1 max-w-[260px] text-xs text-red-500">
+              {health.latestErrorMessage}
+            </p>
+          ) : null}
 
           <Button
             size="sm"
-            className="mt-5 bg-primary hover:bg-red-800 px-15 rounded-[12px] h-[40px]"
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="mt-5 h-[40px] rounded-[12px] bg-primary px-8 hover:bg-red-800"
           >
-            Test Print
+            {refreshing ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : (
+              <RefreshCw size={16} className="mr-2" />
+            )}
+            Refresh
           </Button>
         </div>
       </div>
 
       {/* ================= CONNECT PRINTER ================= */}
-      <div className="mb-12">
-        <h3 className="text-2xl font-semibold mb-6">Connect Printer</h3>
+     {/* ================= CONNECT PRINTER ================= */}
+<div className="mb-12">
+  <h3 className="mb-6 text-2xl font-semibold">Connect Printer</h3>
 
-        {/* Printer Type (FULL ROW) */}
-        <div className="mb-6">
-          <label className="text-[16px] mb-2 block">Printer Type</label>
+  <div className="mb-6">
+    <label className="mb-2 block text-[16px]">Connection Type</label>
 
-          <div className="relative">
-            <select
-              className="w-full h-11 px-4 pr-12 border border-[#BBBBBB] rounded-[10px]
-              text-sm text-gray-500 appearance-none
-              focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-            >
-              <option>eg. john doe</option>
-              <option>Thermal Printer</option>
-              <option>POS Printer</option>
-            </select>
+    <div className="relative">
+      <select
+        value={form.connectionType}
+        onChange={(event) =>
+          updateField("connectionType", event.target.value as ConnectionType)
+        }
+        className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] px-4 pr-12 text-sm text-gray-500 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+      >
+        <option value="">Select connection type</option>
+        <option value="USB">USB</option>
+        <option value="NETWORK">Network / IP</option>
+        <option value="QUEUE">Print Queue</option>
+      </select>
 
-            {/* Custom Arrow */}
-            <div className="absolute right-0 top-0 h-full w-10 bg-primary flex items-center justify-center rounded-r-[10px] pointer-events-none">
-              <ChevronDown size={16} className="text-white" />
-            </div>
-          </div>
-        </div>
-
-        {/* API KEY (FULL ROW) */}
-        <div className="mb-6">
-          <FormInput label="API Key" placeholder="eg. john doe" />
-        </div>
-
-        <div className="flex justify-end">
-          <Button className="bg-primary hover:bg-red-800 px-16 rounded-[12px] py-1.5 h-[40px]">
-            Connect
-          </Button>
-        </div>
+      <div className="pointer-events-none absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-[10px] bg-primary">
+        <ChevronDown size={16} className="text-white" />
       </div>
+    </div>
+  </div>
+
+  <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+    <FormInput
+      label="Printer Name"
+      placeholder="eg. Kitchen Printer"
+      value={form.printerName}
+      onChange={(value) => updateField("printerName", value)}
+    />
+
+    <FormInput
+      label="Printer Target"
+      placeholder="eg. EPSON-TM-T20"
+      value={form.printerTarget}
+      onChange={(value) => updateField("printerTarget", value)}
+    />
+
+    <FormInput
+      label="Device ID"
+      placeholder="eg. USB_DEVICE_001"
+      value={form.deviceId}
+      onChange={(value) => updateField("deviceId", value)}
+    />
+
+    <FormInput
+      label="IP Address"
+      placeholder="eg. 192.168.1.50"
+      value={form.ipAddress}
+      onChange={(value) => updateField("ipAddress", value)}
+    />
+
+    <FormInput
+      label="Queue Name"
+      placeholder="eg. kitchen-printer-queue"
+      value={form.queueName}
+      onChange={(value) => updateField("queueName", value)}
+    />
+  </div>
+
+  <div className="flex justify-end">
+    <Button
+      type="button"
+      onClick={handleSave}
+      disabled={updating}
+      className="h-[40px] rounded-[12px] bg-primary px-16 py-1.5 hover:bg-red-800"
+    >
+      {updating ? (
+        <>
+          <Loader2 size={16} className="mr-2 animate-spin" />
+          Saving...
+        </>
+      ) : (
+        "Connect"
+      )}
+    </Button>
+  </div>
+</div>
 
       {/* ================= PRINT SETTINGS ================= */}
       <div className="mb-12">
-        <h3 className="text-2xl font-semibold mb-6">Print Settings</h3>
+        <h3 className="mb-6 text-2xl font-semibold">Print Settings</h3>
 
         <div className="space-y-6">
-          {/* Paper Size */}
-          <div>
-            <label className="text-[16px] mb-2 block">Paper Size</label>
-
-            <div className="relative">
-              <select
-                className="w-full h-11 px-4 pr-12 border border-[#BBBBBB] rounded-[10px]
-                text-sm text-gray-500 appearance-none
-                focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-              >
-                <option>eg. 80mm</option>
-                <option>58mm</option>
-                <option>80mm</option>
-              </select>
-
-              <div className="absolute right-0 top-0 h-full w-10 bg-primary flex items-center justify-center rounded-r-[10px] pointer-events-none">
-                <ChevronDown size={16} className="text-white" />
-              </div>
-            </div>
-          </div>
-
-          {/* Auto Printing */}
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium">Auto Printing</span>
-            <Switch checked={autoPrint} onCheckedChange={setAutoPrint} />
+            <span className="text-sm font-medium">Printing Enabled</span>
+            <Switch
+              checked={form.enabled}
+              onCheckedChange={(checked) => updateField("enabled", checked)}
+            />
           </div>
 
-          {/* Duplicate Copies */}
           <div>
-            <p className="text-sm font-medium mb-3">Print Duplicate Copy</p>
+            <p className="mb-3 text-sm font-medium">Print Copies</p>
 
-            <div className="flex gap-6">
-              {["Kitchen", "Customer"].map((item) => (
-                <label
-                  key={item}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
+            <div className="flex flex-wrap gap-6">
+              {[
+                {
+                  label: "Kitchen Ticket",
+                  key: "printKitchenTicket" as const,
+                },
+                {
+                  label: "Customer Receipt",
+                  key: "printCustomerReceipt" as const,
+                },
+              ].map((item) => (
+                <button
+                  type="button"
+                  key={item.key}
+                  onClick={() => toggleCheckbox(item.key)}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
                 >
-                  <span className="w-4 h-4 rounded-[4px] bg-primary flex items-center justify-center">
-                    <Check className="w-3 h-3 text-white" />
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-[4px] border ${
+                      form[item.key]
+                        ? "border-primary bg-primary"
+                        : "border-gray-300 bg-white"
+                    }`}
+                  >
+                    {form[item.key] ? (
+                      <Check className="h-3 w-3 text-white" />
+                    ) : null}
                   </span>
-                  {item}
-                </label>
+                  {item.label}
+                </button>
               ))}
             </div>
           </div>
-
-          {/* Language */}
-          <FormInput label="Language" placeholder="eg. English" />
         </div>
       </div>
 
       {/* ================= ORDER PRINT RULES ================= */}
       <div>
-        <h3 className="text-2xl font-semibold mb-6">Order Print Rules</h3>
+        <h3 className="mb-6 text-2xl font-semibold">Order Print Rules</h3>
 
         <div className="space-y-3">
           {[
-            "Print New Orders Automatically",
-            "Print Updated Orders",
-            "Print Cancelled Orders",
+            {
+              label: "Print New Orders Automatically",
+              key: "autoPrintOnNewOrder" as const,
+            },
+            {
+              label: "Print Updated Orders / Status Changes",
+              key: "autoPrintOnStatusChange" as const,
+            },
           ].map((rule) => (
-            <label
-              key={rule}
-              className="flex items-center gap-2 text-sm cursor-pointer"
+            <button
+              type="button"
+              key={rule.key}
+              onClick={() => toggleCheckbox(rule.key)}
+              className="flex cursor-pointer items-center gap-2 text-sm"
             >
-              <span className="w-4 h-4 rounded-[4px] bg-primary flex items-center justify-center">
-                <Check className="w-3 h-3 text-white" />
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded-[4px] border ${
+                  form[rule.key]
+                    ? "border-primary bg-primary"
+                    : "border-gray-300 bg-white"
+                }`}
+              >
+                {form[rule.key] ? (
+                  <Check className="h-3 w-3 text-white" />
+                ) : null}
               </span>
-              {rule}
-            </label>
+              {rule.label}
+            </button>
           ))}
+        </div>
+
+        <div className="mt-8 flex justify-end">
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={updating}
+            className="h-[40px] rounded-[12px] bg-primary px-16 py-1.5 hover:bg-red-800"
+          >
+            {updating ? (
+              <>
+                <Loader2 size={16} className="mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Settings"
+            )}
+          </Button>
         </div>
       </div>
     </div>

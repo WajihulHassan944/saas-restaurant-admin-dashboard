@@ -34,6 +34,7 @@ const StatsCard = ({
   const pathname = usePathname();
   const isOrdersPage = pathname === "/orders" || pathname === "/reports";
 
+  const hasTrend = Boolean(data.trend?.percentage);
   const isUp = data.trend?.direction === "up";
   const Icon = ICON_MAP[data.icon];
   const isDanger = data.iconStyle === "danger";
@@ -46,9 +47,9 @@ const StatsCard = ({
         sm:p-[20px] md:p-[24px]
       `}
     >
-      <div className="flex sm:flex-row items-start sm:items-center gap-4">
+      <div className="flex items-start gap-4 sm:flex-row sm:items-center">
         <div
-          className={`flex items-center justify-center size-[44px] rounded-full p-2 ${
+          className={`flex size-[44px] items-center justify-center rounded-full p-2 ${
             isDanger ? "bg-primary/10" : "bg-gray-100 text-gray-500"
           }`}
         >
@@ -62,32 +63,34 @@ const StatsCard = ({
         <div className="flex flex-col">
           {loading ? (
             <>
-              <div className="h-8 sm:h-10 w-20 rounded-md bg-gray-200 animate-pulse" />
-              <div className="mt-2 h-4 w-28 rounded-md bg-gray-200 animate-pulse" />
-              <div className="mt-2 h-4 w-20 rounded-md bg-gray-200 animate-pulse" />
+              <div className="h-8 w-20 animate-pulse rounded-md bg-gray-200 sm:h-10" />
+              <div className="mt-2 h-4 w-28 animate-pulse rounded-md bg-gray-200" />
+              <div className="mt-2 h-4 w-20 animate-pulse rounded-md bg-gray-200" />
             </>
           ) : (
             <>
-              <div className="text-[16px] sm:text-[22px] font-semibold text-black leading-none">
+              <div className="text-[16px] font-semibold leading-none text-black sm:text-[22px]">
                 {data.value}
               </div>
 
-              <p className="mt-1 text-[11px] sm:text-[15px] text-gray-400">
+              <p className="mt-1 text-[11px] text-gray-400 sm:text-[15px]">
                 {data.title}
               </p>
 
-              <div
-                className={`mt-2 flex items-center gap-1 text-xs sm:text-sm font-medium ${
-                  isUp ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {isUp ? (
-                  <ArrowUpRight size={16} strokeWidth={2.5} />
-                ) : (
-                  <ArrowDownRight size={16} strokeWidth={2.5} />
-                )}
-                {data.trend?.percentage}
-              </div>
+              {hasTrend ? (
+                <div
+                  className={`mt-2 flex items-center gap-1 text-xs font-medium sm:text-sm ${
+                    isUp ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {isUp ? (
+                    <ArrowUpRight size={16} strokeWidth={2.5} />
+                  ) : (
+                    <ArrowDownRight size={16} strokeWidth={2.5} />
+                  )}
+                  {data.trend?.percentage}
+                </div>
+              ) : null}
             </>
           )}
         </div>
