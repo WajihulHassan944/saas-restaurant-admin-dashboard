@@ -74,6 +74,7 @@ export const getMenuVariations = async (params?: {
   search?: string;
   itemId?: string;
   isActive?: boolean;
+  categoryId?: string;
 }) => {
   const { data } = await api.get("/menu/variations", { params });
   return data;

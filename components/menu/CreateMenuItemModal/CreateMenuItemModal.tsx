@@ -24,6 +24,41 @@ interface CreateMenuItemModalProps {
   onSuccess?: () => void;
 }
 
+const normalizeVariationPriceOverrides = (initialData?: any) => {
+  if (Array.isArray(initialData?.variationPriceOverrides)) {
+    return initialData.variationPriceOverrides.map((item: any) => ({
+      variationId: String(item.variationId || ""),
+      pricingMode: item.pricingMode || "FIXED",
+      price:
+        item.price !== undefined && item.price !== null
+          ? String(item.price)
+          : "",
+      adjustmentValue:
+        item.adjustmentValue !== undefined && item.adjustmentValue !== null
+          ? String(item.adjustmentValue)
+          : "",
+    }));
+  }
+
+  if (Array.isArray(initialData?.variations)) {
+    return initialData.variations.map((variation: any) => ({
+      variationId: String(variation.id || variation.variationId || ""),
+      pricingMode: variation.pricingMode || "FIXED",
+      price:
+        variation.price !== undefined && variation.price !== null
+          ? String(variation.price)
+          : "",
+      adjustmentValue:
+        variation.adjustmentValue !== undefined &&
+        variation.adjustmentValue !== null
+          ? String(variation.adjustmentValue)
+          : "",
+    }));
+  }
+
+  return [];
+};
+
 const getInitialForm = (restaurantId?: string, initialData?: any) => ({
   name: initialData?.name || "",
   categoryId: initialData?.categoryId || initialData?.category?.id || "",
@@ -70,6 +105,11 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => ({
   modifierPriceOverrides: Array.isArray(initialData?.modifierPriceOverrides)
     ? initialData.modifierPriceOverrides
     : [],
+  variationPriceOverrides: normalizeVariationPriceOverrides(initialData),
+  supportsSplitPizza:
+    typeof initialData?.supportsSplitPizza === "boolean"
+      ? initialData.supportsSplitPizza
+      : false,
   restaurantId: restaurantId || initialData?.restaurantId || "",
   isActive:
     typeof initialData?.isActive === "boolean" ? initialData.isActive : true,
@@ -180,12 +220,40 @@ export default function CreateMenuItemModal({
           : 0,
       isActive:
         typeof form.isActive === "boolean" ? form.isActive : true,
+      supportsSplitPizza:
+        typeof form.supportsSplitPizza === "boolean"
+          ? form.supportsSplitPizza
+          : false,
       modifierPriceOverrides: Array.isArray(form.modifierPriceOverrides)
         ? form.modifierPriceOverrides
             .filter((item: any) => item?.modifierId)
             .map((item: any) => ({
               modifierId: String(item.modifierId),
               priceDelta: Number(item.priceDelta || 0),
+            }))
+        : [],
+      variationPriceOverrides: Array.isArray(form.variationPriceOverrides)
+        ? form.variationPriceOverrides
+            .filter((item: any) => item?.variationId)
+            .map((item: any) => ({
+              variationId: String(item.variationId),
+              pricingMode: item.pricingMode || "FIXED",
+              price:
+                item.pricingMode === "FIXED"
+                  ? Number(item.price || 0)
+                  : item.price !== "" &&
+                    item.price !== undefined &&
+                    item.price !== null
+                  ? Number(item.price)
+                  : 0,
+              adjustmentValue:
+                item.pricingMode !== "FIXED"
+                  ? Number(item.adjustmentValue || 0)
+                  : item.adjustmentValue !== "" &&
+                    item.adjustmentValue !== undefined &&
+                    item.adjustmentValue !== null
+                  ? Number(item.adjustmentValue)
+                  : 0,
             }))
         : [],
     };
@@ -337,8 +405,6 @@ export default function CreateMenuItemModal({
     </Dialog>
   );
 }
-
-/* ---------- Step Progress ---------- */
 
 function StepProgress({ currentStep }: { currentStep: number }) {
   const steps = ["Step 1", "Step 2"];

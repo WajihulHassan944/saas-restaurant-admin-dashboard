@@ -159,12 +159,12 @@ export const useCreateMenuVariation = () => {
     },
   });
 };
-
 export const useGetMenuVariations = (params?: {
   page?: number;
   limit?: number;
   search?: string;
   itemId?: string;
+  categoryId?: string;
   isActive?: boolean;
 }) => {
   return useQuery({
@@ -174,12 +174,13 @@ export const useGetMenuVariations = (params?: {
       params?.limit,
       params?.search,
       params?.itemId,
+      params?.categoryId,
       params?.isActive,
     ],
     queryFn: () => getMenuVariations(params),
+    enabled: Boolean(params?.categoryId || params?.itemId || params?.search),
   });
 };
-
 export const useUpdateMenuVariation = () => {
   const queryClient = useQueryClient();
 
