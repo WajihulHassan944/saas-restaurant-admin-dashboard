@@ -8,6 +8,7 @@ import { useFileUpload } from "@/hooks/useFileUpload";
 import { toast } from "sonner";
 import { ImagePlus, UploadCloud, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
 
 type Field = keyof z.infer<typeof schema>;
 
@@ -253,14 +254,21 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Preparation Time (minutes) - Optional</Label>
 
-        <Input
-          type="number"
-          value={form.prepTimeMinutes || ""}
-          onChange={(e) => update("prepTimeMinutes", e.target.value)}
-          onBlur={(e) => validateField("prepTimeMinutes", e.target.value)}
-          placeholder="Enter preparation time if applicable"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+      <Input
+  type="number"
+  min={0}
+  value={form.prepTimeMinutes || ""}
+  onKeyDown={blockInvalidNumberKeys}
+  onPaste={blockNegativeNumberPaste}
+  onChange={(e) =>
+    update("prepTimeMinutes", sanitizeNonNegativeNumber(e.target.value))
+  }
+  onBlur={(e) =>
+    validateField("prepTimeMinutes", sanitizeNonNegativeNumber(e.target.value))
+  }
+  placeholder="Enter preparation time if applicable"
+  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+/>
 
         {errors.prepTimeMinutes && (
           <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
@@ -270,16 +278,27 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Delivery Price Adjustment</Label>
 
-        <Input
-          type="number"
-          value={form.deliveryPriceAdjustment || ""}
-          onChange={(e) => update("deliveryPriceAdjustment", e.target.value)}
-          onBlur={(e) =>
-            validateField("deliveryPriceAdjustment", e.target.value)
-          }
-          placeholder="0"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+    <Input
+  type="number"
+  min={0}
+  value={form.deliveryPriceAdjustment || ""}
+  onKeyDown={blockInvalidNumberKeys}
+  onPaste={blockNegativeNumberPaste}
+  onChange={(e) =>
+    update(
+      "deliveryPriceAdjustment",
+      sanitizeNonNegativeNumber(e.target.value)
+    )
+  }
+  onBlur={(e) =>
+    validateField(
+      "deliveryPriceAdjustment",
+      sanitizeNonNegativeNumber(e.target.value)
+    )
+  }
+  placeholder="0"
+  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+/>
 
         {errors.deliveryPriceAdjustment && (
           <p className="text-xs text-red-500">
@@ -291,16 +310,27 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Takeaway Price Adjustment</Label>
 
-        <Input
-          type="number"
-          value={form.takeawayPriceAdjustment || ""}
-          onChange={(e) => update("takeawayPriceAdjustment", e.target.value)}
-          onBlur={(e) =>
-            validateField("takeawayPriceAdjustment", e.target.value)
-          }
-          placeholder="0"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+     <Input
+  type="number"
+  min={0}
+  value={form.takeawayPriceAdjustment || ""}
+  onKeyDown={blockInvalidNumberKeys}
+  onPaste={blockNegativeNumberPaste}
+  onChange={(e) =>
+    update(
+      "takeawayPriceAdjustment",
+      sanitizeNonNegativeNumber(e.target.value)
+    )
+  }
+  onBlur={(e) =>
+    validateField(
+      "takeawayPriceAdjustment",
+      sanitizeNonNegativeNumber(e.target.value)
+    )
+  }
+  placeholder="0"
+  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+/>
 
         {errors.takeawayPriceAdjustment && (
           <p className="text-xs text-red-500">
@@ -312,14 +342,21 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Deposit Amount</Label>
 
-        <Input
-          type="number"
-          value={form.depositAmount || ""}
-          onChange={(e) => update("depositAmount", e.target.value)}
-          onBlur={(e) => validateField("depositAmount", e.target.value)}
-          placeholder="0"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+    <Input
+  type="number"
+  min={0}
+  value={form.depositAmount || ""}
+  onKeyDown={blockInvalidNumberKeys}
+  onPaste={blockNegativeNumberPaste}
+  onChange={(e) =>
+    update("depositAmount", sanitizeNonNegativeNumber(e.target.value))
+  }
+  onBlur={(e) =>
+    validateField("depositAmount", sanitizeNonNegativeNumber(e.target.value))
+  }
+  placeholder="0"
+  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+/>
 
         {errors.depositAmount && (
           <p className="text-xs text-red-500">{errors.depositAmount}</p>

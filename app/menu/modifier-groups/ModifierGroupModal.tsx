@@ -55,7 +55,7 @@ export default function ModifierGroupModal({
 }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-
+console.log("initial", initialData);
   const [form, setForm] = useState<ModifierGroupForm>(getDefaultForm());
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
 
@@ -72,25 +72,58 @@ export default function ModifierGroupModal({
 
   const isLoading = isCreating || isUpdating || isAttaching;
 
-  useEffect(() => {
-    if (initialData) {
-      setForm({
-        name: initialData?.name || "",
-        description: initialData?.description || "",
-        minSelect: Number(initialData?.minSelect ?? 0),
-        maxSelect: Number(initialData?.maxSelect ?? 1),
-        isRequired: Boolean(initialData?.isRequired),
-        sortOrder: Number(initialData?.sortOrder ?? 0),
-      });
 
-      setSelectedCategory(
-        initialData?.category || initialData?.menuCategory || null
-      );
-    } else {
-      setForm(getDefaultForm());
-      setSelectedCategory(null);
-    }
-  }, [initialData, open]);
+  const resolveInitialCategory = async () => {
+  const directCategory = initialData?.category || initialData?.menuCategory;
+
+  if (directCategory?.id) {
+    setSelectedCategory(directCategory);
+    return;
+  }
+
+  const categoryId = initialData?.categoryIds?.[0];
+
+  if (!categoryId) {
+    setSelectedCategory(null);
+    return;
+  }
+
+  const res = await getMenuCategories({
+    page: 1,
+    limit: 100,
+    restaurantId: user?.restaurantId ?? undefined,
+  });
+
+  const categories = Array.isArray(res?.data)
+    ? res.data
+    : Array.isArray(res?.data?.data)
+    ? res.data.data
+    : [];
+
+  const matchedCategory = categories.find(
+    (category: any) => category.id === categoryId
+  );
+
+  setSelectedCategory(matchedCategory || null);
+};
+
+useEffect(() => {
+  if (initialData) {
+    setForm({
+      name: initialData?.name || "",
+      description: initialData?.description || "",
+      minSelect: Number(initialData?.minSelect ?? 0),
+      maxSelect: Number(initialData?.maxSelect ?? 1),
+      isRequired: Boolean(initialData?.isRequired),
+      sortOrder: Number(initialData?.sortOrder ?? 0),
+    });
+
+    resolveInitialCategory();
+  } else {
+    setForm(getDefaultForm());
+    setSelectedCategory(null);
+  }
+}, [initialData, open, user?.restaurantId]);
 
   const handleChange = <K extends keyof ModifierGroupForm>(
     key: K,
@@ -183,29 +216,31 @@ export default function ModifierGroupModal({
     }
 
     try {
-      if (initialData?.id) {
-        await updateModifierGroup({
-          id: initialData.id,
-          data: payload,
-        });
+    if (initialData?.id) {
+  await updateModifierGroup({
+    id: initialData.id,
+    data: payload,
+  });
 
-        // toast.success("Modifier group updated successfully");
-      } else {
-        const createdRes = await createModifierGroup(payload);
-        const groupId = extractCreatedGroupId(createdRes);
+  await attachModifierGroupToCategory({
+    categoryId: selectedCategory.id,
+    groupId: initialData.id,
+    sortOrder: 0,
+  });
+} else {
+  const createdRes = await createModifierGroup(payload);
+  const groupId = extractCreatedGroupId(createdRes);
 
-        if (!groupId) {
-          throw new Error("Modifier group created but no group id was returned");
-        }
+  if (!groupId) {
+    throw new Error("Modifier group created but no group id was returned");
+  }
 
-        await attachModifierGroupToCategory({
-          categoryId: selectedCategory.id,
-          groupId,
-          sortOrder: 0,
-        });
-
-        // toast.success("Modifier group created successfully");
-      }
+  await attachModifierGroupToCategory({
+    categoryId: selectedCategory.id,
+    groupId,
+    sortOrder: 0,
+  });
+}
 
       refresh();
       handleClose(false);
@@ -220,7 +255,7 @@ export default function ModifierGroupModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[420px] rounded-[20px] bg-[#F5F5F5] p-6">
+      <DialogContent className="max-w-[420px] rounded-[20px] bg-[#F5F5F5] p-6 max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
             {initialData ? "Edit" : "Add"} Modifier Group
@@ -242,7 +277,7 @@ export default function ModifierGroupModal({
     labelKey="name"
     valueKey="id"
   />
-</div>
+</div> 
           <InputField
             label="Group Name"
             value={form.name}

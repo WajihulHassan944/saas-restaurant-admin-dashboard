@@ -5,6 +5,8 @@ import {
   createMenuCategory,
   deleteMenuCategory,
   getMenuCategories,
+  getMenuCategoryById,
+  getModifierGroupCategories,
   updateMenuCategory,
 } from "@/services/categories";
 import type {
@@ -119,5 +121,21 @@ export const useDeleteMenuCategory = () => {
         err?.response?.data?.message || "Failed to delete menu category"
       );
     },
+  });
+};
+
+
+export const useGetModifierGroupCategories = (groupId?: string) => {
+  return useQuery({
+    queryKey: ["modifier-group-categories", groupId],
+    queryFn: () => getModifierGroupCategories(groupId as string),
+    enabled: !!groupId,
+  });
+};
+export const useGetMenuCategoryById = (id?: string) => {
+  return useQuery({
+    queryKey: ["menu-category", id],
+    queryFn: () => getMenuCategoryById(id as string),
+    enabled: !!id,
   });
 };

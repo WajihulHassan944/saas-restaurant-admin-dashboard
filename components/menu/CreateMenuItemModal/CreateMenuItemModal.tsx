@@ -232,31 +232,19 @@ export default function CreateMenuItemModal({
               priceDelta: Number(item.priceDelta || 0),
             }))
         : [],
-      variationPriceOverrides: Array.isArray(form.variationPriceOverrides)
-        ? form.variationPriceOverrides
-            .filter((item: any) => item?.variationId)
-            .map((item: any) => ({
-              variationId: String(item.variationId),
-              pricingMode: item.pricingMode || "FIXED",
-              price:
-                item.pricingMode === "FIXED"
-                  ? Number(item.price || 0)
-                  : item.price !== "" &&
-                    item.price !== undefined &&
-                    item.price !== null
-                  ? Number(item.price)
-                  : 0,
-              adjustmentValue:
-                item.pricingMode !== "FIXED"
-                  ? Number(item.adjustmentValue || 0)
-                  : item.adjustmentValue !== "" &&
-                    item.adjustmentValue !== undefined &&
-                    item.adjustmentValue !== null
-                  ? Number(item.adjustmentValue)
-                  : 0,
-            }))
-        : [],
-    };
+     variationPriceOverrides: Array.isArray(form.variationPriceOverrides)
+  ? form.variationPriceOverrides
+      .filter((item: any) => item?.variationId)
+      .map((item: any) => ({
+        variationId: String(item.variationId),
+        price:
+          item.price !== "" &&
+          item.price !== undefined &&
+          item.price !== null
+            ? Number(item.price)
+            : 0,
+      }))
+  : [], };
   };
 
   const nextStep = () => {
@@ -298,7 +286,6 @@ export default function CreateMenuItemModal({
         },
         {
           onSuccess: () => {
-            toast.success("Menu item updated successfully");
             onSuccess?.();
             resetAndClose();
           },
@@ -314,7 +301,6 @@ export default function CreateMenuItemModal({
 
     createMenuItem(payload as any, {
       onSuccess: () => {
-        toast.success("Menu item created successfully");
         onSuccess?.();
         resetAndClose();
       },

@@ -44,7 +44,11 @@ const SidebarItem = ({
           className="w-full flex items-center justify-between px-6 transition-colors"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex items-center justify-center size-10 rounded-xl shrink-0 bg-[#F9FAFB] text-primary">
+            <div
+              className={`flex items-center justify-center size-10 rounded-xl shrink-0 ${
+                isActive ? "bg-primary text-white" : "bg-[#F9FAFB] text-primary"
+              }`}
+            >
               <Icon size={20} strokeWidth={2.2} />
             </div>
 
@@ -67,7 +71,7 @@ const SidebarItem = ({
         </button>
 
         {open && (
-          <div className="mt-2">
+          <div className="mt-2 space-y-1">
             {item.children?.map((child) => {
               const ChildIcon = child.icon;
               const childActive = isActiveRoute(child.href, child.children);
@@ -88,7 +92,8 @@ const SidebarItem = ({
                       <ChildIcon size={16} strokeWidth={2.2} />
                     </div>
                   )}
-                  <span>{child.title}</span>
+
+                  <span className="truncate">{child.title}</span>
                 </Link>
               );
             })}
@@ -108,7 +113,7 @@ const SidebarItem = ({
     >
       <div
         className={`flex items-center justify-center size-10 rounded-xl shrink-0 ${
-          isDashboard ? "bg-primary text-white" : "bg-[#F9FAFB] text-primary"
+          isActive ? "bg-primary text-white" : "bg-[#F9FAFB] text-primary"
         }`}
       >
         <Icon size={20} strokeWidth={2.2} />
@@ -116,9 +121,7 @@ const SidebarItem = ({
 
       <span
         className={`text-sm truncate ${
-          isDashboard
-            ? "text-black"
-            : isActive
+          isActive
             ? "text-primary font-medium"
             : "text-gray hover:text-primary"
         }`}
@@ -140,24 +143,24 @@ export default function Sidebar({
   const mainItems = menuItems.filter((i) => i.section === "main");
   const accountItems = menuItems.filter((i) => i.section === "account");
 
-  const isActiveRoute = (
-    href?: string,
-    children?: MenuItem[]
-  ): boolean => {
+  const isActiveRoute = (href?: string, children?: MenuItem[]): boolean => {
     if (!pathname) return false;
 
-    if (href) {
-      if (pathname === href) return true;
-      if (pathname.startsWith(`${href}/`)) return true;
-    }
-
     if (children?.length) {
-      return children.some((child: MenuItem) =>
+      const hasActiveChild = children.some((child) =>
         isActiveRoute(child.href, child.children)
       );
+
+      if (hasActiveChild) return true;
     }
 
-    return false;
+    if (!href) return false;
+
+    if (href === "/") {
+      return pathname === "/";
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   const handleLogout = (): void => {
@@ -200,7 +203,7 @@ export default function Sidebar({
           ))}
         </div>
 
-        <div className="px-5 pb-5 mt-29">
+        <div className="px-5 pb-5 mt-28">
           <div
             className="relative rounded-2xl px-4 pt-14 pb-4 text-white"
             style={{

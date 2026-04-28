@@ -10,14 +10,15 @@ import {
 } from "@/hooks/useMenuCategories";
 import PaginationSection from "@/components/shared/pagination";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
 import CreateCategoryModalParent from "@/components/menu/listing/CreateCategoryModalParent";
 import VariationModal from "@/components/menu/listing/VariationModal";
+import { useRouter } from "next/navigation";
 
 export default function CategoriesTable({ refetchKey }: any) {
   const { user } = useAuth();
   const restaurantId = user?.restaurantId;
-
+const router = useRouter();
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
 
@@ -246,6 +247,13 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                       >
                         <FaPen size={14} />
                       </button>
+                      <button
+  onClick={() => router.push(`/menu/categories/${item.id}`)}
+  className="text-gray-500 hover:text-primary"
+  title="View Details"
+>
+  <Eye size={16} />
+</button>
 <button
   onClick={() => {
     setSelectedCategoryForVariation(item);
@@ -335,6 +343,13 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                       >
                         <FaPen size={14} />
                       </button>
+                      <button
+  onClick={() => router.push(`/menu/categories/${item.id}`)}
+  className="text-gray-500 hover:text-primary"
+  title="View Details"
+>
+  <Eye size={16} />
+</button>
 <button
   onClick={() => {
     setSelectedCategoryForVariation(item);

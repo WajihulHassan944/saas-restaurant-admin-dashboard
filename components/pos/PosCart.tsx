@@ -259,7 +259,7 @@ setSelectedAddress(null);
                   <div className="flex-1">
                     <p className="text-sm font-medium">{item.name}</p>
                     <p className="text-xs text-gray-500">
-                      Rs {item.price} × {item.quantity}
+                      ${item.price} × {item.quantity}
                     </p>
                   </div>
 
@@ -371,14 +371,14 @@ setSelectedAddress(null);
         <CollapsibleContent className="space-y-3 text-sm">
           <div className="flex justify-between text-gray-500">
             <span>Subtotal</span>
-            <span>Rs {total.toFixed(2)}</span>
+            <span>${total.toFixed(2)}</span>
           </div>
 
           <Separator />
 
           <div className="flex justify-between font-semibold">
             <span>Total</span>
-            <span>Rs {total.toFixed(2)}</span>
+            <span>${total.toFixed(2)}</span>
           </div>
         </CollapsibleContent>
       </Collapsible>

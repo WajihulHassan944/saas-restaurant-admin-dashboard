@@ -47,3 +47,19 @@ export const deleteMenuCategory = async (id: string) => {
   const { data } = await api.delete(`/menu/categories/${id}`);
   return data;
 };
+
+export const getModifierGroupCategories = async (groupId: string) => {
+  if (!groupId) throw new Error("groupId is required");
+
+  const { data } = await api.get(`/menu/modifier-groups/${groupId}/categories`);
+
+  return data;
+};
+
+export const getMenuCategoryById = async (id: string) => {
+  if (!id) throw new Error("category id is required");
+
+  const { data } = await api.get(`/menu/categories/${id}`);
+
+  return data;
+};

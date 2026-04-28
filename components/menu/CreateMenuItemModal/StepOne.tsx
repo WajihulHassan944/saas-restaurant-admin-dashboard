@@ -15,6 +15,7 @@ import AsyncSelect from "@/components/ui/AsyncSelect";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useGetMenuVariations } from "@/hooks/useMenus";
+import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
 
 const schema = z.object({
   name: z.string().min(1, "Item name is required"),
@@ -29,15 +30,7 @@ const pricingModeOptions = [
     value: "FIXED",
     label: "Fixed Price",
   },
-  {
-    value: "AMOUNT_ADJUSTMENT",
-    label: "Amount Adjustment",
-  },
-  {
-    value: "PERCENTAGE_ADJUSTMENT",
-    label: "Percentage Adjustment",
-  },
-];
+ ];
 
 const toSafeString = (value: any) => {
   if (value === undefined || value === null) return "";
@@ -437,13 +430,20 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Base Price</Label>
 
-        <Input
-          type="number"
-          value={form.basePrice}
-          onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
-          onBlur={(e) => validateField("basePrice", e.target.value)}
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+       <Input
+  type="number"
+  value={form.basePrice}
+  onChange={(e) => {
+    const value = sanitizeNonNegativeNumber(e.target.value);
+
+    setForm({ ...form, basePrice: value });
+  }}
+  onKeyDown={blockInvalidNumberKeys}
+  onPaste={blockNegativeNumberPaste}
+  onBlur={(e) => validateField("basePrice", sanitizeNonNegativeNumber(e.target.value))}
+  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+  min={0}
+/>
 
         {errors.basePrice && (
           <p className="text-xs text-red-500">{errors.basePrice}</p>
@@ -527,45 +527,25 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
                       </select>
                     </div>
 
-                    {mode === "FIXED" ? (
-                      <div className="space-y-1">
-                        <Label className="text-xs">Item Variation Price</Label>
+  <div className="space-y-1">
+    <Label className="text-xs">Item Variation Price</Label>
 
-                        <Input
-                          type="number"
-                          value={toSafeString(override.price)}
-                          onChange={(e) =>
-                            updateVariationOverride(String(variation.id), {
-                              price: e.target.value,
-                            })
-                          }
-                          placeholder="eg. 12"
-                          className="h-[40px] rounded-[10px]"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <Label className="text-xs">
-                          {mode === "PERCENTAGE_ADJUSTMENT"
-                            ? "Adjustment Percentage"
-                            : "Adjustment Amount"}
-                        </Label>
+    <Input
+      type="number"
+      min={0}
+      value={toSafeString(override.price)}
+      onKeyDown={blockInvalidNumberKeys}
+      onPaste={blockNegativeNumberPaste}
+      onChange={(e) =>
+        updateVariationOverride(String(variation.id), {
+          price: sanitizeNonNegativeNumber(e.target.value),
+        })
+      }
+      placeholder="eg. 12"
+      className="h-[40px] rounded-[10px]"
+    />
+  </div>
 
-                        <Input
-                          type="number"
-                          value={toSafeString(override.adjustmentValue)}
-                          onChange={(e) =>
-                            updateVariationOverride(String(variation.id), {
-                              adjustmentValue: e.target.value,
-                            })
-                          }
-                          placeholder={
-                            mode === "PERCENTAGE_ADJUSTMENT" ? "eg. 10" : "eg. 2"
-                          }
-                          className="h-[40px] rounded-[10px]"
-                        />
-                      </div>
-                    )}
                   </div>
 
                   {variationError ? (

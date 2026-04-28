@@ -208,7 +208,7 @@ export default function GroupOrderDetails() {
             <div className="text-right text-sm">
               <p>x{item.quantity}</p>
               <p className="text-green-600 font-medium">
-                PKR {item.lineTotal}
+                ${item.lineTotal}
               </p>
             </div>
           </div>
@@ -222,20 +222,20 @@ export default function GroupOrderDetails() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-gray-500">Subtotal</p>
-            <p>PKR {order.subtotal}</p>
+            <p>${order.subtotal}</p>
           </div>
           <div>
             <p className="text-gray-500">Delivery Fee</p>
-            <p>PKR {order.deliveryFee}</p>
+            <p>${order.deliveryFee}</p>
           </div>
           <div>
             <p className="text-gray-500">Tax</p>
-            <p>PKR {order.taxAmount}</p>
+            <p>${order.taxAmount}</p>
           </div>
           <div>
             <p className="text-gray-500">Total</p>
             <p className="text-green-600 font-semibold">
-              PKR {order.totalAmount}
+              ${order.totalAmount}
             </p>
           </div>
         </div>

@@ -672,7 +672,7 @@ function getModifierGroupCount(item: any) {
 }
 
 function formatCurrency(value: any) {
-  return `Rs. ${Number(value ?? 0)}`;
+  return `$${Number(value ?? 0)}`;
 }
 
 function MiniItemPreview({ item }: { item: any }) {

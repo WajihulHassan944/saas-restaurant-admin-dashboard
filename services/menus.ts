@@ -30,10 +30,9 @@ export const getMenuItems = async (params?: {
   page?: number;
   limit?: number;
   search?: string;
+  restaurantId?: string;
   categoryId?: string;
   menuId?: string;
-  isActive?: boolean;
-  isAvailable?: boolean;
 }) => {
   const { data } = await api.get("/menu/items", { params });
   return data;
@@ -111,6 +110,14 @@ export const getModifierGroups = async (params?: {
   isActive?: boolean;
 }) => {
   const { data } = await api.get("/menu/modifier-groups", { params });
+  return data;
+};
+
+export const getCategoryModifierGroups = async (categoryId: string) => {
+  const { data } = await api.get(
+    `/menu/categories/${categoryId}/modifier-groups`
+  );
+
   return data;
 };
 

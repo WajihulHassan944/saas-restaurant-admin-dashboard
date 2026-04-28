@@ -18,6 +18,7 @@ import {
   deleteModifier,
   deleteModifierGroup,
   deleteRestaurantMenu,
+  getCategoryModifierGroups,
   getMenuById,
   getMenuItems,
   getMenuItemsByMenu,
@@ -57,15 +58,13 @@ export const useCreateMenuItem = () => {
     },
   });
 };
-
 export const useGetMenuItems = (params?: {
   page?: number;
   limit?: number;
   search?: string;
+  restaurantId?: string;
   categoryId?: string;
   menuId?: string;
-  isActive?: boolean;
-  isAvailable?: boolean;
 }) => {
   return useQuery({
     queryKey: [
@@ -73,15 +72,13 @@ export const useGetMenuItems = (params?: {
       params?.page,
       params?.limit,
       params?.search,
+      params?.restaurantId,
       params?.categoryId,
       params?.menuId,
-      params?.isActive,
-      params?.isAvailable,
     ],
     queryFn: () => getMenuItems(params),
   });
 };
-
 export const useBulkCreateMenuItems = () => {
   const queryClient = useQueryClient();
 
@@ -259,6 +256,14 @@ export const useGetModifierGroups = (params?: {
     ],
     queryFn: () => getModifierGroups(params),
     enabled: !!params?.restaurantId, // 🔥 prevent call without restaurant
+  });
+};
+
+export const useGetCategoryModifierGroups = (categoryId?: string) => {
+  return useQuery({
+    queryKey: ["category-modifier-groups", categoryId],
+    queryFn: () => getCategoryModifierGroups(categoryId as string),
+    enabled: !!categoryId,
   });
 };
 

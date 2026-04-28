@@ -4,7 +4,6 @@ import {
   List,
   ShoppingBag,
   Monitor,
-  Users,
   Truck,
   UserCog,
   Gift,
@@ -13,11 +12,13 @@ import {
   BarChart3,
   Bell,
   ShieldCheck,
-  ChevronRight,
   FileText,
+  Tags,
+  PackagePlus,
+  Layers,
+  ClipboardList,
 } from "lucide-react";
 import { PiUsersThree } from "react-icons/pi";
-
 
 export type SidebarSection = "main" | "account";
 
@@ -30,7 +31,6 @@ export interface MenuItem {
 }
 
 export const menuItems: MenuItem[] = [
-  // MAIN
   {
     title: "Dashboard",
     href: "/",
@@ -48,6 +48,38 @@ export const menuItems: MenuItem[] = [
     href: "/menu",
     icon: List,
     section: "main",
+    children: [
+       {
+        title: "Menu",
+        href: "/menu",
+        icon: List,
+        section: "main",
+      },
+        {
+        title: "Categories",
+        href: "/menu/categories",
+        icon: ClipboardList,
+        section: "main",
+      },
+      {
+        title: "Modifier Groups",
+        href: "/menu/modifier-groups",
+        icon: Layers,
+        section: "main",
+      },
+      {
+        title: "Modifiers",
+        href: "/menu/modifier",
+        icon: Tags,
+        section: "main",
+      },
+      {
+        title: "Items",
+        href: "/menu/items",
+        icon: PackagePlus,
+        section: "main",
+      },
+    ],
   },
   {
     title: "Order Management",
@@ -85,28 +117,27 @@ export const menuItems: MenuItem[] = [
     icon: Gift,
     section: "main",
   },
-
   {
-  title: "Content Management",
-  href: "/content-management",
-  icon: FileText,
-  section: "main",
-  children: [
-    {
-      title: "Faqs",
-      href: "/faqs",
-      icon: FileText,
-      section: "main",
-    },
-    {
-      title: "Privacy Policy",
-      href: "/privacy-policy",
-      icon: ShieldCheck,
-      section: "main",
-    },
-  ],
-},
-  // ACCOUNT SETTINGS
+    title: "Content Management",
+    href: "/content-management",
+    icon: FileText,
+    section: "main",
+    children: [
+      {
+        title: "Faqs",
+        href: "/faqs",
+        icon: FileText,
+        section: "main",
+      },
+      {
+        title: "Privacy Policy",
+        href: "/privacy-policy",
+        icon: ShieldCheck,
+        section: "main",
+      },
+    ],
+  },
+
   {
     title: "Profile",
     href: "/profile",

@@ -92,11 +92,11 @@ const OrderDetailsMain = ({ order }: { order: any }) => {
                   </span>
 
                   <span className="text-right text-xs sm:text-sm">
-                    Rs {item.unitPrice.toFixed(2)}
+                    ${item.unitPrice.toFixed(2)}
                   </span>
 
                   <span className="text-right font-semibold text-xs sm:text-sm">
-                    Rs {item.lineTotal.toFixed(2)}
+                    ${item.lineTotal.toFixed(2)}
                   </span>
 
                   <div className="flex justify-end">

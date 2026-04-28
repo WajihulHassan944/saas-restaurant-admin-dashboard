@@ -268,7 +268,7 @@ const {
                     </td>
 
                     <td className="px-2 text-center">
-                      Rs. {item.priceDelta ?? 0}
+                      ${item.priceDelta ?? 0}
                     </td>
 
                     <td className="px-2 text-center">
@@ -354,7 +354,7 @@ const {
 
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-primary">
-                      Rs. {item.priceDelta ?? 0}
+                      ${item.priceDelta ?? 0}
                     </span>
 
                     <span className="text-xs text-gray-500">

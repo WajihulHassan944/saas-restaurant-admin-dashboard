@@ -11,12 +11,15 @@ import { Button } from "@/components/ui/button";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Loader2,
+  Pencil,
+  PlusCircle,
+  Trash2,
+} from "lucide-react";
 import FormInput from "@/components/register/form/FormInput";
 import { Label } from "@/components/ui/label";
-import AsyncSelect from "@/components/ui/AsyncSelect";
-
-type PricingMode = "FLAT_ADJUSTMENT" | "PERCENTAGE_ADJUSTMENT";
 
 type Props = {
   open: boolean;
@@ -27,18 +30,53 @@ type Props = {
   onSuccess?: () => void;
 };
 
-type ModifierOverride = {
-  modifier: any | null;
-  priceDelta: string;
-};
+type ViewMode = "form" | "list";
+
+const PREDEFINED_VARIATIONS = [
+  {
+    name: "Small",
+    description: "Small size option",
+    price: "",
+  },
+  {
+    name: "Medium",
+    description: "Medium size option",
+    price: "",
+  },
+  {
+    name: "Large",
+    description: "Large size option",
+    price: "",
+  },
+  {
+    name: "Extra Large",
+    description: "Extra large size option",
+    price: "",
+  },
+  {
+    name: "Regular",
+    description: "Regular serving option",
+    price: "",
+  },
+  {
+    name: "Family",
+    description: "Family size option",
+    price: "",
+  },
+];
+
+const SORT_ORDER_OPTIONS = [
+  { label: "Top Priority", value: 0 },
+  { label: "High Priority", value: 10 },
+  { label: "Medium Priority", value: 50 },
+  { label: "Low Priority", value: 100 },
+];
 
 const getEmptyForm = (categoryId = "") => ({
   categoryId,
   name: "",
   description: "",
   price: "",
-  pricingMode: "FLAT_ADJUSTMENT" as PricingMode,
-  adjustmentValue: "",
   sortOrder: 0,
   isDefault: false,
   isActive: true,
@@ -69,11 +107,31 @@ export default function VariationModal({
     [item, initialData]
   );
 
-  const [form, setForm] = useState(getEmptyForm(resolvedCategoryId));
-  const [modifierOverrides, setModifierOverrides] = useState<ModifierOverride[]>(
-    [{ modifier: null, priceDelta: "" }]
+  const categoryName = useMemo(
+    () =>
+      item?.name ||
+      item?.category?.name ||
+      item?.menuCategory?.name ||
+      initialData?.category?.name ||
+      initialData?.menuCategory?.name ||
+      "this category",
+    [item, initialData]
   );
 
+  const categoryImage = useMemo(
+  () =>
+    item?.previewUrl ||
+    item?.imageUrl ||
+    item?.category?.imageUrl ||
+    item?.menuCategory?.imageUrl ||
+    initialData?.category?.imageUrl ||
+    initialData?.menuCategory?.imageUrl ||
+    "",
+  [item, initialData]
+);
+
+  const [viewMode, setViewMode] = useState<ViewMode>("form");
+  const [form, setForm] = useState(getEmptyForm(resolvedCategoryId));
   const [variations, setVariations] = useState<any[]>([]);
   const [loadingVariations, setLoadingVariations] = useState(false);
   const [deletingVariationId, setDeletingVariationId] = useState<string | null>(
@@ -82,112 +140,40 @@ export default function VariationModal({
   const [editMode, setEditMode] = useState<"create" | "edit">(mode);
   const [editingVariation, setEditingVariation] = useState<any>(initialData);
 
-  const attachedGroupIds = useMemo(() => {
-    const rawGroups =
-      item?.modifierGroups ||
-      item?.attachedModifierGroups ||
-      item?.modifier_groups ||
-      item?.addons ||
-      item?.modifierLinks?.map((link: any) => ({
-        id: link?.modifierGroupId || link?.modifierGroup?.id,
-        name: link?.modifierGroup?.name,
-      })) ||
-      [];
-
-    if (!Array.isArray(rawGroups)) return [];
-
-    return rawGroups
-      .map((group: any) => String(group?.id || group?.modifierGroupId || ""))
-      .filter(Boolean);
-  }, [item]);
-
-  const categoryValue = useMemo(() => {
-    if (!form.categoryId) return null;
-
-    if (item?.id && String(item.id) === String(form.categoryId)) {
-      return item;
-    }
-
-    if (
-      item?.category?.id &&
-      String(item.category.id) === String(form.categoryId)
-    ) {
-      return item.category;
-    }
-
-    if (
-      item?.menuCategory?.id &&
-      String(item.menuCategory.id) === String(form.categoryId)
-    ) {
-      return item.menuCategory;
-    }
-
-    return {
-      id: form.categoryId,
-      name:
-        item?.name ||
-        initialData?.category?.name ||
-        initialData?.menuCategory?.name ||
-        "Selected Category",
-    };
-  }, [form.categoryId, item, initialData]);
-
   const resetForm = (categoryId = resolvedCategoryId) => {
     setForm(getEmptyForm(categoryId));
-    setModifierOverrides([{ modifier: null, priceDelta: "" }]);
     setEditMode("create");
     setEditingVariation(null);
   };
 
   const populateFormForEdit = (variation: any) => {
-    const existingOverrides = Array.isArray(variation?.modifierPriceOverrides)
-      ? variation.modifierPriceOverrides
-      : [];
-
     setForm({
       categoryId: resolvedCategoryId,
       name: variation?.name || "",
       description: variation?.description || "",
       price: String(variation?.price ?? ""),
-      pricingMode: variation?.pricingMode || "FLAT_ADJUSTMENT",
-      adjustmentValue: String(variation?.adjustmentValue ?? ""),
       sortOrder: Number(variation?.sortOrder ?? 0),
       isDefault: !!variation?.isDefault,
       isActive: variation?.isActive === false ? false : true,
     });
 
-    setModifierOverrides(
-      existingOverrides.length
-        ? existingOverrides.map((override: any) => ({
-            modifier:
-              override?.modifier || override?.modifierId
-                ? {
-                    id: override?.modifier?.id || override?.modifierId,
-                    name:
-                      override?.modifier?.modifierGroup?.name &&
-                      override?.modifier?.name
-                        ? `${override.modifier.modifierGroup.name} - ${override.modifier.name}`
-                        : override?.modifier?.name || "Selected Modifier",
-                  }
-                : null,
-            priceDelta: String(override?.priceDelta ?? ""),
-          }))
-        : [{ modifier: null, priceDelta: "" }]
-    );
-
     setEditMode("edit");
     setEditingVariation(variation);
+    setViewMode("form");
   };
 
-  useEffect(() => {
-    if (!open) return;
+  const applyPresetVariation = (preset: (typeof PREDEFINED_VARIATIONS)[number]) => {
+    setForm((prev) => ({
+      ...prev,
+      name: preset.name,
+      description: preset.description,
+      price: preset.price,
+    }));
 
-    if (mode === "edit" && initialData) {
-      populateFormForEdit(initialData);
-    } else {
-      resetForm(resolvedCategoryId);
-    }
-  }, [open, mode, initialData, resolvedCategoryId]);
+    setEditMode("create");
+    setEditingVariation(null);
+    setViewMode("form");
+  };
 
   const fetchVariations = async () => {
     if (!resolvedCategoryId || !open) return;
@@ -218,6 +204,17 @@ export default function VariationModal({
   };
 
   useEffect(() => {
+    if (!open) return;
+
+    if (mode === "edit" && initialData) {
+      populateFormForEdit(initialData);
+    } else {
+      resetForm(resolvedCategoryId);
+      setViewMode("form");
+    }
+  }, [open, mode, initialData, resolvedCategoryId]);
+
+  useEffect(() => {
     if (!open || !token || !resolvedCategoryId) return;
     fetchVariations();
   }, [open, token, resolvedCategoryId]);
@@ -229,142 +226,36 @@ export default function VariationModal({
     }));
   };
 
-  const fetchModifierOptions = async ({
-    search,
-    page,
-  }: {
-    search: string;
-    page: number;
-  }): Promise<{ data: any[]; meta?: any }> => {
-    const query = new URLSearchParams({
-      page: String(page),
-      limit: "20",
-    });
-
-    if (search?.trim()) {
-      query.set("search", search.trim());
-    }
-
-    const res = await get(`/v1/menu/modifiers?${query.toString()}`);
-
-    if (!res || res.error) {
-      return { data: [], meta: undefined };
-    }
-
-    const raw =
-      (Array.isArray(res?.data) && res.data) ||
-      (Array.isArray(res?.data?.data) && res.data.data) ||
-      (Array.isArray(res?.data?.items) && res.data.items) ||
-      [];
-
-    const filtered = attachedGroupIds.length
-      ? raw.filter((modifier: any) => {
-          const groupId = String(
-            modifier?.modifierGroupId || modifier?.modifierGroup?.id || ""
-          );
-          return groupId ? attachedGroupIds.includes(groupId) : true;
-        })
-      : raw;
-
-    return {
-      data: filtered,
-      meta: res?.meta || res?.data?.meta || res?.data?.pagination,
-    };
-  };
-
-  const addModifierOverride = () => {
-    setModifierOverrides((prev) => [
-      ...prev,
-      { modifier: null, priceDelta: "" },
-    ]);
-  };
-
-  const removeModifierOverride = (index: number) => {
-    setModifierOverrides((prev) => {
-      const updated = prev.filter((_, i) => i !== index);
-      return updated.length ? updated : [{ modifier: null, priceDelta: "" }];
-    });
-  };
-
-  const updateModifierOverride = (
-    index: number,
-    key: keyof ModifierOverride,
-    value: any
-  ) => {
-    setModifierOverrides((prev) =>
-      prev.map((entry, i) =>
-        i === index
-          ? {
-              ...entry,
-              [key]: value,
-            }
-          : entry
-      )
-    );
-  };
-
-  const normalizedModifierPayload = modifierOverrides
-    .filter((entry) => entry?.modifier?.id)
-    .map((entry) => ({
-      modifierId: entry.modifier.id,
-      priceDelta: Number(entry.priceDelta || 0),
-    }));
-
   const handleSubmit = async () => {
     if (!form.categoryId) {
       toast.error("Category is required");
       return;
     }
 
-    if (!form.name.trim() || form.price === "") {
-      toast.error("Name and price are required");
+    if (!form.name.trim()) {
+      toast.error("Variation name is required");
       return;
     }
 
-    if (!form.pricingMode) {
-      toast.error("Pricing mode is required");
+    if (form.price === "") {
+      toast.error("Price is required");
       return;
     }
 
-    if (form.adjustmentValue === "") {
-      toast.error("Adjustment value is required");
-      return;
-    }
+    const price = Number(form.price);
 
-    const adjustmentValue = Number(form.adjustmentValue);
-
-    if (Number.isNaN(adjustmentValue)) {
-      toast.error("Adjustment value must be a valid number");
-      return;
-    }
-
-    if (
-      form.pricingMode === "PERCENTAGE_ADJUSTMENT" &&
-      (adjustmentValue < 0 || adjustmentValue > 100)
-    ) {
-      toast.error("Percentage adjustment must be between 0 and 100");
-      return;
-    }
-
-    const duplicateModifierIds = normalizedModifierPayload.map((entry) =>
-      String(entry.modifierId)
-    );
-
-    if (new Set(duplicateModifierIds).size !== duplicateModifierIds.length) {
-      toast.error("Duplicate modifiers are not allowed");
+    if (Number.isNaN(price)) {
+      toast.error("Price must be a valid number");
       return;
     }
 
     const basePayload = {
       name: form.name.trim(),
       description: form.description.trim(),
-      price: Number(form.price),
-      pricingMode: form.pricingMode,
-      adjustmentValue,
+      price,
       sortOrder: Number(form.sortOrder),
       isDefault: form.isDefault,
       isActive: form.isActive,
-      modifierPriceOverrides: normalizedModifierPayload,
     };
 
     const createPayload = {
@@ -372,17 +263,10 @@ export default function VariationModal({
       ...basePayload,
     };
 
-    const updatePayload = {
-      ...basePayload,
-    };
-
     let res: any;
 
     if (editMode === "edit" && editingVariation?.id) {
-      res = await patch(
-        `/v1/menu/variations/${editingVariation.id}`,
-        updatePayload
-      );
+      res = await patch(`/v1/menu/variations/${editingVariation.id}`, basePayload);
     } else {
       res = await post("/v1/menu/variations", createPayload);
     }
@@ -392,18 +276,14 @@ export default function VariationModal({
       return;
     }
 
-    if (res.error) {
+    if (res.error || res.success === false) {
       toast.error(
         res.error ||
+          res.message ||
           (editMode === "edit"
             ? "Failed to update variation"
             : "Failed to add variation")
       );
-      return;
-    }
-
-    if (res.success === false) {
-      toast.error(res.message || "Request failed");
       return;
     }
 
@@ -422,6 +302,7 @@ export default function VariationModal({
     }
 
     resetForm(resolvedCategoryId);
+    setViewMode("list");
   };
 
   const handleDeleteVariation = async (variationId: string) => {
@@ -451,197 +332,207 @@ export default function VariationModal({
     onSuccess?.();
   };
 
+  const getSortOrderLabel = (value: any) => {
+    const option = SORT_ORDER_OPTIONS.find(
+      (entry) => entry.value === Number(value)
+    );
+
+    return option?.label || `Custom Order (${value ?? 0})`;
+  };
+
   return (
     <Dialog
       open={open}
       onOpenChange={(value) => {
         onOpenChange(value);
-        if (!value) resetForm(resolvedCategoryId);
+
+        if (!value) {
+          resetForm(resolvedCategoryId);
+          setViewMode("form");
+        }
       }}
     >
-      <DialogContent className="max-h-[95vh] max-w-[920px] overflow-auto rounded-[20px] bg-[#F5F5F5] p-6">
+      <DialogContent className="max-h-[95vh] max-w-[760px] overflow-auto rounded-[20px] bg-[#F5F5F5] p-6">
         <DialogHeader className="space-y-1">
           <DialogTitle className="text-2xl font-semibold">
-            {editMode === "edit" ? "Edit Variation" : "Add Variation"}
+            {viewMode === "list"
+              ? "Category Variations"
+              : editMode === "edit"
+              ? "Edit Variation"
+              : "Add Variation"}
           </DialogTitle>
 
           <p className="text-sm text-gray-500">
-            Manage category variations, pricing, and modifier overrides
+            {viewMode === "list"
+              ? `View variations for ${categoryName}`
+              : `Create and manage variations for ${categoryName}`}
           </p>
         </DialogHeader>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[420px,1fr]">
-          <div className="space-y-4 rounded-[16px] bg-white p-5">
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <AsyncSelect
-                value={categoryValue}
-                onChange={(val) => handleChange("categoryId", val?.id || "")}
-                placeholder="Select category"
-                fetchOptions={async () => ({
-                  data: item?.id ? [item] : [],
-                })}
-                labelKey="name"
-                valueKey="id"
-              />
-            </div>
-
-            <FormInput
-              label="Variation Name"
-              placeholder="e.g Large, Medium"
-              value={form.name}
-              onChange={(v) => handleChange("name", v)}
-              required
-            />
-
-            <FormInput
-              label="Description"
-              placeholder="Enter variation description"
-              value={form.description}
-              onChange={(v) => handleChange("description", v)}
-            />
-
-            <FormInput
-              label="Price"
-              placeholder="Enter base price"
-              value={form.price}
-              onChange={(v) => handleChange("price", v)}
-              type="number"
-              required
-            />
-
-            <div className="space-y-2">
-              <Label>Pricing Mode</Label>
-
-              <div className="relative">
-                <select
-                  value={form.pricingMode}
-                  onChange={(e) =>
-                    handleChange("pricingMode", e.target.value as PricingMode)
-                  }
-                  className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] px-4 pr-12 text-sm text-gray-500 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                >
-                  <option value="FLAT_ADJUSTMENT">Flat Adjustment</option>
-                  <option value="PERCENTAGE_ADJUSTMENT">
-                    Percentage Adjustment
-                  </option>
-                </select>
-
-                <div className="pointer-events-none absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-[10px] bg-primary">
-                  <ChevronDown size={16} className="text-white" />
-                </div>
-              </div>
-            </div>
-
-            <FormInput
-              label={
-                form.pricingMode === "PERCENTAGE_ADJUSTMENT"
-                  ? "Adjustment Percentage"
-                  : "Adjustment Amount"
-              }
-              placeholder={
-                form.pricingMode === "PERCENTAGE_ADJUSTMENT"
-                  ? "e.g 10"
-                  : "e.g 5"
-              }
-              value={form.adjustmentValue}
-              onChange={(v) => handleChange("adjustmentValue", v)}
-              type="number"
-              required
-            />
-
-            <FormInput
-              label="Sort Order"
-              placeholder="0"
-              value={String(form.sortOrder)}
-              onChange={(v) => handleChange("sortOrder", Number(v))}
-              type="number"
-            />
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Modifier Price Overrides</Label>
-                <button
-                  type="button"
-                  onClick={addModifierOverride}
-                  className="text-sm font-medium text-primary"
-                >
-                  + Add Modifier
-                </button>
-              </div>
-
-              {modifierOverrides.map((entry, index) => (
-                <div
-                  key={index}
-                  className="space-y-3 rounded-[12px] border border-gray-200 p-3"
-                >
-                  <div className="space-y-2">
-                    <Label>Modifier</Label>
-                    <AsyncSelect
-                      value={entry.modifier}
-                      onChange={(val) =>
-                        updateModifierOverride(index, "modifier", val)
-                      }
-                      placeholder="Select modifier"
-                      fetchOptions={fetchModifierOptions}
-                      labelKey="name"
-                      valueKey="id"
-                    />
+        {viewMode === "form" ? (
+          <>
+            {editMode === "create" && (
+              <div className="mt-5 rounded-[16px] bg-white p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">
+                      Quick Variation Templates
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Select a preset or enter a custom variation below.
+                    </p>
                   </div>
 
-                  <FormInput
-                    label="Price Delta"
-                    placeholder="0"
-                    value={entry.priceDelta}
-                    onChange={(v) =>
-                      updateModifierOverride(index, "priceDelta", v)
-                    }
-                    type="number"
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setViewMode("list")}
+                    className="rounded-[10px]"
+                  >
+                    View Variations
+                  </Button>
+                </div>
 
-                  <div className="flex justify-end">
+                <div className="flex flex-wrap gap-2">
+                  {PREDEFINED_VARIATIONS.map((preset) => (
                     <button
+                      key={preset.name}
                       type="button"
-                      onClick={() => removeModifierOverride(index)}
-                      className="text-sm text-red-500"
-                      disabled={
-                        modifierOverrides.length === 1 && !entry.modifier
-                      }
+                      onClick={() => applyPresetVariation(preset)}
+                      className={`rounded-full border px-4 py-2 text-sm transition ${
+                        form.name === preset.name
+                          ? "border-primary bg-primary text-white"
+                          : "border-gray-200 bg-[#F9FAFB] text-gray-700 hover:border-primary hover:text-primary"
+                      }`}
                     >
-                      Remove
+                      Add {preset.name}
                     </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
+             <div className="flex items-center gap-3 rounded-[12px] bg-[#F9FAFB] px-4 pl-0 py-3">
+  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[12px] border bg-white">
+    {categoryImage ? (
+      <img
+        src={categoryImage}
+        alt={categoryName}
+        className="h-full w-full object-cover"
+      />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-gray-400">
+        IMG
+      </div>
+    )}
+  </div>
+
+  <div className="min-w-0">
+    <p className="text-xs font-medium uppercase text-gray-400">
+      Category
+    </p>
+    <p className="truncate text-sm font-semibold text-gray-900">
+      {categoryName}
+    </p>
+  </div>
+</div>
+
+              <FormInput
+                label="Variation Name"
+                placeholder="e.g Small, Medium, Large"
+                value={form.name}
+                onChange={(v) => handleChange("name", v)}
+                required
+              />
+
+              <FormInput
+                label="Description"
+                placeholder="Enter variation description"
+                value={form.description}
+                onChange={(v) => handleChange("description", v)}
+              />
+
+              <FormInput
+                label="Price"
+                placeholder="Enter price"
+                value={form.price}
+                onChange={(v) => handleChange("price", v)}
+                type="number"
+                required
+              />
+
+              <div className="space-y-2">
+                <Label>Display Priority</Label>
+
+                <div className="relative">
+                  <select
+                    value={String(form.sortOrder)}
+                    onChange={(e) =>
+                      handleChange("sortOrder", Number(e.target.value))
+                    }
+                    className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] bg-white px-4 pr-12 text-sm text-gray-600 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  >
+                    {SORT_ORDER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="pointer-events-none absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-[10px] bg-primary">
+                    <ChevronDown size={16} className="text-white" />
                   </div>
                 </div>
-              ))}
+
+                <p className="text-xs text-gray-500">
+                  Top priority variations appear first for customers.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.isDefault}
+                    onChange={(e) => handleChange("isDefault", e.target.checked)}
+                    className="accent-primary"
+                  />
+                  Default
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.isActive}
+                    onChange={(e) => handleChange("isActive", e.target.checked)}
+                    className="accent-primary"
+                  />
+                  Active
+                </label>
+              </div>
             </div>
 
-            <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={form.isDefault}
-                  onChange={(e) => handleChange("isDefault", e.target.checked)}
-                  className="accent-primary"
-                />
-                Default
-              </label>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (editMode === "edit") {
+                    resetForm(resolvedCategoryId);
+                  }
 
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => handleChange("isActive", e.target.checked)}
-                  className="accent-primary"
-                />
-                Active
-              </label>
-            </div>
+                  setViewMode("list");
+                }}
+                className="rounded-[10px]"
+              >
+                Cancel
+              </Button>
 
-            <div className="flex gap-3">
               <Button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="mt-2 w-full rounded-[10px] bg-primary py-4 hover:bg-primary/90"
+                className="rounded-[10px] bg-primary px-6 hover:bg-primary/90"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -654,121 +545,142 @@ export default function VariationModal({
                   "Save Variation"
                 )}
               </Button>
-
-              {editMode === "edit" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => resetForm(resolvedCategoryId)}
-                  className="mt-2 rounded-[10px] py-4"
-                >
-                  Cancel
-                </Button>
-              )}
             </div>
-          </div>
+          </>
+        ) : (
+          <div className="mt-5 rounded-[16px] bg-white p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Variations for {categoryName}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  View, edit, and delete category variations.
+                </p>
+              </div>
 
-          <div className="rounded-[16px] bg-white p-5">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Category Variations
-              </h3>
-              <p className="text-sm text-gray-500">
-                View, edit, and delete variations for this category
-              </p>
+              <Button
+                type="button"
+                onClick={() => {
+                  resetForm(resolvedCategoryId);
+                  setViewMode("form");
+                }}
+                className="rounded-[10px] bg-primary hover:bg-primary/90"
+              >
+                <PlusCircle size={18} />
+                Add Variation
+              </Button>
             </div>
 
             {loadingVariations ? (
-              <div className="flex min-h-[200px] items-center justify-center text-gray-500">
-                <Loader2 className="animate-spin" size={20} />
+              <div className="flex min-h-[260px] items-center justify-center text-gray-500">
+                <Loader2 className="animate-spin" size={22} />
               </div>
             ) : variations.length === 0 ? (
-              <div className="flex min-h-[200px] items-center justify-center text-sm text-gray-400">
-                No variations found for this category
+              <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[16px] border border-dashed border-gray-200 bg-[#F9FAFB] p-6 text-center">
+                <p className="text-base font-semibold text-gray-900">
+                  No variations added yet
+                </p>
+                <p className="mt-1 max-w-[320px] text-sm text-gray-500">
+                  Add size or serving options like Small, Medium, Large, or your
+                  own custom variation.
+                </p>
+
+                <Button
+                  type="button"
+                  onClick={() => {
+                    resetForm(resolvedCategoryId);
+                    setViewMode("form");
+                  }}
+                  className="mt-4 rounded-[10px] bg-primary hover:bg-primary/90"
+                >
+                  <PlusCircle size={18} />
+                  Add First Variation
+                </Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-4 ">
                 {variations.map((variation: any) => (
                   <div
                     key={variation.id}
-                    className="rounded-[14px] border border-gray-200 p-4"
+                    className="rounded-[16px] border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-semibold text-gray-900">
+                          <h4 className="truncate text-base font-semibold text-gray-900">
                             {variation?.name || "-"}
                           </h4>
 
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs ${
-                              variation?.isActive
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {variation?.isActive ? "Active" : "Inactive"}
-                          </span>
-
                           {variation?.isDefault ? (
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                               Default
                             </span>
                           ) : null}
                         </div>
 
-                        <p className="mt-1 text-sm text-gray-500">
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-500">
                           {variation?.description || "No description"}
                         </p>
-
-                        <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
-                          <span>Price: {variation?.price ?? 0}</span>
-                          <span>
-                            Pricing:{" "}
-                            {variation?.pricingMode ===
-                            "PERCENTAGE_ADJUSTMENT"
-                              ? `${variation?.adjustmentValue ?? 0}%`
-                              : variation?.adjustmentValue ?? 0}
-                          </span>
-                          <span>Sort Order: {variation?.sortOrder ?? 0}</span>
-                          <span>
-                            Overrides:{" "}
-                            {Array.isArray(variation?.modifierPriceOverrides)
-                              ? variation.modifierPriceOverrides.length
-                              : 0}
-                          </span>
-                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => populateFormForEdit(variation)}
-                          className="rounded-md border p-2 text-gray-600 hover:text-primary"
-                        >
-                          <Pencil size={16} />
-                        </button>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                          variation?.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {variation?.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteVariation(variation.id)}
-                          disabled={deletingVariationId === variation.id}
-                          className="rounded-md border p-2 text-gray-600 hover:text-red-500 disabled:opacity-50"
-                        >
-                          {deletingVariationId === variation.id ? (
-                            <Loader2 className="animate-spin" size={16} />
-                          ) : (
-                            <Trash2 size={16} />
-                          )}
-                        </button>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-[12px] bg-[#F9FAFB] p-3">
+                        <p className="text-xs text-gray-400">Price</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {variation?.price ?? 0}
+                        </p>
                       </div>
+
+                      <div className="rounded-[12px] bg-[#F9FAFB] p-3">
+                        <p className="text-xs text-gray-400">Priority</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {getSortOrderLabel(variation?.sortOrder)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => populateFormForEdit(variation)}
+                        className="inline-flex items-center gap-2 rounded-[10px] border px-3 py-2 text-sm text-gray-700 transition hover:border-primary hover:text-primary"
+                      >
+                        <Pencil size={15} />
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteVariation(variation.id)}
+                        disabled={deletingVariationId === variation.id}
+                        className="inline-flex items-center gap-2 rounded-[10px] border px-3 py-2 text-sm text-gray-700 transition hover:border-red-300 hover:text-red-500 disabled:opacity-50"
+                      >
+                        {deletingVariationId === variation.id ? (
+                          <Loader2 className="animate-spin" size={15} />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
