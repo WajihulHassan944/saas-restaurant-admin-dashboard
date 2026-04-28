@@ -21,6 +21,7 @@ import {
   useUpdateMenu,
 } from "@/hooks/useMenus";
 import { getMenuItems } from "@/services/menus";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CreateMenuModalProps {
   open: boolean;
@@ -41,7 +42,8 @@ export default function CreateMenuModal({
 }: CreateMenuModalProps) {
   const isEdit = Boolean(menuId);
 
-  const [restaurantId, setRestaurantId] = useState("");
+  const { user, token } = useAuth();
+  const restaurantId = user?.restaurantId ?? undefined;
   const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
@@ -67,20 +69,6 @@ export default function CreateMenuModal({
     createMenuMutation.isPending || updateMenuMutation.isPending;
 
   /* ================= LOAD AUTH ================= */
-
-  useEffect(() => {
-    const authRaw = localStorage.getItem("auth");
-    if (!authRaw) return;
-
-    try {
-      const auth = JSON.parse(authRaw);
-      setRestaurantId(auth?.user?.restaurantId || "");
-    } catch {
-      console.error("Invalid auth");
-    }
-  }, []);
-
-  /* ================= PREFILL EDIT DATA ================= */
 
   useEffect(() => {
     if (!open) return;
@@ -155,12 +143,12 @@ export default function CreateMenuModal({
     }
 
     try {
-      const res = await getMenuItems({
-        page,
-        limit: 10,
-        search: search || undefined,
-      });
-
+     const res = await getMenuItems({
+  page,
+  limit: 10,
+  search: search || undefined,
+  restaurantId,
+});
       return {
         data: Array.isArray(res?.data) ? res.data : [],
         meta: res?.meta,

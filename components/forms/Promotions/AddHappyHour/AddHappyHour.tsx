@@ -6,12 +6,10 @@ import { Radio } from "@/components/ui/radioBtn";
 import { Input } from "@/components/ui/input";
 import PageWrapper from "@/components/forms/Promotions/PageWrapper";
 import Section from "@/components/forms/Promotions/Section";
-import AdvanceSettings from "@/components/forms/Promotions/AdvanceSettings";
 
 export default function AddHappyHour() {
   return (
     <PageWrapper title="Add Happy Hour">
-      {/* Activate Happy Hour */}
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-gray-600">
           Do you want to activate the happy hour promotion?
@@ -55,10 +53,7 @@ export default function AddHappyHour() {
         </div>
       </Section>
 
-      {/* Advance Settings */}
-      <Section label="Advance Setting">
-        <AdvanceSettings />
-      </Section>
+    
     </PageWrapper>
   );
 }

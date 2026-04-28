@@ -8,6 +8,7 @@ import CouponsPage from "@/components/PromotionManagement/CouponsPage/CouponsPag
 import PromotionsOverview from "@/components/PromotionManagement/PromotionOverview/PromotionsOverview";
 import PromotionTabs from "@/components/PromotionManagement/PromotionTabs";
 import PromotionsPage from "@/components/PromotionManagement/PromotionsPage/PromotionsPage";
+import HappyHourPage from "@/components/PromotionManagement/HappyHourPage/HappyHourPage";
 
 const PromotionManagementPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -38,7 +39,7 @@ const PromotionManagementPage = () => {
         {activeTab === "overview" && <PromotionsOverview />}
         {activeTab === "coupons" && <CouponsPage />}
         {activeTab === "promotions" && <PromotionsPage />}
-        {activeTab === "happy-hours" && <div>Happy Hours Content</div>}
+        {activeTab === "happy-hours" && <HappyHourPage />}
       </div>
     </Container>
   );
