@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
-  CircleDollarSign,
   Clock,
   Layers,
   ListTree,
