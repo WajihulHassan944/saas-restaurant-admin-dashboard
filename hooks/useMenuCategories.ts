@@ -7,6 +7,7 @@ import {
   getMenuCategories,
   getMenuCategoryById,
   getModifierGroupCategories,
+  reorderMenuCategories,
   updateMenuCategory,
 } from "@/services/categories";
 import type {
@@ -137,5 +138,26 @@ export const useGetMenuCategoryById = (id?: string) => {
     queryKey: ["menu-category", id],
     queryFn: () => getMenuCategoryById(id as string),
     enabled: !!id,
+  });
+};
+
+
+export const useReorderMenuCategories = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: reorderMenuCategories,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success("Menu categories reordered successfully");
+    },
+
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message || "Failed to reorder menu categories"
+      );
+    },
   });
 };

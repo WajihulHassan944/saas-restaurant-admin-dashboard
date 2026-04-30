@@ -132,3 +132,26 @@ export const forceDeleteBranch = async (id: string) => {
   const { data } = await api.delete(`/branches/${id}/force`);
   return data;
 };
+
+
+
+// services/branches.ts
+
+export type TemporaryClosurePayload =
+  | {
+      isClosed: true;
+      closedUntil: string;
+      reason?: string;
+      message?: string;
+    }
+  | {
+      isClosed: false;
+    };
+
+export const updateBranchTemporaryClosure = async (
+  id: string,
+  payload: TemporaryClosurePayload
+) => {
+  const { data } = await api.patch(`/branches/${id}/temporary-closure`, payload);
+  return data;
+};

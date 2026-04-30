@@ -18,6 +18,7 @@ import {
   deleteModifier,
   deleteModifierGroup,
   deleteRestaurantMenu,
+  duplicateModifier,
   getCategoryModifierGroups,
   getMenuById,
   getMenuItems,
@@ -27,6 +28,7 @@ import {
   getModifiers,
   getRestaurantMenu,
   getRestaurantMenus,
+  reorderMenuItems,
   updateMenu,
   updateMenuItem,
   updateMenuItemLink,
@@ -691,6 +693,47 @@ export const useUpdateMenu = () => {
       queryClient.invalidateQueries({ queryKey: ["menus"] });
       queryClient.invalidateQueries({ queryKey: ["menu", variables.menuId] });
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+    },
+  });
+};
+
+
+
+export const useDuplicateModifier = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: duplicateModifier,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["modifiers"] });
+      toast.success("Modifier duplicated successfully");
+    },
+
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message || "Failed to duplicate modifier"
+      );
+    },
+  });
+};
+
+// hooks
+export const useReorderMenuItems = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: reorderMenuItems,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+      toast.success("Menu items reordered successfully");
+    },
+
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message || "Failed to reorder menu items"
+      );
     },
   });
 };

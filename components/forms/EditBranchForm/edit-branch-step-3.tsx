@@ -1,8 +1,10 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import { Radio } from "@/components/ui/radioBtn";
 import { Switch } from "@/components/ui/switch";
-import { ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
+import { ChevronDown, ChevronUp, Clock, Clock3 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const DAYS = [
@@ -86,14 +88,55 @@ export default function EditBranchStepThree({ data, setData }: any) {
 
   return (
     <div className="bg-white rounded-[14px]">
-      <div className="mb-[32px] mt-8">
-        <h2 className="text-md font-semibold text-gray-600">
-          Setup Working Hour
-        </h2>
-        <p className="text-sm text-gray-500">
-          Configure your standard business working hour from here
+
+
+{/* ================= DELIVERY TIME ================= */}
+<div className="mb-[24px] rounded-[16px] border border-gray-100 bg-white p-[24px] shadow-sm">
+  <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+    <div className="flex items-start gap-3">
+      <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-primary/10 text-primary">
+        <Clock3 size={20} />
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900">
+          Delivery Time
+        </h3>
+
+        <p className="mt-1 text-xs leading-5 text-gray-500">
+          Set the estimated delivery time customers will see for this branch.
         </p>
       </div>
+    </div>
+
+    <div className="flex w-full items-center gap-3 md:w-auto">
+      <div className="relative w-full md:w-[180px]">
+        <Input
+          type="number"
+          min={0}
+          value={(data.deliveryTime)}
+          onKeyDown={blockInvalidNumberKeys}
+          onPaste={blockNegativeNumberPaste}
+          onChange={(e) =>
+            setData({
+              ...data,
+              deliveryTime:
+                e.target.value === ""
+                  ? null
+                  : Number(sanitizeNonNegativeNumber(e.target.value)),
+            })
+          }
+          placeholder="eg. 30"
+          className="h-[42px] rounded-[10px] pr-[72px]"
+        />
+
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
+          min
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
 
       {/* ================= MODE ================= */}
       <div className="mb-[32px] p-[30px]">

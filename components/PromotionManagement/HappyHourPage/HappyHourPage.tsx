@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Tag } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import PromotionSectionHeader from "../PromotionOverview/PromotionSectionHeader";
 import PromotionStatCard from "@/components/cards/PromotionStatCard";
-import { useGetAdminPromotionCampaigns } from "@/hooks/usePromotions";
+import HappyHoursTable from "./table";
+import { useGetAdminHappyHours } from "@/hooks/usePromotions";
 import { useAuth } from "@/hooks/useAuth";
 
 const getListFromResponse = (response: any) => {
@@ -18,36 +19,36 @@ const getMetaFromResponse = (response: any) => {
   return response?.meta ?? response?.data?.meta ?? {};
 };
 
-export default function HappyHourPage() {
+export default function HappyHoursPage() {
   const { user, restaurantId } = useAuth();
 
   const branchId = user?.branchId ?? null;
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const { data, isLoading, isFetching } = useGetAdminPromotionCampaigns({
+  const { data, isLoading, isFetching } = useGetAdminHappyHours({
     restaurantId,
     branchId,
     page,
     limit,
   });
 
-  const promotions = getListFromResponse(data);
+  const happyHours = getListFromResponse(data);
   const meta = getMetaFromResponse(data);
   const loading = isLoading || isFetching;
 
   const stats = useMemo(() => {
-    const total = meta?.total ?? promotions.length;
+    const total = meta?.total ?? happyHours.length;
 
-    const active = promotions.filter(
+    const active = happyHours.filter(
       (item: any) => item?.status === "ACTIVE" || item?.isActive
     ).length;
 
-    const upcoming = promotions.filter(
+    const upcoming = happyHours.filter(
       (item: any) => item?.status === "SCHEDULED"
     ).length;
 
-    const expired = promotions.filter(
+    const expired = happyHours.filter(
       (item: any) => item?.status === "EXPIRED"
     ).length;
 
@@ -57,48 +58,48 @@ export default function HappyHourPage() {
       upcoming,
       expired,
     };
-  }, [promotions, meta?.total]);
+  }, [happyHours, meta?.total]);
 
   return (
     <div className="mt-1 space-y-10">
       <PromotionSectionHeader
-        title="Promotions"
-        description="Boost Customer Loyalty with Custom Coupon Offers"
+        title="Happy Hours"
+        description="Create time-based offers to increase sales during selected hours"
         showViewAll={false}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <PromotionStatCard
-          icon={<Tag size={18} />}
+          icon={<Clock size={18} />}
           value={stats.total}
-          label="Total Promotions"
+          label="Total Happy Hours"
           loading={loading}
         />
 
         <PromotionStatCard
-          icon={<Tag size={18} />}
+          icon={<Clock size={18} />}
           value={stats.active}
-          label="Active Promotions"
+          label="Active Happy Hours"
           loading={loading}
         />
 
         <PromotionStatCard
-          icon={<Tag size={18} />}
+          icon={<Clock size={18} />}
           value={stats.upcoming}
-          label="Upcoming Promotions"
+          label="Upcoming Happy Hours"
           loading={loading}
         />
 
         <PromotionStatCard
-          icon={<Tag size={18} />}
+          icon={<Clock size={18} />}
           value={stats.expired}
-          label="Expired Promotions"
+          label="Expired Happy Hours"
           loading={loading}
         />
       </div>
 
-      {/* <PromotionsTable
-        promotions={promotions}
+      <HappyHoursTable
+        happyHours={happyHours}
         loading={loading}
         meta={{
           page: meta?.page ?? page,
@@ -109,7 +110,7 @@ export default function HappyHourPage() {
           hasPrevious: Boolean(meta?.hasPrevious),
         }}
         onPageChange={setPage}
-      /> */}
+      />
     </div>
   );
 }

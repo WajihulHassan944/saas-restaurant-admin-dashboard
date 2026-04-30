@@ -321,3 +321,19 @@ export const updateMenu = async ({
   const { data } = await api.patch(`/menus/${menuId}`, payload);
   return data;
 };
+
+export const duplicateModifier = async (modifierId: string) => {
+  const { data } = await api.post(`/menu/modifiers/${modifierId}/duplicate`);
+  return data;
+};
+
+
+export const reorderMenuItems = async (payload: {
+  items: {
+    id: string;
+    sortOrder: number;
+  }[];
+}) => {
+  const { data } = await api.patch("/menu/items/reorder", payload);
+  return data;
+};

@@ -15,7 +15,11 @@ import AsyncSelect from "@/components/ui/AsyncSelect";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { useGetMenuVariations } from "@/hooks/useMenus";
-import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
+import {
+  blockInvalidNumberKeys,
+  blockNegativeNumberPaste,
+  sanitizeNonNegativeNumber,
+} from "@/utils/numberInput";
 
 const schema = z.object({
   name: z.string().min(1, "Item name is required"),
@@ -24,13 +28,6 @@ const schema = z.object({
 });
 
 type Field = keyof z.infer<typeof schema>;
-
-const pricingModeOptions = [
-  {
-    value: "FIXED",
-    label: "Fixed Price",
-  },
- ];
 
 const toSafeString = (value: any) => {
   if (value === undefined || value === null) return "";
@@ -57,13 +54,11 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
       ? JSON.parse(localStorage.getItem("auth") || "{}")?.user?.restaurantId
       : null);
 
-  const {
-    data: variationsResponse,
-    isFetching: isFetchingVariations,
-  } = useGetMenuVariations({
-    categoryId: form?.categoryId || undefined,
-    limit: 100,
-  });
+  const { data: variationsResponse, isFetching: isFetchingVariations } =
+    useGetMenuVariations({
+      categoryId: form?.categoryId || undefined,
+      limit: 100,
+    });
 
   const categoryVariations = useMemo(() => {
     const raw = normalizeApiArray(variationsResponse);
@@ -78,8 +73,8 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         name: variation.name || "",
         description: variation.description || "",
         price: variation.price,
-        pricingMode: variation.pricingMode || "FIXED",
-        adjustmentValue: variation.adjustmentValue,
+        pickupPrice: variation.pickupPrice,
+        displayText: variation.displayText || "",
         sortOrder: Number(variation.sortOrder || 0),
       });
     });
@@ -116,24 +111,28 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
         return {
           variationId: String(variation.id),
-          pricingMode:
-            existing?.pricingMode ||
-            variation.pricingMode ||
-            "FIXED",
+
           price:
             existing?.price !== undefined && existing?.price !== null
               ? String(existing.price)
               : variation.price !== undefined && variation.price !== null
               ? String(variation.price)
               : "",
-          adjustmentValue:
-            existing?.adjustmentValue !== undefined &&
-            existing?.adjustmentValue !== null
-              ? String(existing.adjustmentValue)
-              : variation.adjustmentValue !== undefined &&
-                variation.adjustmentValue !== null
-              ? String(variation.adjustmentValue)
+
+          pickupPrice:
+            existing?.pickupPrice !== undefined &&
+            existing?.pickupPrice !== null
+              ? String(existing.pickupPrice)
+              : variation.pickupPrice !== undefined &&
+                variation.pickupPrice !== null
+              ? String(variation.pickupPrice)
               : "",
+
+          displayText:
+            existing?.displayText !== undefined &&
+            existing?.displayText !== null
+              ? String(existing.displayText)
+              : variation.displayText || "",
         };
       });
 
@@ -142,7 +141,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         variationPriceOverrides: nextOverrides,
       };
     });
-  }, [form?.categoryId, categoryVariations.length]);
+  }, [form?.categoryId, categoryVariations.length, setForm]);
 
   const variationPriceMap = useMemo(() => {
     const map = new Map<string, any>();
@@ -183,9 +182,9 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
             ...current,
             {
               variationId,
-              pricingMode: "FIXED",
               price: "",
-              adjustmentValue: "",
+              pickupPrice: "",
+              displayText: "",
               ...patch,
             },
           ];
@@ -221,26 +220,23 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
     for (const variation of categoryVariations) {
       const override = variationPriceMap.get(String(variation.id));
-      const mode = override?.pricingMode || "FIXED";
 
-      if (mode === "FIXED") {
-        if (
-          override?.price === "" ||
-          override?.price === undefined ||
-          override?.price === null ||
-          Number.isNaN(Number(override.price))
-        ) {
-          variationErrors[String(variation.id)] = "Price is required";
-        }
-      } else {
-        if (
-          override?.adjustmentValue === "" ||
-          override?.adjustmentValue === undefined ||
-          override?.adjustmentValue === null ||
-          Number.isNaN(Number(override.adjustmentValue))
-        ) {
-          variationErrors[String(variation.id)] = "Adjustment is required";
-        }
+      if (
+        override?.price === "" ||
+        override?.price === undefined ||
+        override?.price === null ||
+        Number.isNaN(Number(override.price))
+      ) {
+        variationErrors[String(variation.id)] = "Price is required";
+      }
+
+      if (
+        override?.pickupPrice !== "" &&
+        override?.pickupPrice !== undefined &&
+        override?.pickupPrice !== null &&
+        Number.isNaN(Number(override.pickupPrice))
+      ) {
+        variationErrors[String(variation.id)] = "Pickup price must be valid";
       }
     }
 
@@ -374,6 +370,13 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
     loadSelectedCategory();
   }, [form?.categoryId]);
 
+  const shouldShowSplitPizzaOption = useMemo(() => {
+    const itemName = String(form?.name || "").toLowerCase();
+    const categoryName = String(selectedCategory?.name || "").toLowerCase();
+
+    return itemName.includes("pizza") || categoryName.includes("pizza");
+  }, [form?.name, selectedCategory?.name]);
+
   return (
     <div className="space-y-5">
       <div className="space-y-2">
@@ -430,20 +433,25 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Base Price</Label>
 
-       <Input
-  type="number"
-  value={form.basePrice}
-  onChange={(e) => {
-    const value = sanitizeNonNegativeNumber(e.target.value);
+        <Input
+          type="number"
+          value={form.basePrice}
+          onChange={(e) => {
+            const value = sanitizeNonNegativeNumber(e.target.value);
 
-    setForm({ ...form, basePrice: value });
-  }}
-  onKeyDown={blockInvalidNumberKeys}
-  onPaste={blockNegativeNumberPaste}
-  onBlur={(e) => validateField("basePrice", sanitizeNonNegativeNumber(e.target.value))}
-  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-  min={0}
-/>
+            setForm({ ...form, basePrice: value });
+          }}
+          onKeyDown={blockInvalidNumberKeys}
+          onPaste={blockNegativeNumberPaste}
+          onBlur={(e) =>
+            validateField(
+              "basePrice",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          min={0}
+        />
 
         {errors.basePrice && (
           <p className="text-xs text-red-500">{errors.basePrice}</p>
@@ -473,12 +481,11 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
           <div className="space-y-3">
             {categoryVariations.map((variation: any) => {
               const override = variationPriceMap.get(String(variation.id)) || {
-                pricingMode: "FIXED",
                 price: "",
-                adjustmentValue: "",
+                pickupPrice: "",
+                displayText: "",
               };
 
-              const mode = override.pricingMode || "FIXED";
               const variationError =
                 errors?.variationPriceOverrides?.[String(variation.id)];
 
@@ -491,6 +498,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
                     <p className="text-sm font-semibold text-gray-900">
                       {variation.name}
                     </p>
+
                     {variation.description ? (
                       <p className="text-xs text-gray-500">
                         {variation.description}
@@ -498,54 +506,61 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
                     ) : null}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <Label className="text-xs">Pricing Mode</Label>
+                      <Label className="text-xs">Variation Price</Label>
 
-                      <select
-                        value={mode}
-                        onChange={(e) => {
+                      <Input
+                        type="number"
+                        min={0}
+                        value={toSafeString(override.price)}
+                        onKeyDown={blockInvalidNumberKeys}
+                        onPaste={blockNegativeNumberPaste}
+                        onChange={(e) =>
                           updateVariationOverride(String(variation.id), {
-                            pricingMode: e.target.value,
-                            price:
-                              e.target.value === "FIXED"
-                                ? override.price
-                                : "",
-                            adjustmentValue:
-                              e.target.value !== "FIXED"
-                                ? override.adjustmentValue
-                                : "",
-                          });
-                        }}
-                        className="h-[40px] w-full rounded-[10px] border border-gray-300 bg-white px-3 text-sm outline-none"
-                      >
-                        {pricingModeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                            price: sanitizeNonNegativeNumber(e.target.value),
+                          })
+                        }
+                        placeholder="eg. 12"
+                        className="h-[40px] rounded-[10px]"
+                      />
                     </div>
 
-  <div className="space-y-1">
-    <Label className="text-xs">Item Variation Price</Label>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Pickup Price</Label>
 
-    <Input
-      type="number"
-      min={0}
-      value={toSafeString(override.price)}
-      onKeyDown={blockInvalidNumberKeys}
-      onPaste={blockNegativeNumberPaste}
-      onChange={(e) =>
-        updateVariationOverride(String(variation.id), {
-          price: sanitizeNonNegativeNumber(e.target.value),
-        })
-      }
-      placeholder="eg. 12"
-      className="h-[40px] rounded-[10px]"
-    />
-  </div>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={toSafeString(override.pickupPrice)}
+                        onKeyDown={blockInvalidNumberKeys}
+                        onPaste={blockNegativeNumberPaste}
+                        onChange={(e) =>
+                          updateVariationOverride(String(variation.id), {
+                            pickupPrice: sanitizeNonNegativeNumber(
+                              e.target.value
+                            ),
+                          })
+                        }
+                        placeholder="eg. 10"
+                        className="h-[40px] rounded-[10px]"
+                      />
+                    </div>
 
+                    <div className="space-y-1">
+                      <Label className="text-xs">Display Text</Label>
+
+                      <Input
+                        value={toSafeString(override.displayText)}
+                        onChange={(e) =>
+                          updateVariationOverride(String(variation.id), {
+                            displayText: e.target.value,
+                          })
+                        }
+                        placeholder="eg. Small 10 inch"
+                        className="h-[40px] rounded-[10px]"
+                      />
+                    </div>
                   </div>
 
                   {variationError ? (
@@ -560,20 +575,23 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         )}
       </div>
 
-      <label className="flex items-center gap-2 rounded-[12px] border border-gray-200 bg-white p-3 text-sm">
-        <input
-          type="checkbox"
-          checked={Boolean(form.supportsSplitPizza)}
-          onChange={(e) =>
-            setForm((prev: any) => ({
-              ...prev,
-              supportsSplitPizza: e.target.checked,
-            }))
-          }
-          className="accent-[var(--primary)]"
-        />
-        <span>Supports Split Pizza</span>
-      </label>
+      {shouldShowSplitPizzaOption && (
+        <label className="flex items-center gap-2 rounded-[12px] border border-gray-200 bg-white p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={Boolean(form.supportsSplitPizza)}
+            onChange={(e) =>
+              setForm((prev: any) => ({
+                ...prev,
+                supportsSplitPizza: e.target.checked,
+              }))
+            }
+            className="accent-[var(--primary)]"
+          />
+
+          <span>Supports Split Pizza</span>
+        </label>
+      )}
     </div>
   );
 });

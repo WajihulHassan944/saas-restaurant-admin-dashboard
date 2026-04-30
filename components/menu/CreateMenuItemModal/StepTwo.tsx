@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { toast } from "sonner";
-import { ImagePlus, UploadCloud, X } from "lucide-react";
+import { FileText, ImagePlus, UploadCloud, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
 
@@ -33,6 +33,9 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       [key]: value,
     }));
   };
+
+
+  
 
   const processImageFile = async (file: File) => {
     if (!file) return;
@@ -425,6 +428,8 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
       </div>
+
+   
 
       <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
         <label className="flex cursor-pointer items-center gap-2">

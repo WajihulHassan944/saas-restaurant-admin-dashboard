@@ -3,7 +3,7 @@
 import Container from "@/components/container";
 import Header from "@/components/branches/header";
 import TabButton from "@/components/ui/TabButton";
-import { useState, useEffect } from "react";
+import { useState, useEffect, JSX } from "react";
 
 import EditBranchStepOne from "@/components/forms/EditBranchForm/edit-branch-step-1";
 import EditBranchStepTwo from "@/components/forms/EditBranchForm/edit-branch-step-2";
@@ -145,22 +145,61 @@ const handleSave = async () => {
       toast.success("Delivery config updated");
     }
 
-    // ================= STEP 3 =================
-    if (activeTab === "workingHours") {
-      const res = await api.put(
-        `/v1/branches/${branchId}/opening-hours`,
-        {
-          openingHours: branchData.settings?.openingHours || [],
-        }
-      );
+   // ================= STEP 3 =================
+// ================= STEP 3 =================
+if (activeTab === "workingHours") {
+  const deliveryTime =
+    branchData.deliveryTime === "" ||
+    branchData.deliveryTime === undefined ||
+    branchData.deliveryTime === null
+      ? null
+      : Number(branchData.deliveryTime);
 
-      if (res?.error) {
-        toast.error(res.error);
-        return;
-      }
-
-      toast.success("Working hours updated");
+  // ✅ 1. Update opening hours API
+  const openingHoursRes = await api.put(
+    `/v1/branches/${branchId}/opening-hours`,
+    {
+      openingHours: branchData.settings?.openingHours || [],
     }
+  );
+
+  if (openingHoursRes?.error) {
+    toast.error(openingHoursRes.error);
+    return;
+  }
+
+  // ✅ 2. Update deliveryTime through edit branch API
+  // deliveryTime is sent inside settings as required
+  const branchRes = await api.patch(`/v1/branches/${branchId}`, {
+    restaurantId: branchData.restaurantId,
+    name: branchData.name,
+    isMain: branchData.isMain,
+    branchAdmin: branchData.branchAdmin,
+
+    street: branchData.address?.street,
+    area: branchData.address?.area,
+    city: branchData.address?.city,
+    state: branchData.address?.state,
+    country: branchData.address?.country,
+    lat: branchData.address?.lat,
+    lng: branchData.address?.lng,
+
+    description: branchData.description,
+
+    settings: {
+      ...fullSettings,
+      deliveryTime,
+    },
+  });
+
+  if (branchRes?.error) {
+    toast.error(branchRes.error);
+    return;
+  }
+
+  toast.success("Working hours updated");
+}
+   
 
     // ================= NAVIGATION =================
     if (activeTab === "workingHours") {
@@ -176,7 +215,14 @@ const handleSave = async () => {
   }
 };
 
-  const steps = [
+  const steps: {
+  key: EditTab; 
+  tabLabel: string;
+  title: string;
+  description: string;
+  component: JSX.Element;
+}[] = [
+    
     {
       key: "basicInfo",
       tabLabel: "Basic Information",

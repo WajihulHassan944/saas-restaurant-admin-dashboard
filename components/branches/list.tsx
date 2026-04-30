@@ -56,18 +56,19 @@ const openDialog = (branchId: string) => {
   return (
     <div className="space-y-3 min-h-[40vh]">
       {branches.map((branch) => (
-        <BranchCard
-          key={branch.id}
-          id={branch.id}
-          name={branch.name}
-          isActive={branch.isActive}
-          loading={loading}
-          isDefault={branch.isMain}
-          itemsCount={0} 
-          openDialog={openDialog}
-            coverImage={branch.coverImage}
+      <BranchCard
+  key={branch.id}
+  id={branch.id}
+  name={branch.name}
+  isActive={branch.isActive}
+  availability={branch.availability}
+  loading={loading}
+  isDefault={branch.isMain}
+  itemsCount={0}
+  openDialog={openDialog}
+  coverImage={branch.coverImage}
   logoUrl={branch.logoUrl}
-        />
+/>
       ))}
 
      <BranchDetailsModal

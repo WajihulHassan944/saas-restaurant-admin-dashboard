@@ -63,3 +63,14 @@ export const getMenuCategoryById = async (id: string) => {
 
   return data;
 };
+
+
+export const reorderMenuCategories = async (payload: {
+  items: {
+    id: string;
+    sortOrder: number;
+  }[];
+}) => {
+  const { data } = await api.patch("/menu/categories/reorder", payload);
+  return data;
+};

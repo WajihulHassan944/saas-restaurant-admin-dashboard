@@ -21,12 +21,14 @@ import {
   useDeleteBranch,
   useActivateBranch,
   useSuspendBranch,
+  useUpdateBranchTemporaryClosure,
 } from "@/hooks/useBranches";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
 import DeleteDialog from "../dialogs/delete-dialog";
 import BranchCoverModal from "../branches/BranchCoverModal";
+import TemporaryBranchClosureModal from "./TemporaryBranchClosureModal";
 
 export default function BranchCard({
   id,
@@ -34,11 +36,12 @@ export default function BranchCard({
   isDefault,
   itemsCount,
   isActive,
+  availability,
   openDialog,
   openMenuDetails,
   editMenu,
   loading,
-   coverImage,
+  coverImage,
   logoUrl,
 }: BranchProps & { loading?: boolean }) {
   const [openingHoursOpen, setOpeningHoursOpen] = useState(false);
@@ -48,12 +51,21 @@ const [isDeleting, setIsDeleting] = useState(false);
   const deleteMutation = useDeleteBranch();
   const activateMutation = useActivateBranch();
   const suspendMutation = useSuspendBranch();
-
+const [temporaryClosureOpen, setTemporaryClosureOpen] = useState(false);
 const { token } = useAuth();
 const { del } = useApi(token);
   const handleOpenChange = (value: boolean) => {
     setOpeningHoursOpen(value);
   };
+
+  const temporaryClosureMutation = useUpdateBranchTemporaryClosure();
+
+  const isTemporarilyClosed = Boolean(
+  availability?.isTemporarilyClosed ||
+    availability?.temporaryClosure?.isClosed
+);
+
+const temporaryClosure = availability?.temporaryClosure;
 
   const iconMap = [
     { key: "menu", icon: List },
@@ -93,6 +105,25 @@ const { del } = useApi(token);
     setIsDeleting(false);
   }
 }; 
+
+
+const handleReopenTemporaryClosure = async () => {
+  if (!isTemporarilyClosed) return;
+
+  try {
+    await temporaryClosureMutation.mutateAsync({
+      id,
+      payload: {
+        isClosed: false,
+      },
+    });
+
+    window.location.reload();
+  } catch (err) {
+    console.error(err);
+  }
+};
+
   /**
    * ================= ACTIVATE
    */
@@ -172,6 +203,11 @@ return (
                 main
               </span>
             )}
+            {isTemporarilyClosed && (
+  <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-[2px] rounded-full">
+    temporarily closed
+  </span>
+)}
           </div>
 
           <p className="text-xs text-gray-400 mt-1">
@@ -214,28 +250,53 @@ return (
         onClick: () => editMenu?.(id),
         icon: <List size={16} />,
       },
-
-  ...(openDialog
-    ? [
-        {
-          label: "Opening Hours",
-          onClick: () => setOpeningHoursOpen(true),
-          icon: <Store size={16} />,
-        },
-        {
-          label: "Activate",
-          onClick: !isActive ? handleActivate : undefined,
-          className: isActive ? "opacity-50 pointer-events-none" : "",
-          icon: <Power size={16} />,
-        },
-        {
-          label: "Suspend",
-          onClick: isActive ? handleSuspend : undefined,
-          className: !isActive ? "opacity-50 pointer-events-none" : "",
-          icon: <PauseCircle size={16} />,
-        },
-      ]
-    : []),
+...(openDialog
+  ? [
+      {
+        label: "Opening Hours",
+        onClick: () => setOpeningHoursOpen(true),
+        icon: <Store size={16} />,
+      },
+      {
+        label: isTemporarilyClosed
+          ? "Already Temporarily Closed"
+          : "Temporary Closure",
+        onClick: !isTemporarilyClosed
+          ? () => setTemporaryClosureOpen(true)
+          : undefined,
+        className: isTemporarilyClosed
+          ? "opacity-50 pointer-events-none"
+          : "",
+        icon: <PauseCircle size={16} />,
+      },
+      {
+        label: "Reopen Branch",
+        onClick: isTemporarilyClosed
+          ? handleReopenTemporaryClosure
+          : undefined,
+        className: !isTemporarilyClosed
+          ? "opacity-50 pointer-events-none"
+          : "",
+        icon: temporaryClosureMutation.isPending ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <Power size={16} />
+        ),
+      },
+      {
+        label: "Activate",
+        onClick: !isActive ? handleActivate : undefined,
+        className: isActive ? "opacity-50 pointer-events-none" : "",
+        icon: <Power size={16} />,
+      },
+      {
+        label: "Suspend",
+        onClick: isActive ? handleSuspend : undefined,
+        className: !isActive ? "opacity-50 pointer-events-none" : "",
+        icon: <PauseCircle size={16} />,
+      },
+    ]
+  : []),
 
   {
     label: "Delete",
@@ -272,6 +333,11 @@ return (
                 </span>
               </div>
             )}
+            {isTemporarilyClosed && (
+  <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-[2px] rounded-full">
+    temporarily closed
+  </span>
+)}
           </div>
 
           <p className="text-sm text-gray-400">
@@ -323,27 +389,53 @@ return (
         icon: <List size={16} />,
       },
 
-  ...(openDialog
-    ? [
-        {
-          label: "Opening Hours",
-          onClick: () => setOpeningHoursOpen(true),
-          icon: <Store size={16} />,
-        },
-        {
-          label: "Activate",
-          onClick: !isActive ? handleActivate : undefined,
-          className: isActive ? "opacity-50 pointer-events-none" : "",
-          icon: <Power size={16} />,
-        },
-        {
-          label: "Suspend",
-          onClick: isActive ? handleSuspend : undefined,
-          className: !isActive ? "opacity-50 pointer-events-none" : "",
-          icon: <PauseCircle size={16} />,
-        },
-      ]
-    : []),
+   ...(openDialog
+  ? [
+      {
+        label: "Opening Hours",
+        onClick: () => setOpeningHoursOpen(true),
+        icon: <Store size={16} />,
+      },
+      {
+        label: isTemporarilyClosed
+          ? "Already Temporarily Closed"
+          : "Temporary Closure",
+        onClick: !isTemporarilyClosed
+          ? () => setTemporaryClosureOpen(true)
+          : undefined,
+        className: isTemporarilyClosed
+          ? "opacity-50 pointer-events-none"
+          : "",
+        icon: <PauseCircle size={16} />,
+      },
+      {
+        label: "Reopen Branch",
+        onClick: isTemporarilyClosed
+          ? handleReopenTemporaryClosure
+          : undefined,
+        className: !isTemporarilyClosed
+          ? "opacity-50 pointer-events-none"
+          : "",
+        icon: temporaryClosureMutation.isPending ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <Power size={16} />
+        ),
+      },
+      {
+        label: "Activate",
+        onClick: !isActive ? handleActivate : undefined,
+        className: isActive ? "opacity-50 pointer-events-none" : "",
+        icon: <Power size={16} />,
+      },
+      {
+        label: "Suspend",
+        onClick: isActive ? handleSuspend : undefined,
+        className: !isActive ? "opacity-50 pointer-events-none" : "",
+        icon: <PauseCircle size={16} />,
+      },
+    ]
+  : []),
 
   {
     label: "Delete",
@@ -362,7 +454,12 @@ return (
       branchId={id}
       branchName={name}
     />
-
+<TemporaryBranchClosureModal
+  open={temporaryClosureOpen}
+  onOpenChange={setTemporaryClosureOpen}
+  branchId={id}
+  branchName={name}
+/>
     <DeleteDialog
       open={deleteDialogOpen}
       onOpenChange={setDeleteDialogOpen}

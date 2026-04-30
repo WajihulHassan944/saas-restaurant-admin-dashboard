@@ -38,19 +38,30 @@ export type PromotionCampaignPayload = {
 };
 
 export type HappyHourPayload = {
+  code: string;
+  title: string;
+  description?: string;
   restaurantId?: string | null;
   branchId?: string | null;
 
-  name: string;
-  description?: string;
-  startTime?: string;
-  endTime?: string;
-  daysOfWeek?: string[];
-  discountType?: string;
-  discountValue?: number;
+  discountType: "FLAT" | "PERCENTAGE" | string;
+  discountValue: number;
+  maxDiscountAmount?: number;
+  minOrderAmount?: number;
+  maxUses?: number;
+  maxUsesPerCustomer?: number;
+
+  startsAt: string | null;
+  expiresAt?: string | null;
+
+  scopeMenuItemId?: string | null;
+  scopeCategoryId?: string | null;
+
   isActive?: boolean;
 
-  [key: string]: any;
+  activeDays?: number[];
+  dailyStartTime?: string;
+  dailyEndTime?: string;
 };
 
 const buildPromotionParams = (params?: PromotionQueryParams) => {
@@ -151,14 +162,8 @@ export const getAdminHappyHourDetail = async (id: string) => {
 };
 
 export const createAdminHappyHour = async (payload: HappyHourPayload) => {
-  const { restaurantId, branchId, ...body } = payload;
-
-  const response = await api.post("/admin/promotions/happy-hours", body, {
-    params: buildPromotionParams({
-      restaurantId,
-      branchId,
-    }),
-  });
+  
+  const response = await api.post("/admin/promotions/happy-hours", payload);
 
   return response.data;
 };
@@ -167,24 +172,22 @@ export const updateAdminHappyHour = async (
   id: string,
   payload: Partial<HappyHourPayload>
 ) => {
-  const { restaurantId, branchId, ...body } = payload;
+ 
+  const response = await api.patch(`/admin/promotions/happy-hours/${id}`, payload);
 
-  const response = await api.patch(`/admin/promotions/happy-hours/${id}`, body, {
-    params: buildPromotionParams({
-      restaurantId,
-      branchId,
-    }),
+  return response.data;
+};
+
+export const deleteAdminHappyHour = async (
+  id: string,
+  params?: PromotionQueryParams
+) => {
+  const response = await api.delete(`/admin/promotions/happy-hours/${id}`, {
+    params: buildPromotionParams(params),
   });
 
   return response.data;
 };
-
-export const deleteAdminHappyHour = async (id: string) => {
-  const response = await api.delete(`/admin/promotions/happy-hours/${id}`);
-
-  return response.data;
-};
-
 /**
  * Promotion Stats
  */

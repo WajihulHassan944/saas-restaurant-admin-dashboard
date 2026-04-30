@@ -28,14 +28,20 @@ const normalizeVariationPriceOverrides = (initialData?: any) => {
   if (Array.isArray(initialData?.variationPriceOverrides)) {
     return initialData.variationPriceOverrides.map((item: any) => ({
       variationId: String(item.variationId || ""),
-      pricingMode: item.pricingMode || "FIXED",
+
       price:
         item.price !== undefined && item.price !== null
           ? String(item.price)
           : "",
-      adjustmentValue:
-        item.adjustmentValue !== undefined && item.adjustmentValue !== null
-          ? String(item.adjustmentValue)
+
+      pickupPrice:
+        item.pickupPrice !== undefined && item.pickupPrice !== null
+          ? String(item.pickupPrice)
+          : "",
+
+      displayText:
+        item.displayText !== undefined && item.displayText !== null
+          ? String(item.displayText)
           : "",
     }));
   }
@@ -43,15 +49,20 @@ const normalizeVariationPriceOverrides = (initialData?: any) => {
   if (Array.isArray(initialData?.variations)) {
     return initialData.variations.map((variation: any) => ({
       variationId: String(variation.id || variation.variationId || ""),
-      pricingMode: variation.pricingMode || "FIXED",
+
       price:
         variation.price !== undefined && variation.price !== null
           ? String(variation.price)
           : "",
-      adjustmentValue:
-        variation.adjustmentValue !== undefined &&
-        variation.adjustmentValue !== null
-          ? String(variation.adjustmentValue)
+
+      pickupPrice:
+        variation.pickupPrice !== undefined && variation.pickupPrice !== null
+          ? String(variation.pickupPrice)
+          : "",
+
+      displayText:
+        variation.displayText !== undefined && variation.displayText !== null
+          ? String(variation.displayText)
           : "",
     }));
   }
@@ -146,6 +157,7 @@ export default function CreateMenuItemModal({
     setForm({
       ...getInitialForm(restaurantId, initialData),
       imagePreview: initialData?.imageUrl || "",
+      
     });
   }, [open, restaurantId, initialData]);
 
@@ -232,18 +244,29 @@ export default function CreateMenuItemModal({
               priceDelta: Number(item.priceDelta || 0),
             }))
         : [],
-     variationPriceOverrides: Array.isArray(form.variationPriceOverrides)
+    variationPriceOverrides: Array.isArray(form.variationPriceOverrides)
   ? form.variationPriceOverrides
       .filter((item: any) => item?.variationId)
       .map((item: any) => ({
         variationId: String(item.variationId),
+
         price:
           item.price !== "" &&
           item.price !== undefined &&
           item.price !== null
             ? Number(item.price)
             : 0,
+
+        pickupPrice:
+          item.pickupPrice !== "" &&
+          item.pickupPrice !== undefined &&
+          item.pickupPrice !== null
+            ? Number(item.pickupPrice)
+            : 0,
+
+        displayText: item.displayText || "",
       }))
+  
   : [], };
   };
 

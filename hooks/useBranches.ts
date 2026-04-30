@@ -13,6 +13,8 @@ import {
   activateBranch,
   updateBranchImages,
   forceDeleteBranch,
+  TemporaryClosurePayload,
+  updateBranchTemporaryClosure,
 } from "@/services/branches";
 import { useRouter } from "next/navigation";
 
@@ -285,6 +287,39 @@ export const useUpdateBranchImages = () => {
     onError: (err: any) => {
       toast.error(
         err?.response?.data?.message || "Failed to update images"
+      );
+    },
+  });
+};
+
+
+
+export const useUpdateBranchTemporaryClosure = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: TemporaryClosurePayload;
+    }) => updateBranchTemporaryClosure(id, payload),
+
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["branches"] });
+      queryClient.invalidateQueries({ queryKey: ["branch", variables.id] });
+
+      toast.success(
+        variables.payload.isClosed
+          ? "Branch closed temporarily!"
+          : "Branch reopened successfully!"
+      );
+    },
+
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message || "Failed to update branch closure status"
       );
     },
   });

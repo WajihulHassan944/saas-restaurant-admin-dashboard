@@ -5,15 +5,22 @@ import { Button } from "@/components/ui/button";
 import { FaPen, FaTrash } from "react-icons/fa";
 import ModifierModal from "./ModifierModal";
 import PaginationSection from "@/components/shared/pagination";
-import { Search } from "lucide-react";
-import { useGetModifiers, useDeleteModifier } from "@/hooks/useMenus";
+import { Copy, MoreVertical, Search } from "lucide-react";
+import {
+  useGetModifiers,
+  useDeleteModifier,
+  useDuplicateModifier,
+} from "@/hooks/useMenus";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 export default function ModifiersTable() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-const { restaurantId } = useAuth();
+
+  const { restaurantId } = useAuth();
+
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -23,6 +30,8 @@ const { restaurantId } = useAuth();
   const [selected, setSelected] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search.trim());
@@ -31,17 +40,19 @@ const { restaurantId } = useAuth();
 
     return () => clearTimeout(timer);
   }, [search]);
-const {
-  data: response,
-  isLoading,
-  isFetching,
-  refetch,
-} = useGetModifiers({
-  page,
-  limit,
-  search: debouncedSearch,
-  ...(restaurantId ? { restaurantId } : {}),
-});
+
+  const {
+    data: response,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetModifiers({
+    page,
+    limit,
+    search: debouncedSearch,
+    ...(restaurantId ? { restaurantId } : {}),
+  });
+
   useEffect(() => {
     if (refreshKey) {
       refetch();
@@ -49,6 +60,9 @@ const {
   }, [refreshKey, refetch]);
 
   const { mutate: deleteModifier, isPending: isDeleting } = useDeleteModifier();
+
+  const { mutate: duplicateModifier, isPending: isDuplicating } =
+    useDuplicateModifier();
 
   const items = useMemo(() => {
     if (!response) return [];
@@ -66,14 +80,12 @@ const {
 
   const pagination = useMemo(() => {
     const source =
-      response?.data?.pagination ||
-      response?.pagination ||
-      response?.meta ||
-      {};
+      response?.data?.pagination || response?.pagination || response?.meta || {};
 
     const total = Number(source?.total ?? items.length ?? 0);
     const currentPage = Number(source?.page ?? page);
     const pageSize = Number(source?.limit ?? limit);
+
     const totalPages = Number(
       source?.totalPages ??
         (pageSize > 0 ? Math.ceil(total / pageSize) : 1) ??
@@ -101,6 +113,15 @@ const {
     });
   };
 
+  const handleDuplicate = (modifierId: string) => {
+    duplicateModifier(modifierId, {
+      onSuccess: () => {
+        setOpenActionId(null);
+        refetch();
+      },
+    });
+  };
+
   const getModifierGroupNames = (item: any) => {
     const fromModifierGroups = Array.isArray(item?.modifierGroups)
       ? item.modifierGroups
@@ -119,6 +140,7 @@ const {
     rawGroups.forEach((group: any) => {
       const id = String(group?.id || "");
       if (!id) return;
+
       if (!uniqueMap.has(id)) {
         uniqueMap.set(id, group);
       }
@@ -200,6 +222,7 @@ const {
             className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
             size={18}
           />
+
           <input
             placeholder="Search modifiers..."
             value={search}
@@ -288,23 +311,40 @@ const {
                     </td>
 
                     <td className="px-2 text-center">
-                      <div className="flex justify-center gap-3">
+                      <div className="flex items-center justify-center gap-3">
                         <button
+                          type="button"
                           onClick={() => {
                             setSelected(item);
                             setOpen(true);
                           }}
                           className="text-gray-500 hover:text-primary"
+                          aria-label="Edit modifier"
                         >
                           <FaPen size={14} />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => setDeleteId(item.id)}
                           className="text-gray-500 hover:text-red-500"
+                          aria-label="Delete modifier"
                         >
                           <FaTrash size={14} />
                         </button>
+
+                        <ActionDropdown
+                          item={item}
+                          isOpen={openActionId === item.id}
+                          isDuplicating={isDuplicating}
+                          onToggle={() =>
+                            setOpenActionId((prev) =>
+                              prev === item.id ? null : item.id
+                            )
+                          }
+                          onClose={() => setOpenActionId(null)}
+                          onDuplicate={handleDuplicate}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -373,23 +413,40 @@ const {
                       {item.isActive ? "Active" : "Inactive"}
                     </span>
 
-                    <div className="flex gap-3">
+                    <div className="flex items-center gap-3">
                       <button
+                        type="button"
                         onClick={() => {
                           setSelected(item);
                           setOpen(true);
                         }}
                         className="text-gray-500 hover:text-primary"
+                        aria-label="Edit modifier"
                       >
                         <FaPen size={14} />
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
+                        aria-label="Delete modifier"
                       >
                         <FaTrash size={14} />
                       </button>
+
+                      <ActionDropdown
+                        item={item}
+                        isOpen={openActionId === item.id}
+                        isDuplicating={isDuplicating}
+                        onToggle={() =>
+                          setOpenActionId((prev) =>
+                            prev === item.id ? null : item.id
+                          )
+                        }
+                        onClose={() => setOpenActionId(null)}
+                        onDuplicate={handleDuplicate}
+                      />
                     </div>
                   </div>
                 </div>
@@ -421,6 +478,65 @@ const {
         title="Delete Modifier"
         description="Are you sure you want to delete this modifier? This action cannot be undone."
       />
+    </div>
+  );
+}
+
+function ActionDropdown({
+  item,
+  isOpen,
+  isDuplicating,
+  onToggle,
+  onClose,
+  onDuplicate,
+}: {
+  item: any;
+  isOpen: boolean;
+  isDuplicating: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onDuplicate: (modifierId: string) => void;
+}) {
+  const dropdownRef = useClickOutside<HTMLDivElement>(() => {
+    if (isOpen) {
+      onClose();
+    }
+  });
+
+  return (
+    <div ref={dropdownRef} className="relative flex justify-center">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+        aria-label="Modifier actions"
+      >
+        <MoreVertical size={17} />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute right-0 top-9 z-30 w-[160px] overflow-hidden rounded-[12px] border border-gray-100 bg-white py-1 text-left shadow-lg">
+          <button
+            type="button"
+            disabled={isDuplicating}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
+              if (isDuplicating) return;
+
+              onDuplicate(item.id);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Copy size={15} />
+            {isDuplicating ? "Duplicating..." : "Duplicate"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

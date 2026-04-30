@@ -1,42 +1,61 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FaPen, FaTrash } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useDeleteMenuCategory,
   useGetMenuCategories,
+  useReorderMenuCategories,
 } from "@/hooks/useMenuCategories";
-import PaginationSection from "@/components/shared/pagination";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
-import { Eye, Search } from "lucide-react";
+import { Eye, GripVertical, Loader2, Search } from "lucide-react";
 import CreateCategoryModalParent from "@/components/menu/listing/CreateCategoryModalParent";
 import VariationModal from "@/components/menu/listing/VariationModal";
 import { useRouter } from "next/navigation";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import InfiniteScrollFooter from "@/components/shared/infinite-scroll-footer";
+
+const PAGE_LIMIT = 10;
 
 export default function CategoriesTable({ refetchKey }: any) {
   const { user } = useAuth();
-  const restaurantId = user?.restaurantId;
-const router = useRouter();
+
+  const restaurantId = user?.restaurantId || user?.tenantId || "";
+
+  const router = useRouter();
+
+  const reorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(PAGE_LIMIT);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  const [allItems, setAllItems] = useState<any[]>([]);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+
   const [selected, setSelected] = useState<any>(null);
   const [open, setOpen] = useState(false);
-const [variationOpen, setVariationOpen] = useState(false);
-const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
-  useState<any>(null);
+
+  const [variationOpen, setVariationOpen] = useState(false);
+  const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
+    useState<any>(null);
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  /* ================= DEBOUNCE ================= */
+  const canFetchCategories = Boolean(restaurantId);
+
+  /* ================= DEBOUNCE SEARCH ================= */
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(search);
+      setDebouncedSearch(search.trim());
       setPage(1);
+      setAllItems([]);
+      setHasLoadedOnce(false);
     }, 500);
 
     return () => clearTimeout(timer);
@@ -52,56 +71,153 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
     page,
     limit,
     search: debouncedSearch,
-    ...(restaurantId ? { restaurantId } : {}),
+    restaurantId: restaurantId || undefined,
   });
-
-  /* 🔥 proper refetch */
-  useEffect(() => {
-    if (refetchKey) refetch();
-  }, [refetchKey, refetch]);
 
   const { mutate: deleteMenuCategory, isPending: isDeleting } =
     useDeleteMenuCategory();
 
-  const items = useMemo(() => {
-    if (!response) return [];
-    return (
+  const { mutate: reorderCategories, isPending: isReordering } =
+    useReorderMenuCategories();
+
+  const fetchedItems = useMemo<any[] | null>(() => {
+    if (!response) return null;
+
+    const rawItems =
       response?.data?.items ||
       response?.data?.categories ||
       response?.data?.data ||
       response?.items ||
       response?.categories ||
       response?.data ||
-      []
+      [];
+
+    return Array.isArray(rawItems) ? rawItems : [];
+  }, [response]);
+
+  const meta = useMemo(() => {
+    return (
+      response?.data?.pagination ||
+      response?.data?.meta ||
+      response?.pagination ||
+      response?.meta ||
+      {}
     );
   }, [response]);
 
-  /* ================= PAGINATION ================= */
   const pagination = useMemo(() => {
-    const source =
-      response?.data?.pagination ||
-      response?.pagination ||
-      response?.meta ||
-      {};
-
-    const total = Number(source?.total ?? items.length ?? 0);
-    const currentPage = Number(source?.page ?? page);
-    const pageSize = Number(source?.limit ?? limit);
+    const currentPage = Number(meta?.page ?? page);
+    const pageSize = Number(meta?.limit ?? limit);
+    const total = Number(meta?.total ?? 0);
     const totalPages = Number(
-      source?.totalPages ??
-        (pageSize > 0 ? Math.ceil(total / pageSize) : 1) ??
-        1
+      meta?.totalPages ??
+        (total > 0 && pageSize > 0 ? Math.ceil(total / pageSize) : 1)
     );
 
     return {
       page: currentPage,
-      totalPages: totalPages || 1,
-      total,
       limit: pageSize || limit,
-      hasNext: source?.hasNext ?? currentPage < (totalPages || 1),
-      hasPrevious: source?.hasPrevious ?? currentPage > 1,
+      total,
+      totalPages: totalPages || 1,
+      hasNext:
+        typeof meta?.hasNext === "boolean"
+          ? meta.hasNext
+          : total > 0
+          ? allItems.length < total
+          : Boolean(fetchedItems && fetchedItems.length >= pageSize),
+      hasPrevious:
+        typeof meta?.hasPrevious === "boolean"
+          ? meta.hasPrevious
+          : currentPage > 1,
     };
-  }, [response, items.length, page, limit]);
+  }, [meta, page, limit, allItems.length, fetchedItems]);
+
+  const hasMore = useMemo(() => {
+    if (!hasLoadedOnce) return false;
+
+    if (pagination.total > 0) {
+      return allItems.length < pagination.total;
+    }
+
+    return Boolean(pagination.hasNext);
+  }, [hasLoadedOnce, pagination.total, pagination.hasNext, allItems.length]);
+
+  const shouldShowInitialLoader =
+    !canFetchCategories ||
+    (!hasLoadedOnce && allItems.length === 0) ||
+    ((isLoading || isFetching) && page === 1 && allItems.length === 0);
+
+  const shouldShowEmpty =
+    canFetchCategories &&
+    hasLoadedOnce &&
+    !isLoading &&
+    !isFetching &&
+    allItems.length === 0;
+
+  /* ================= MERGE FETCHED PAGES ================= */
+  useEffect(() => {
+    if (!fetchedItems) return;
+
+    setHasLoadedOnce(true);
+
+    setAllItems((prev) => {
+      if (page === 1) {
+        return fetchedItems;
+      }
+
+      const map = new Map<string, any>();
+
+      [...prev, ...fetchedItems].forEach((item: any) => {
+        if (item?.id) {
+          map.set(String(item.id), item);
+        }
+      });
+
+      return Array.from(map.values());
+    });
+  }, [fetchedItems, page]);
+
+  /* ================= RESTAURANT READY ================= */
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    setPage(1);
+    setAllItems([]);
+    setHasLoadedOnce(false);
+    refetch();
+  }, [restaurantId, refetch]);
+
+  /* ================= EXTERNAL REFRESH ================= */
+  useEffect(() => {
+    if (!refetchKey) return;
+
+    setPage(1);
+    setHasLoadedOnce(false);
+    refetch();
+  }, [refetchKey, refetch]);
+
+  /* ================= INFINITE SCROLL ================= */
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || isFetching || isLoading) return;
+
+    setPage((prev) => {
+      if (pagination.totalPages > 0 && prev >= pagination.totalPages) {
+        return prev;
+      }
+
+      return prev + 1;
+    });
+  }, [hasMore, isFetching, isLoading, pagination.totalPages]);
+
+  const desktopLoadMoreRef = useInfiniteScroll<HTMLDivElement>({
+    enabled: hasMore && !isFetching && !isLoading,
+    onLoadMore: handleLoadMore,
+  });
+
+  const mobileLoadMoreRef = useInfiniteScroll<HTMLDivElement>({
+    enabled: hasMore && !isFetching && !isLoading,
+    onLoadMore: handleLoadMore,
+  });
 
   /* ================= DELETE ================= */
   const handleDelete = () => {
@@ -109,46 +225,119 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
 
     deleteMenuCategory(deleteId, {
       onSuccess: () => {
+        setAllItems((prev) => prev.filter((item) => item.id !== deleteId));
         setDeleteId(null);
         refetch();
       },
     });
   };
 
+  /* ================= REORDER ================= */
+  const buildReorderPayload = (items: any[]) => ({
+    items: items.map((item, index) => ({
+      id: String(item.id),
+      sortOrder: index + 1,
+    })),
+  });
+
+  const persistReorder = (items: any[]) => {
+    if (reorderTimerRef.current) {
+      clearTimeout(reorderTimerRef.current);
+    }
+
+    reorderTimerRef.current = setTimeout(() => {
+      reorderCategories(buildReorderPayload(items), {
+        onError: () => {
+          refetch();
+        },
+      });
+    }, 500);
+  };
+
+  const moveItem = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+
+    setAllItems((prev) => {
+      const fromIndex = prev.findIndex((item) => item.id === fromId);
+      const toIndex = prev.findIndex((item) => item.id === toId);
+
+      if (fromIndex === -1 || toIndex === -1) {
+        return prev;
+      }
+
+      const updated = [...prev];
+      const [movedItem] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, movedItem);
+
+      const normalized = updated.map((item, index) => ({
+        ...item,
+        sortOrder: index + 1,
+      }));
+
+      persistReorder(normalized);
+
+      return normalized;
+    });
+  };
+
+  const handleDragStart = (id: string) => {
+    setDraggedId(id);
+  };
+
+  const handleDrop = (targetId: string) => {
+    if (!draggedId) return;
+
+    moveItem(draggedId, targetId);
+    setDraggedId(null);
+  };
+
+  /* ================= REFRESH HELPERS ================= */
+  const softRefresh = () => {
+    setPage(1);
+    setHasLoadedOnce(false);
+    refetch();
+  };
+
   /* ================= SKELETON ================= */
   const SkeletonRow = () => (
     <tr>
       <td colSpan={6} className="py-6">
-        <div className="animate-pulse flex gap-3 items-center">
-          <div className="h-10 w-10 bg-gray-200 rounded-md" />
-          <div className="h-4 w-[120px] bg-gray-200 rounded" />
+        <div className="flex animate-pulse items-center gap-3">
+          <div className="h-10 w-10 rounded-md bg-gray-200" />
+          <div className="h-4 w-[120px] rounded bg-gray-200" />
         </div>
       </td>
     </tr>
   );
 
   const SkeletonCard = () => (
-    <div className="animate-pulse rounded-[18px] bg-white p-4 shadow-sm border">
+    <div className="animate-pulse rounded-[18px] border bg-white p-4 shadow-sm">
       <div className="flex gap-4">
-        <div className="h-20 w-20 bg-gray-200 rounded-[14px]" />
+        <div className="h-20 w-20 rounded-[14px] bg-gray-200" />
+
         <div className="flex-1 space-y-3">
-          <div className="h-4 w-[140px] bg-gray-200 rounded" />
-          <div className="h-3 w-[100px] bg-gray-200 rounded" />
-          <div className="h-3 w-[80px] bg-gray-200 rounded" />
+          <div className="h-4 w-[140px] rounded bg-gray-200" />
+          <div className="h-3 w-[100px] rounded bg-gray-200" />
+          <div className="h-3 w-[80px] rounded bg-gray-200" />
         </div>
       </div>
     </div>
   );
 
+  const EmptyState = () => (
+    <div className="py-10 text-center text-gray-400">No categories found</div>
+  );
+
   return (
     <div className="w-full">
-      {/* 🔥 PREMIUM SEARCH */}
+      {/* ================= SEARCH ================= */}
       <div className="mb-6 flex items-center gap-3">
         <div className="relative w-full max-w-[420px]">
           <Search
             className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
             size={18}
           />
+
           <input
             placeholder="Search categories..."
             value={search}
@@ -158,49 +347,82 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
         </div>
 
         <Button
-          onClick={() => refetch()}
+          disabled={!canFetchCategories}
+          onClick={() => {
+            if (!canFetchCategories) return;
+
+            setPage(1);
+            setHasLoadedOnce(false);
+            refetch();
+          }}
           className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm"
         >
           Search
         </Button>
       </div>
 
+      {isReordering && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
+          <Loader2 size={14} className="animate-spin" />
+          Saving category order...
+        </div>
+      )}
+
       {/* ================= DESKTOP TABLE ================= */}
-      <div className="hidden md:block overflow-x-auto rounded-[16px] bg-white">
+      <div className="hidden overflow-x-auto rounded-[16px] bg-white md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-gray-500">
-              <th className="py-3 px-2">Category</th>
-            <th className="px-2">Description</th>
-<th className="px-2 text-center">Slug</th>
+              <th className="w-[48px] px-2 py-3"></th>
+              <th className="px-2 py-3">Category</th>
+              <th className="px-2">Description</th>
+              <th className="px-2 text-center">Slug</th>
               <th className="px-2 text-center">Status</th>
               <th className="px-2 text-center">Actions</th>
             </tr>
           </thead>
 
           <tbody>
-            {isLoading || isFetching ? (
+            {shouldShowInitialLoader ? (
               Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-            ) : items.length === 0 ? (
+            ) : shouldShowEmpty ? (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-gray-400">
-                  No categories found
+                <td colSpan={6}>
+                  <EmptyState />
                 </td>
               </tr>
             ) : (
-              items.map((item: any) => (
-                <tr key={item.id} className="border-b hover:bg-gray-50">
+              allItems.map((item: any) => (
+                <tr
+                  key={item.id}
+                  draggable
+                  onDragStart={() => handleDragStart(item.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDrop(item.id)}
+                  onDragEnd={() => setDraggedId(null)}
+                  className={`border-b transition hover:bg-gray-50 ${
+                    draggedId === item.id ? "bg-primary/5 opacity-60" : ""
+                  }`}
+                >
+                  <td className="px-2 py-4">
+                    <div className="flex cursor-grab justify-center text-gray-400 active:cursor-grabbing">
+                      <GripVertical size={18} />
+                    </div>
+                  </td>
+
                   <td className="px-2 py-4">
                     <div className="flex items-center gap-3">
                       <img
                         src={item.imageUrl || "https://via.placeholder.com/40"}
                         alt={item.name}
-                        className="h-10 w-10 rounded-[10px] object-cover border"
+                        className="h-10 w-10 rounded-[10px] border object-cover"
                       />
+
                       <div>
-                        <span className="font-medium block">{item.name}</span>
+                        <span className="block font-medium">{item.name}</span>
+
                         {item.description ? (
-                          <span className="text-xs text-gray-400 line-clamp-1">
+                          <span className="line-clamp-1 text-xs text-gray-400">
                             {item.description}
                           </span>
                         ) : null}
@@ -208,21 +430,21 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                     </div>
                   </td>
 
-              <td className="px-2 max-w-[220px]">
-  {item.description ? (
-    <span className="text-sm text-gray-600 truncate block">
-      {item.description.length > 40
-        ? item.description.slice(0, 40) + "..."
-        : item.description}
-    </span>
-  ) : (
-    "-"
-  )}
-</td>
+                  <td className="max-w-[220px] px-2">
+                    {item.description ? (
+                      <span className="block truncate text-sm text-gray-600">
+                        {item.description.length > 40
+                          ? `${item.description.slice(0, 40)}...`
+                          : item.description}
+                      </span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
 
-<td className="px-2 text-center text-gray-500 text-sm">
-  {item.slug || "-"}
-</td>
+                  <td className="px-2 text-center text-sm text-gray-500">
+                    {item.slug || "-"}
+                  </td>
 
                   <td className="px-2 text-center">
                     <span
@@ -239,6 +461,7 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                   <td className="px-2 text-center">
                     <div className="flex justify-center gap-3">
                       <button
+                        type="button"
                         onClick={() => {
                           setSelected(item);
                           setOpen(true);
@@ -247,23 +470,31 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                       >
                         <FaPen size={14} />
                       </button>
+
                       <button
-  onClick={() => router.push(`/menu/categories/${item.id}`)}
-  className="text-gray-500 hover:text-primary"
-  title="View Details"
->
-  <Eye size={16} />
-</button>
-<button
-  onClick={() => {
-    setSelectedCategoryForVariation(item);
-    setVariationOpen(true);
-  }}
-  className="text-gray-500 hover:text-primary text-xs font-medium"
->
-  Variation
-</button>
+                        type="button"
+                        onClick={() =>
+                          router.push(`/menu/categories/${item.id}`)
+                        }
+                        className="text-gray-500 hover:text-primary"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+
                       <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategoryForVariation(item);
+                          setVariationOpen(true);
+                        }}
+                        className="text-xs font-medium text-gray-500 hover:text-primary"
+                      >
+                        Variation
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
                       >
@@ -277,25 +508,44 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
           </tbody>
         </table>
 
-        <div className="mt-4 px-2 pb-2">
-          <PaginationSection {...pagination} onPageChange={setPage} />
-        </div>
+        {!shouldShowInitialLoader && !shouldShowEmpty && allItems.length > 0 && (
+          <InfiniteScrollFooter
+            loadMoreRef={desktopLoadMoreRef}
+            isFetching={isFetching && page > 1}
+            hasMore={hasMore}
+            total={pagination.total}
+            shown={allItems.length}
+            label="categories"
+          />
+        )}
       </div>
 
       {/* ================= MOBILE CARDS ================= */}
       <div className="space-y-4 md:hidden">
-        {isLoading || isFetching ? (
+        {shouldShowInitialLoader ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
-        ) : items.length === 0 ? (
-          <div className="py-10 text-center text-gray-400">
-            No categories found
-          </div>
+        ) : shouldShowEmpty ? (
+          <EmptyState />
         ) : (
-          items.map((item: any) => (
+          allItems.map((item: any) => (
             <div
               key={item.id}
-              className="rounded-[18px] bg-white p-4 shadow-sm border"
+              draggable
+              onDragStart={() => handleDragStart(item.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(item.id)}
+              onDragEnd={() => setDraggedId(null)}
+              className={`rounded-[18px] border bg-white p-4 shadow-sm transition ${
+                draggedId === item.id ? "bg-primary/5 opacity-60" : ""
+              }`}
             >
+              <div className="mb-3 flex justify-end">
+                <div className="flex cursor-grab items-center gap-1 text-xs text-gray-400 active:cursor-grabbing">
+                  <GripVertical size={16} />
+                  Drag
+                </div>
+              </div>
+
               <div className="flex gap-4">
                 <img
                   src={item.imageUrl || "https://via.placeholder.com/80"}
@@ -309,20 +559,20 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                       {item.name}
                     </h3>
 
-                  <p className="text-sm text-gray-500">
-  {item.description
-    ? item.description.length > 50
-      ? item.description.slice(0, 50) + "..."
-      : item.description
-    : "No description"}
-</p>
+                    <p className="text-sm text-gray-500">
+                      {item.description
+                        ? item.description.length > 50
+                          ? `${item.description.slice(0, 50)}...`
+                          : item.description
+                        : "No description"}
+                    </p>
                   </div>
 
-               <span className="font-semibold text-primary text-sm">
-  {item.slug || "-"}
-</span>
+                  <span className="text-sm font-semibold text-primary">
+                    {item.slug || "-"}
+                  </span>
 
-                  <div className="mt-2 flex justify-between items-center">
+                  <div className="mt-2 flex items-center justify-between">
                     <span
                       className={`rounded-full px-2 py-1 text-xs ${
                         item.isActive
@@ -335,6 +585,7 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
 
                     <div className="flex gap-3">
                       <button
+                        type="button"
                         onClick={() => {
                           setSelected(item);
                           setOpen(true);
@@ -343,23 +594,31 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
                       >
                         <FaPen size={14} />
                       </button>
+
                       <button
-  onClick={() => router.push(`/menu/categories/${item.id}`)}
-  className="text-gray-500 hover:text-primary"
-  title="View Details"
->
-  <Eye size={16} />
-</button>
-<button
-  onClick={() => {
-    setSelectedCategoryForVariation(item);
-    setVariationOpen(true);
-  }}
-  className="text-gray-500 hover:text-primary text-xs font-medium"
->
-  Variation
-</button>
+                        type="button"
+                        onClick={() =>
+                          router.push(`/menu/categories/${item.id}`)
+                        }
+                        className="text-gray-500 hover:text-primary"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+
                       <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategoryForVariation(item);
+                          setVariationOpen(true);
+                        }}
+                        className="text-xs font-medium text-gray-500 hover:text-primary"
+                      >
+                        Variation
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
                       >
@@ -373,10 +632,19 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
           ))
         )}
 
-        <PaginationSection {...pagination} onPageChange={setPage} />
+        {!shouldShowInitialLoader && !shouldShowEmpty && allItems.length > 0 && (
+          <InfiniteScrollFooter
+            loadMoreRef={mobileLoadMoreRef}
+            isFetching={isFetching && page > 1}
+            hasMore={hasMore}
+            total={pagination.total}
+            shown={allItems.length}
+            label="categories"
+          />
+        )}
       </div>
 
-      {/* 🔥 EDIT MODAL */}
+      {/* ================= EDIT MODAL ================= */}
       <CreateCategoryModalParent
         open={open}
         onOpenChange={(val) => {
@@ -384,10 +652,10 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
           if (!val) setSelected(null);
         }}
         initialData={selected}
-        onSuccess={() => refetch()}
+        onSuccess={softRefresh}
       />
 
-      {/* DELETE */}
+      {/* ================= DELETE MODAL ================= */}
       <DeleteDialog
         open={!!deleteId}
         onOpenChange={(value) => {
@@ -399,20 +667,17 @@ const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
         description="Are you sure you want to delete this category? This action cannot be undone."
       />
 
-
+      {/* ================= VARIATION MODAL ================= */}
       <VariationModal
-  open={variationOpen}
-  onOpenChange={(val) => {
-    setVariationOpen(val);
-    if (!val) setSelectedCategoryForVariation(null);
-  }}
-  item={selectedCategoryForVariation}
-  mode="create"
-  onSuccess={() => {
-    refetch();
-  }}
-/>
-
+        open={variationOpen}
+        onOpenChange={(val) => {
+          setVariationOpen(val);
+          if (!val) setSelectedCategoryForVariation(null);
+        }}
+        item={selectedCategoryForVariation}
+        mode="create"
+        onSuccess={softRefresh}
+      />
     </div>
   );
 }

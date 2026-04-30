@@ -225,12 +225,23 @@ export const useUpdateAdminHappyHour = () => {
     },
   });
 };
-
 export const useDeleteAdminHappyHour = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteAdminHappyHour(id),
+    mutationFn: ({
+      id,
+      restaurantId,
+      branchId,
+    }: {
+      id: string;
+      restaurantId?: string | null;
+      branchId?: string | null;
+    }) =>
+      deleteAdminHappyHour(id, {
+        restaurantId,
+        branchId,
+      }),
 
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -239,7 +250,6 @@ export const useDeleteAdminHappyHour = () => {
     },
   });
 };
-
 /**
  * Promotion Stats
  */
