@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
@@ -9,15 +9,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, PlusCircle, X, ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2, PlusCircle } from "lucide-react";
 import FormInput from "@/components/register/form/FormInput";
 import { toast } from "sonner";
-import { useFileUpload } from "@/hooks/useFileUpload";
 import {
   useCreateMenuCategory,
   useUpdateMenuCategory,
 } from "@/hooks/useMenuCategories";
 import VariationModal from "./VariationModal";
+import ImageDropzoneUpload from "@/components/ui/ImageDropzoneUpload";
 
 interface CreateMenuModalProps {
   open: boolean;
@@ -35,11 +35,18 @@ const SORT_ORDER_OPTIONS = [
   { label: "Low Priority", value: 100 },
 ];
 
+const revokeBlobUrl = (url?: string | null) => {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+};
+
 const getInitialForm = (restaurantId?: string, initialData?: any) => ({
   name: initialData?.name || "",
   slug: initialData?.slug || "",
   description: initialData?.description || "",
   imageUrl: initialData?.imageUrl || "",
+  imagePreview: initialData?.imageUrl || "",
   sortOrder:
     initialData?.sortOrder !== undefined && initialData?.sortOrder !== null
       ? Number(initialData.sortOrder)
@@ -60,7 +67,6 @@ export default function CreateCategoryModalParent({
   const { user } = useAuth();
   const restaurantId = user?.restaurantId ?? undefined;
 
-  const { uploadFile, uploading } = useFileUpload();
   const { mutate: createMenuCategory, isPending: isCreating } =
     useCreateMenuCategory();
   const { mutate: updateMenuCategory, isPending: isUpdating } =
@@ -70,28 +76,38 @@ export default function CreateCategoryModalParent({
   const isSubmitting = isCreating || isUpdating;
 
   const [form, setForm] = useState(getInitialForm(restaurantId, initialData));
-  const [preview, setPreview] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [step, setStep] = useState<ModalStep>("form");
   const [createdCategory, setCreatedCategory] = useState<any>(null);
   const [variationModalOpen, setVariationModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
+  const imagePreviewRef = useRef<string | null>(form.imagePreview || null);
 
-    setForm(getInitialForm(restaurantId, initialData));
-    setStep("form");
-    setCreatedCategory(null);
-    setVariationModalOpen(false);
-    setPreview(null);
-  }, [open, restaurantId, initialData]);
+  const isBusy = isSubmitting || imageUploading;
+
+  useEffect(() => {
+    imagePreviewRef.current = form.imagePreview || null;
+  }, [form.imagePreview]);
 
   useEffect(() => {
     return () => {
-      if (preview?.startsWith("blob:")) {
-        URL.revokeObjectURL(preview);
-      }
+      revokeBlobUrl(imagePreviewRef.current);
     };
-  }, [preview]);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setForm((prev: any) => {
+      revokeBlobUrl(prev.imagePreview);
+
+      return getInitialForm(restaurantId, initialData);
+    });
+
+    setStep("form");
+    setCreatedCategory(null);
+    setVariationModalOpen(false);
+  }, [open, restaurantId, initialData]);
 
   const updateForm = (key: string, value: any) => {
     if (key === "name") {
@@ -119,34 +135,39 @@ export default function CreateCategoryModalParent({
     }));
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImagePreviewChange = (previewUrl: string) => {
+    setForm((prev: any) => {
+      if (
+        prev.imagePreview?.startsWith("blob:") &&
+        prev.imagePreview !== previewUrl
+      ) {
+        URL.revokeObjectURL(prev.imagePreview);
+      }
 
-    if (preview?.startsWith("blob:")) {
-      URL.revokeObjectURL(preview);
-    }
-
-    const localPreview = URL.createObjectURL(file);
-    setPreview(localPreview);
-
-    const result = await uploadFile(e);
-
-    if (result?.fileUrl) {
-      setForm((prev: any) => ({
+      return {
         ...prev,
-        imageUrl: result.fileUrl,
-      }));
-    }
+        imagePreview: previewUrl,
+      };
+    });
   };
 
-  const clearImage = () => {
-    if (preview?.startsWith("blob:")) {
-      URL.revokeObjectURL(preview);
-    }
+  const handleImageUrlChange = (fileUrl: string) => {
+    setForm((prev: any) => ({
+      ...prev,
+      imageUrl: fileUrl,
+    }));
+  };
 
-    setPreview(null);
-    updateForm("imageUrl", "");
+  const handleClearImage = () => {
+    setForm((prev: any) => {
+      revokeBlobUrl(prev.imagePreview);
+
+      return {
+        ...prev,
+        imageUrl: "",
+        imagePreview: "",
+      };
+    });
   };
 
   const payload = useMemo(
@@ -170,8 +191,12 @@ export default function CreateCategoryModalParent({
   );
 
   const resetForm = () => {
-    setForm(getInitialForm(restaurantId));
-    setPreview(null);
+    setForm((prev: any) => {
+      revokeBlobUrl(prev.imagePreview);
+
+      return getInitialForm(restaurantId);
+    });
+
     setCreatedCategory(null);
     setStep("form");
   };
@@ -181,6 +206,11 @@ export default function CreateCategoryModalParent({
   };
 
   const handleSubmit = () => {
+    if (imageUploading) {
+      toast.error("Please wait until image upload is complete");
+      return;
+    }
+
     if (!payload.name) {
       toast.error("Category name required");
       return;
@@ -225,7 +255,7 @@ export default function CreateCategoryModalParent({
           ...category,
           id: category?.id,
           imageUrl: payload.imageUrl,
-          previewUrl: preview || payload.imageUrl,
+          previewUrl: form.imagePreview || payload.imageUrl,
         };
 
         setCreatedCategory(normalizedCategory);
@@ -242,7 +272,7 @@ export default function CreateCategoryModalParent({
   };
 
   const handleClose = () => {
-    if (isSubmitting || uploading) return;
+    if (isBusy) return;
 
     onOpenChange(false);
     resetForm();
@@ -266,7 +296,7 @@ export default function CreateCategoryModalParent({
       <Dialog
         open={open}
         onOpenChange={(value) => {
-          if (!isSubmitting && !uploading) {
+          if (!isBusy) {
             if (!value) {
               handleClose();
               return;
@@ -339,7 +369,8 @@ export default function CreateCategoryModalParent({
                         {SORT_ORDER_OPTIONS.find(
                           (option) =>
                             option.value === Number(createdCategory?.sortOrder)
-                        )?.label || `Custom Order (${createdCategory?.sortOrder ?? 0})`}
+                        )?.label ||
+                          `Custom Order (${createdCategory?.sortOrder ?? 0})`}
                       </p>
                     </div>
 
@@ -411,40 +442,19 @@ export default function CreateCategoryModalParent({
                   onChange={(v) => updateForm("description", v)}
                 />
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Image</label>
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploading || isSubmitting}
-                    className="w-full rounded-[10px] border border-gray-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-
-                  {uploading && (
-                    <p className="text-xs text-gray-500">Uploading image...</p>
-                  )}
-
-                  {preview || form.imageUrl ? (
-                    <div className="relative mt-2 w-full overflow-hidden rounded-[14px] border bg-gray-50">
-                      <img
-                        src={preview || form.imageUrl}
-                        alt="Category preview"
-                        className="h-[180px] w-full object-cover"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={clearImage}
-                        disabled={uploading || isSubmitting}
-                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                <ImageDropzoneUpload
+                  label="Image"
+                  value={form.imageUrl}
+                  previewUrl={form.imagePreview}
+                  onChange={handleImageUrlChange}
+                  onPreviewChange={handleImagePreviewChange}
+                  onClear={handleClearImage}
+                  disabled={isSubmitting}
+                  onUploadingChange={setImageUploading}
+                  previewAlt="Category preview"
+                  previewHeightClassName="h-[180px]"
+                  emptyTitle="Drag & drop category image here"
+                />
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
@@ -457,7 +467,7 @@ export default function CreateCategoryModalParent({
                       onChange={(e) =>
                         updateForm("sortOrder", Number(e.target.value))
                       }
-                      disabled={isSubmitting || uploading}
+                      disabled={isBusy}
                       className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] bg-white px-4 pr-12 text-sm text-gray-600 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {SORT_ORDER_OPTIONS.map((option) => (
@@ -484,7 +494,7 @@ export default function CreateCategoryModalParent({
                   variant="ghost"
                   className="rounded-[10px] px-6 py-2 text-[16px] text-gray-700"
                   onClick={handleClose}
-                  disabled={isSubmitting || uploading}
+                  disabled={isBusy}
                 >
                   Close
                 </Button>
@@ -493,12 +503,12 @@ export default function CreateCategoryModalParent({
                   type="button"
                   onClick={handleSubmit}
                   className="rounded-[10px] bg-primary px-6 py-2 text-[16px] hover:bg-primary/90"
-                  disabled={isSubmitting || uploading}
+                  disabled={isBusy}
                 >
-                  {isSubmitting || uploading ? (
+                  {isBusy ? (
                     <>
                       <Loader2 className="mr-2 animate-spin" size={18} />
-                      {uploading
+                      {imageUploading
                         ? "Uploading..."
                         : isEditMode
                         ? "Updating..."

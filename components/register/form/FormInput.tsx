@@ -3,13 +3,21 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
-import { useState, forwardRef } from "react";
+import {
+  forwardRef,
+  useState,
+  type InputHTMLAttributes,
+} from "react";
 
-interface FormInputProps {
+interface FormInputProps
+  extends Omit<
+    InputHTMLAttributes<HTMLInputElement>,
+    "onChange" | "value" | "type" | "onBlur" | "placeholder" | "required"
+  > {
   label: string;
   placeholder?: string;
   value?: string;
-  type?: string; // NEW
+  type?: InputHTMLAttributes<HTMLInputElement>["type"];
   onChange?: (val: string) => void;
   onBlur?: () => void;
   required?: boolean;
@@ -31,6 +39,8 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
       error,
       errorText,
       showPasswordToggle,
+      className = "",
+      ...inputProps
     },
     ref
   ) => {
@@ -58,21 +68,24 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
             onChange={(e) => onChange?.(e.target.value)}
             onBlur={onBlur}
             placeholder={placeholder}
+            required={required}
             className={`
               border-[#BBBBBB]
               placeholder-[#BBBBBB]
               focus:border-primary
               focus:ring-1
               focus:ring-primary
-              pr-10
+              ${showPasswordToggle && type === "password" ? "pr-10" : ""}
               ${error ? "border-primary bg-primary/5" : ""}
+              ${className}
             `}
+            {...inputProps}
           />
 
           {showPasswordToggle && type === "password" && (
             <button
               type="button"
-              onClick={() => setShowPassword((p) => !p)}
+              onClick={() => setShowPassword((prev) => !prev)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -81,7 +94,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
         </div>
 
         {error && errorText && (
-          <p className="text-xs text-primary mt-1">{errorText}</p>
+          <p className="mt-1 text-xs text-primary">{errorText}</p>
         )}
       </div>
     );

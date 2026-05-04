@@ -8,23 +8,38 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type InputHTMLAttributes,
+} from "react";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
-import { useCreateModifier, useUpdateMenuVariation, useUpdateModifier } from "@/hooks/useMenus";
+import {
+  useCreateModifier,
+  useUpdateMenuVariation,
+  useUpdateModifier,
+} from "@/hooks/useMenus";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import { useGetModifierGroupCategories } from "@/hooks/useMenuCategories";
+import {
+  blockInvalidNumberKeys,
+  blockNegativeNumberPaste,
+  sanitizeNonNegativeNumber,
+} from "@/utils/numberInput";
 
 type VariationPriceOverride = {
   variationId: string;
-  priceDelta: number | "";
+  priceDelta: string;
 };
 
 interface ModifierForm {
   modifierGroupIds: string[];
   name: string;
-  priceDelta: number;
+  priceDelta: string;
   sortOrder: number;
   variationPriceOverrides: VariationPriceOverride[];
 }
@@ -39,7 +54,7 @@ const SORT_ORDER_OPTIONS = [
 const getEmptyForm = (): ModifierForm => ({
   modifierGroupIds: [],
   name: "",
-  priceDelta: 0,
+  priceDelta: "0",
   sortOrder: 0,
   variationPriceOverrides: [],
 });
@@ -105,7 +120,7 @@ export default function ModifierModal({
         variationId: String(variation?.id),
         priceDelta:
           existing?.priceDelta !== undefined && existing?.priceDelta !== null
-            ? Number(existing.priceDelta)
+            ? sanitizeNonNegativeNumber(String(existing.priceDelta))
             : "",
       };
     });
@@ -137,7 +152,9 @@ export default function ModifierModal({
       setForm({
         modifierGroupIds: resolvedGroup?.id ? [String(resolvedGroup.id)] : [],
         name: initialData.name || "",
-        priceDelta: Number(initialData.priceDelta || 0),
+        priceDelta: sanitizeNonNegativeNumber(
+          String(initialData.priceDelta ?? 0)
+        ),
         sortOrder: Number(initialData.sortOrder || 0),
         variationPriceOverrides: [],
       });
@@ -272,14 +289,17 @@ export default function ModifierModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleNumberChange = (key: "priceDelta", value: string) => {
+    handleChange(key, sanitizeNonNegativeNumber(value));
+  };
+
   const handleVariationOverrideChange = (
     variationId: string,
     priceDelta: string
   ) => {
-    setForm((prev): ModifierForm => {
-      const normalizedValue: number | "" =
-        priceDelta === "" ? "" : Number(priceDelta);
+    const sanitizedPriceDelta = sanitizeNonNegativeNumber(priceDelta);
 
+    setForm((prev): ModifierForm => {
       const exists = prev.variationPriceOverrides.some(
         (override) => String(override.variationId) === String(variationId)
       );
@@ -292,7 +312,7 @@ export default function ModifierModal({
               String(override.variationId) === String(variationId)
                 ? {
                     ...override,
-                    priceDelta: normalizedValue,
+                    priceDelta: sanitizedPriceDelta,
                   }
                 : override
           ),
@@ -305,7 +325,7 @@ export default function ModifierModal({
           ...prev.variationPriceOverrides,
           {
             variationId,
-            priceDelta: normalizedValue,
+            priceDelta: sanitizedPriceDelta,
           },
         ],
       };
@@ -333,44 +353,46 @@ export default function ModifierModal({
   );
 
   const patchVariationModifierOverrides = async (modifierId: string) => {
-  if (!modifierId || normalizedVariationOverrides.length === 0) return;
+    if (!modifierId || normalizedVariationOverrides.length === 0) return;
 
-  await Promise.all(
-    normalizedVariationOverrides.map(async (override) => {
-      const variation = variations.find(
-        (entry) => String(entry.id) === String(override.variationId)
-      );
+    await Promise.all(
+      normalizedVariationOverrides.map(async (override) => {
+        const variation = variations.find(
+          (entry) => String(entry.id) === String(override.variationId)
+        );
 
-      if (!variation?.id) return;
+        if (!variation?.id) return;
 
-      const existingOverrides = Array.isArray(variation?.modifierPriceOverrides)
-        ? variation.modifierPriceOverrides
-        : [];
+        const existingOverrides = Array.isArray(
+          variation?.modifierPriceOverrides
+        )
+          ? variation.modifierPriceOverrides
+          : [];
 
-      const nextOverrides = [
-        ...existingOverrides
-          .filter(
-            (entry: any) => String(entry?.modifierId) !== String(modifierId)
-          )
-          .map((entry: any) => ({
-            modifierId: String(entry.modifierId),
-            priceDelta: Number(entry.priceDelta),
-          })),
-        {
-          modifierId: String(modifierId),
-          priceDelta: Number(override.priceDelta),
-        },
-      ];
+        const nextOverrides = [
+          ...existingOverrides
+            .filter(
+              (entry: any) => String(entry?.modifierId) !== String(modifierId)
+            )
+            .map((entry: any) => ({
+              modifierId: String(entry.modifierId),
+              priceDelta: Number(entry.priceDelta),
+            })),
+          {
+            modifierId: String(modifierId),
+            priceDelta: Number(override.priceDelta),
+          },
+        ];
 
-      await updateMenuVariation({
-        id: String(variation.id),
-        data: {
-          modifierPriceOverrides: nextOverrides,
-        },
-      });
-    })
-  );
-};
+        await updateMenuVariation({
+          id: String(variation.id),
+          data: {
+            modifierPriceOverrides: nextOverrides,
+          },
+        });
+      })
+    );
+  };
 
   const getModifierIdFromResponse = (res: any) => {
     return (
@@ -389,11 +411,49 @@ export default function ModifierModal({
       return;
     }
 
+    const priceDelta = Number(form.priceDelta);
+    const sortOrder = Number(form.sortOrder);
+
+    if (form.priceDelta === "" || Number.isNaN(priceDelta)) {
+      toast.error("Default price delta must be a valid number");
+      return;
+    }
+
+    if (priceDelta < 0) {
+      toast.error("Default price delta cannot be negative");
+      return;
+    }
+
+    if (Number.isNaN(sortOrder)) {
+      toast.error("Display priority must be a valid number");
+      return;
+    }
+
+    const hasInvalidVariationOverride = form.variationPriceOverrides.some(
+      (override) =>
+        override.priceDelta !== "" && Number.isNaN(Number(override.priceDelta))
+    );
+
+    if (hasInvalidVariationOverride) {
+      toast.error("Variation override price must be a valid number");
+      return;
+    }
+
+    const hasNegativeVariationOverride = form.variationPriceOverrides.some(
+      (override) =>
+        override.priceDelta !== "" && Number(override.priceDelta) < 0
+    );
+
+    if (hasNegativeVariationOverride) {
+      toast.error("Variation override price cannot be negative");
+      return;
+    }
+
     try {
       const modifierPayload = {
         name: form.name.trim(),
-        priceDelta: Number(form.priceDelta),
-        sortOrder: Number(form.sortOrder),
+        priceDelta,
+        sortOrder,
         modifierGroupIds: form.modifierGroupIds,
       };
 
@@ -407,13 +467,11 @@ export default function ModifierModal({
 
         const modifierId = getModifierIdFromResponse(modifierRes);
         await patchVariationModifierOverrides(modifierId);
-
       } else {
         modifierRes = await createModifier(modifierPayload);
 
         const modifierId = getModifierIdFromResponse(modifierRes);
         await patchVariationModifierOverrides(modifierId);
-
       }
 
       refresh?.();
@@ -483,7 +541,10 @@ export default function ModifierModal({
             label="Default Price Delta"
             type="number"
             value={form.priceDelta}
-            onChange={(v: string) => handleChange("priceDelta", Number(v))}
+            onChange={(v: string) => handleNumberChange("priceDelta", v)}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            min={0}
           />
 
           <div className="space-y-2">
@@ -569,6 +630,9 @@ export default function ModifierModal({
                           e.target.value
                         )
                       }
+                      onKeyDown={blockInvalidNumberKeys}
+                      onPaste={blockNegativeNumberPaste}
+                      min={0}
                       placeholder="Override"
                       className="h-[38px] w-full rounded-[10px] border border-gray-300 px-3 text-sm outline-none focus:border-gray-400"
                     />
@@ -600,11 +664,15 @@ export default function ModifierModal({
   );
 }
 
-interface InputFieldProps {
+interface InputFieldProps
+  extends Omit<
+    InputHTMLAttributes<HTMLInputElement>,
+    "onChange" | "value" | "type"
+  > {
   label: string;
   value: string | number;
   onChange: (value: string) => void;
-  type?: string;
+  type?: InputHTMLAttributes<HTMLInputElement>["type"];
 }
 
 function InputField({
@@ -612,6 +680,8 @@ function InputField({
   value,
   onChange,
   type = "text",
+  className = "",
+  ...inputProps
 }: InputFieldProps) {
   return (
     <div className="space-y-1">
@@ -619,8 +689,21 @@ function InputField({
       <input
         type={type}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-[40px] w-full rounded-[10px] border border-gray-300 px-3 outline-none focus:border-gray-400"
+        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+          onChange(e.target.value)
+        }
+        className={`
+          h-[40px]
+          w-full
+          rounded-[10px]
+          border
+          border-gray-300
+          px-3
+          outline-none
+          focus:border-gray-400
+          ${className}
+        `}
+        {...inputProps}
       />
     </div>
   );

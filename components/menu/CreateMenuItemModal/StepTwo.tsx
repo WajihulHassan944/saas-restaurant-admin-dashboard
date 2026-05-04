@@ -1,14 +1,17 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useState } from "react";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useFileUpload } from "@/hooks/useFileUpload";
 import { toast } from "sonner";
-import { FileText, ImagePlus, UploadCloud, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
+import {
+  blockInvalidNumberKeys,
+  blockNegativeNumberPaste,
+  sanitizeNonNegativeNumber,
+} from "@/utils/numberInput";
+import ImageDropzoneUpload from "@/components/ui/ImageDropzoneUpload";
 
 type Field = keyof z.infer<typeof schema>;
 
@@ -23,9 +26,7 @@ const schema = z.object({
 
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   const [errors, setErrors] = useState<any>({});
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { uploadFile, uploading } = useFileUpload();
+  const [imageUploading, setImageUploading] = useState(false);
 
   const update = (key: string, value: string | boolean) => {
     setForm((prev: any) => ({
@@ -34,21 +35,12 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
     }));
   };
 
-
-  
-
-  const processImageFile = async (file: File) => {
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a valid image file");
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(file);
-
+  const handleImagePreviewChange = (previewUrl: string) => {
     setForm((prev: any) => {
-      if (prev.imagePreview?.startsWith("blob:")) {
+      if (
+        prev.imagePreview?.startsWith("blob:") &&
+        prev.imagePreview !== previewUrl
+      ) {
         URL.revokeObjectURL(prev.imagePreview);
       }
 
@@ -57,54 +49,27 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
         imagePreview: previewUrl,
       };
     });
+  };
 
-    const syntheticEvent = {
-      target: {
-        files: [file],
-      },
-    } as unknown as React.ChangeEvent<HTMLInputElement>;
+  const handleImageUrlChange = (fileUrl: string) => {
+    setForm((prev: any) => ({
+      ...prev,
+      imageUrl: fileUrl,
+    }));
+  };
 
-    const result = await uploadFile(syntheticEvent);
+  const handleClearImage = () => {
+    setForm((prev: any) => {
+      if (prev.imagePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(prev.imagePreview);
+      }
 
-    if (result?.fileUrl) {
-      setForm((prev: any) => ({
+      return {
         ...prev,
-        imageUrl: result.fileUrl,
-      }));
-    } else {
-      toast.error("Image upload failed");
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-
-    await processImageFile(file);
-  };
-
-  const openFilePicker = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    await processImageFile(file);
+        imageUrl: "",
+        imagePreview: "",
+      };
+    });
   };
 
   const validateField = (field: Field, value: any) => {
@@ -142,7 +107,7 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
   };
 
   const validateStep = () => {
-    if (uploading) {
+    if (imageUploading) {
       toast.error("Please wait until image upload is complete");
       return false;
     }
@@ -151,6 +116,7 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
 
     if (!result.success) {
       const fieldErrors: any = {};
+
       result.error.issues.forEach((err) => {
         fieldErrors[err.path[0]] = err.message;
       });
@@ -169,109 +135,38 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
 
   return (
     <div className="space-y-5">
-      <div className="space-y-3">
-        <Label>Image</Label>
-
-        {form.imagePreview ? (
-          <div className="relative overflow-hidden rounded-[18px] border border-gray-200 bg-white shadow-sm">
-            <img
-              src={form.imagePreview}
-              alt="Preview"
-              className="h-52 w-full object-cover"
-            />
-
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 via-black/20 to-transparent px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-white">Image uploaded</p>
-                <p className="text-xs text-white/80">
-                  Drag & drop another image to replace it
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((prev: any) => ({
-                    ...prev,
-                    imageUrl: "",
-                    imagePreview: "",
-                  }))
-                }
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div
-              onClick={openFilePicker}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`absolute inset-0 cursor-pointer transition ${
-                isDragging ? "bg-primary/10 ring-2 ring-primary ring-inset" : ""
-              }`}
-            />
-          </div>
-        ) : (
-          <div
-            onClick={openFilePicker}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`group relative cursor-pointer overflow-hidden rounded-[18px] border border-dashed bg-white px-6 py-8 text-center transition-all duration-200 ${
-              isDragging
-                ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                : "border-gray-300 hover:border-primary/50 hover:bg-gray-50"
-            }`}
-          >
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9FAFB] text-primary shadow-sm">
-              {isDragging ? <UploadCloud size={24} /> : <ImagePlus size={24} />}
-            </div>
-
-            <div className="mt-4 space-y-1">
-              <p className="text-sm font-semibold text-dark">
-                Drag & drop your image here
-              </p>
-              <p className="text-xs text-gray-500">
-                or <span className="font-medium text-primary">click to browse</span>
-              </p>
-              <p className="text-[11px] text-gray-400">
-                PNG, JPG, WEBP up to 10MB
-              </p>
-            </div>
-          </div>
-        )}
-
-        <Input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="hidden"
-        />
-
-        {uploading && <p className="text-xs text-gray-500">Uploading image...</p>}
-      </div>
+      <ImageDropzoneUpload
+        label="Image"
+        value={form.imageUrl}
+        previewUrl={form.imagePreview}
+        onChange={handleImageUrlChange}
+        onPreviewChange={handleImagePreviewChange}
+        onClear={handleClearImage}
+        onUploadingChange={setImageUploading}
+        previewAlt="Item image preview"
+      />
 
       <div className="space-y-2">
         <Label>Preparation Time (minutes) - Optional</Label>
 
-      <Input
-  type="number"
-  min={0}
-  value={form.prepTimeMinutes || ""}
-  onKeyDown={blockInvalidNumberKeys}
-  onPaste={blockNegativeNumberPaste}
-  onChange={(e) =>
-    update("prepTimeMinutes", sanitizeNonNegativeNumber(e.target.value))
-  }
-  onBlur={(e) =>
-    validateField("prepTimeMinutes", sanitizeNonNegativeNumber(e.target.value))
-  }
-  placeholder="Enter preparation time if applicable"
-  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-/>
+        <Input
+          type="number"
+          min={0}
+          value={form.prepTimeMinutes || ""}
+          onKeyDown={blockInvalidNumberKeys}
+          onPaste={blockNegativeNumberPaste}
+          onChange={(e) =>
+            update("prepTimeMinutes", sanitizeNonNegativeNumber(e.target.value))
+          }
+          onBlur={(e) =>
+            validateField(
+              "prepTimeMinutes",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          placeholder="Enter preparation time if applicable"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
 
         {errors.prepTimeMinutes && (
           <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
@@ -281,27 +176,27 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Delivery Price Adjustment</Label>
 
-    <Input
-  type="number"
-  min={0}
-  value={form.deliveryPriceAdjustment || ""}
-  onKeyDown={blockInvalidNumberKeys}
-  onPaste={blockNegativeNumberPaste}
-  onChange={(e) =>
-    update(
-      "deliveryPriceAdjustment",
-      sanitizeNonNegativeNumber(e.target.value)
-    )
-  }
-  onBlur={(e) =>
-    validateField(
-      "deliveryPriceAdjustment",
-      sanitizeNonNegativeNumber(e.target.value)
-    )
-  }
-  placeholder="0"
-  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-/>
+        <Input
+          type="number"
+          min={0}
+          value={form.deliveryPriceAdjustment || ""}
+          onKeyDown={blockInvalidNumberKeys}
+          onPaste={blockNegativeNumberPaste}
+          onChange={(e) =>
+            update(
+              "deliveryPriceAdjustment",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          onBlur={(e) =>
+            validateField(
+              "deliveryPriceAdjustment",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          placeholder="0"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
 
         {errors.deliveryPriceAdjustment && (
           <p className="text-xs text-red-500">
@@ -313,27 +208,27 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Takeaway Price Adjustment</Label>
 
-     <Input
-  type="number"
-  min={0}
-  value={form.takeawayPriceAdjustment || ""}
-  onKeyDown={blockInvalidNumberKeys}
-  onPaste={blockNegativeNumberPaste}
-  onChange={(e) =>
-    update(
-      "takeawayPriceAdjustment",
-      sanitizeNonNegativeNumber(e.target.value)
-    )
-  }
-  onBlur={(e) =>
-    validateField(
-      "takeawayPriceAdjustment",
-      sanitizeNonNegativeNumber(e.target.value)
-    )
-  }
-  placeholder="0"
-  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-/>
+        <Input
+          type="number"
+          min={0}
+          value={form.takeawayPriceAdjustment || ""}
+          onKeyDown={blockInvalidNumberKeys}
+          onPaste={blockNegativeNumberPaste}
+          onChange={(e) =>
+            update(
+              "takeawayPriceAdjustment",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          onBlur={(e) =>
+            validateField(
+              "takeawayPriceAdjustment",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          placeholder="0"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
 
         {errors.takeawayPriceAdjustment && (
           <p className="text-xs text-red-500">
@@ -345,21 +240,24 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       <div className="space-y-2">
         <Label>Deposit Amount</Label>
 
-    <Input
-  type="number"
-  min={0}
-  value={form.depositAmount || ""}
-  onKeyDown={blockInvalidNumberKeys}
-  onPaste={blockNegativeNumberPaste}
-  onChange={(e) =>
-    update("depositAmount", sanitizeNonNegativeNumber(e.target.value))
-  }
-  onBlur={(e) =>
-    validateField("depositAmount", sanitizeNonNegativeNumber(e.target.value))
-  }
-  placeholder="0"
-  className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-/>
+        <Input
+          type="number"
+          min={0}
+          value={form.depositAmount || ""}
+          onKeyDown={blockInvalidNumberKeys}
+          onPaste={blockNegativeNumberPaste}
+          onChange={(e) =>
+            update("depositAmount", sanitizeNonNegativeNumber(e.target.value))
+          }
+          onBlur={(e) =>
+            validateField(
+              "depositAmount",
+              sanitizeNonNegativeNumber(e.target.value)
+            )
+          }
+          placeholder="0"
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
 
         {errors.depositAmount && (
           <p className="text-xs text-red-500">{errors.depositAmount}</p>
@@ -372,7 +270,12 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
         <Textarea
           value={form.ingredients || ""}
           placeholder="e.g. Chicken patty, lettuce, cheese, mayo"
-          onChange={(e) => setForm({ ...form, ingredients: e.target.value })}
+          onChange={(e) =>
+            setForm((prev: any) => ({
+              ...prev,
+              ingredients: e.target.value,
+            }))
+          }
           onBlur={(e) => validateField("ingredients", e.target.value)}
           className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
@@ -389,10 +292,10 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           value={form.nutritionalInformation || ""}
           placeholder="e.g. 450 kcal, 20g protein, 15g fat"
           onChange={(e) =>
-            setForm({
-              ...form,
+            setForm((prev: any) => ({
+              ...prev,
               nutritionalInformation: e.target.value,
-            })
+            }))
           }
           onBlur={(e) =>
             validateField("nutritionalInformation", e.target.value)
@@ -428,8 +331,6 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
       </div>
-
-   
 
       <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
         <label className="flex cursor-pointer items-center gap-2">

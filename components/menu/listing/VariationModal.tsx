@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import FormInput from "@/components/register/form/FormInput";
 import { Label } from "@/components/ui/label";
+import { blockInvalidNumberKeys, blockNegativeNumberPaste, sanitizeNonNegativeNumber } from "@/utils/numberInput";
 
 type Props = {
   open: boolean;
@@ -219,12 +220,12 @@ export default function VariationModal({
     fetchVariations();
   }, [open, token, resolvedCategoryId]);
 
-  const handleChange = (key: string, value: any) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
+const handleChange = (key: string, value: any) => {
+  setForm((prev) => ({
+    ...prev,
+    [key]: key === "price" ? sanitizeNonNegativeNumber(String(value)) : value,
+  }));
+};
 
   const handleSubmit = async () => {
     if (!form.categoryId) {
@@ -237,17 +238,18 @@ export default function VariationModal({
       return;
     }
 
-    if (form.price === "") {
-      toast.error("Price is required");
-      return;
-    }
-
+    
     const price = Number(form.price);
 
-    if (Number.isNaN(price)) {
-      toast.error("Price must be a valid number");
-      return;
-    }
+if (form.price === "" || Number.isNaN(price)) {
+  toast.error("Price must be a valid number");
+  return;
+}
+
+if (price < 0) {
+  toast.error("Price cannot be negative");
+  return;
+}
 
     const basePayload = {
       name: form.name.trim(),
@@ -453,14 +455,17 @@ export default function VariationModal({
                 onChange={(v) => handleChange("description", v)}
               />
 
-              <FormInput
-                label="Price"
-                placeholder="Enter price"
-                value={form.price}
-                onChange={(v) => handleChange("price", v)}
-                type="number"
-                required
-              />
+             <FormInput
+  label="Price"
+  placeholder="Enter price"
+  value={form.price}
+  onChange={(v) => handleChange("price", v)}
+  type="number"
+  onKeyDown={blockInvalidNumberKeys}
+  onPaste={blockNegativeNumberPaste}
+  min={0}
+  required
+/>
 
               <div className="space-y-2">
                 <Label>Display Priority</Label>
