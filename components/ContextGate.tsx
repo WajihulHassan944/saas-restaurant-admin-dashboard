@@ -5,9 +5,13 @@ import { useAuthContext } from "@/context/AuthContext";
 import useApi from "@/hooks/useApi";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function ContextGate() {
-  const { user, loading, setUser, token } = useAuthContext();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const { user, loading, setUser, token, logout } = useAuthContext();
   const { get } = useApi(token);
 
   const [open, setOpen] = useState(false);
@@ -18,11 +22,24 @@ export default function ContextGate() {
   /* ================= CHECK ================= */
 
   useEffect(() => {
-    if (loading || !user) return;
+    // 🚫 Never show on login page
+    if (pathname === "/login") {
+      setOpen(false);
+      return;
+    }
 
-    const needsRestaurant = !user.restaurantId;
-    setOpen(needsRestaurant);
-  }, [user, loading]);
+    // 🚫 Wait until auth ready
+    if (loading) return;
+
+    // 🚫 If logged out → don't open
+    if (!user || !token) {
+      setOpen(false);
+      return;
+    }
+
+    // ✅ Only open if needed
+    setOpen(!user.restaurantId);
+  }, [user, loading, token, pathname]);
 
   /* ================= FETCH ================= */
 
@@ -77,15 +94,15 @@ export default function ContextGate() {
     setOpen(false);
   };
 
-  if (!open) return null;
+  // 🚫 Hard guard (prevents flicker + ghost modal)
+  if (!open || !user || !token || pathname === "/login") return null;
 
   /* ================= UI ================= */
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
-
       <div className="w-full max-w-[560px] bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 animate-in zoom-in-95 duration-300">
-
+        
         {/* HEADER */}
         <div className="text-center mb-6">
           <h2 className="text-2xl font-semibold tracking-tight">
@@ -120,10 +137,10 @@ export default function ContextGate() {
                 key={r.id}
                 onClick={() => setSelectedRestaurant(r)}
                 className={`w-full p-4 rounded-xl border text-left transition-all duration-200
-                  
-                  ${selectedRestaurant?.id === r.id
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-gray-200 hover:border-primary hover:bg-gray-50 hover:shadow-sm"
+                  ${
+                    selectedRestaurant?.id === r.id
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-gray-200 hover:border-primary hover:bg-gray-50 hover:shadow-sm"
                   }
                 `}
               >
@@ -148,8 +165,23 @@ export default function ContextGate() {
 
           {/* EMPTY STATE */}
           {!isFetching && restaurants.length === 0 && (
-            <div className="text-center text-sm text-gray-400 py-6">
-              No restaurants found
+            <div className="text-center text-sm text-gray-500 py-6 space-y-3">
+              <p>
+                You haven’t registered any restaurant or it might have been deleted.
+              </p>
+              <p>
+                Please request Super Admin to add one, then login again.
+              </p>
+
+              <button
+                onClick={() => {
+                  logout();
+                  router.push("/login");
+                }}
+                className="mt-2 px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600"
+              >
+                Logout & Go to Login
+              </button>
             </div>
           )}
         </div>
@@ -160,17 +192,16 @@ export default function ContextGate() {
             onClick={handleConfirm}
             disabled={!selectedRestaurant}
             className={`w-full h-[48px] rounded-xl text-sm font-medium transition-all
-              
-              ${selectedRestaurant
-                ? "bg-primary text-white hover:opacity-90"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              ${
+                selectedRestaurant
+                  ? "bg-primary text-white hover:opacity-90"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }
             `}
           >
             Continue
           </button>
         </div>
-
       </div>
     </div>
   );

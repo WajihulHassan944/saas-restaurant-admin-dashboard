@@ -5,11 +5,12 @@ import { ChevronDown, Check } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function RestaurantPicker() {
   const { token, user, setUser } = useAuth();
   const { get } = useApi(token);
-
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [restaurants, setRestaurants] = useState<any[]>([]);
@@ -17,6 +18,16 @@ export default function RestaurantPicker() {
 
   const [open, setOpen] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+
+    const handleLogout = (): void => {
+    localStorage.removeItem("auth");
+    toast.success("Logged out successfully");
+
+    setTimeout(() => {
+      router.push("/login");
+    }, 500);
+  };
+
 
   /* ================= FETCH ================= */
 
@@ -165,12 +176,26 @@ export default function RestaurantPicker() {
                 </button>
               ))}
 
-            {/* EMPTY */}
-            {!isFetching && restaurants.length === 0 && (
-              <div className="text-center text-xs text-gray-400 py-3">
-                No restaurants found
-              </div>
-            )}
+          
+{!isFetching && restaurants.length === 0 && (
+  <div className="text-center text-xs text-gray-500 py-3 space-y-2">
+    <p>
+      You haven’t registered any restaurant or it might have been deleted.
+    </p>
+    <p>
+      Please request Super Admin to add one, then login again.
+    </p>
+
+    <button
+    onClick={handleLogout}
+      className="mt-2 px-3 py-1.5 text-xs rounded-md bg-red-500 text-white hover:bg-red-600"
+    >
+      Go to Login
+    </button>
+  </div>
+)}
+
+
           </div>
         </div>
       )}
