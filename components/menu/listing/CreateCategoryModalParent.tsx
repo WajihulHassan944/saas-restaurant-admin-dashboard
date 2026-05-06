@@ -16,7 +16,6 @@ import {
   useCreateMenuCategory,
   useUpdateMenuCategory,
 } from "@/hooks/useMenuCategories";
-import VariationModal from "./VariationModal";
 import ImageDropzoneUpload from "@/components/ui/ImageDropzoneUpload";
 
 interface CreateMenuModalProps {
@@ -25,8 +24,6 @@ interface CreateMenuModalProps {
   initialData?: any;
   onSuccess?: () => void;
 }
-
-type ModalStep = "form" | "created";
 
 const SORT_ORDER_OPTIONS = [
   { label: "Top Priority", value: 0 },
@@ -40,6 +37,13 @@ const revokeBlobUrl = (url?: string | null) => {
     URL.revokeObjectURL(url);
   }
 };
+
+const buildSlug = (value: string) =>
+  String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]+/g, "");
 
 const getInitialForm = (restaurantId?: string, initialData?: any) => ({
   name: initialData?.name || "",
@@ -64,22 +68,21 @@ export default function CreateCategoryModalParent({
   initialData,
   onSuccess,
 }: CreateMenuModalProps) {
-  const { user } = useAuth();
-  const restaurantId = user?.restaurantId ?? undefined;
+  const { restaurantId: authRestaurantId } = useAuth();
+
+const restaurantId = authRestaurantId ?? undefined;
 
   const { mutate: createMenuCategory, isPending: isCreating } =
     useCreateMenuCategory();
+
   const { mutate: updateMenuCategory, isPending: isUpdating } =
     useUpdateMenuCategory();
 
-  const isEditMode = !!initialData?.id;
+  const isEditMode = Boolean(initialData?.id);
   const isSubmitting = isCreating || isUpdating;
 
   const [form, setForm] = useState(getInitialForm(restaurantId, initialData));
   const [imageUploading, setImageUploading] = useState(false);
-  const [step, setStep] = useState<ModalStep>("form");
-  const [createdCategory, setCreatedCategory] = useState<any>(null);
-  const [variationModalOpen, setVariationModalOpen] = useState(false);
 
   const imagePreviewRef = useRef<string | null>(form.imagePreview || null);
 
@@ -103,19 +106,11 @@ export default function CreateCategoryModalParent({
 
       return getInitialForm(restaurantId, initialData);
     });
-
-    setStep("form");
-    setCreatedCategory(null);
-    setVariationModalOpen(false);
   }, [open, restaurantId, initialData]);
 
   const updateForm = (key: string, value: any) => {
     if (key === "name") {
-      const slug = String(value || "")
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, "-")
-        .replace(/[^\w-]+/g, "");
+      const slug = buildSlug(value);
 
       setForm((prev) => ({
         ...prev,
@@ -172,20 +167,14 @@ export default function CreateCategoryModalParent({
 
   const payload = useMemo(
     () => ({
-      restaurantId,
+      restaurantId: restaurantId || undefined,
       parentCategoryId: form.parentCategoryId || undefined,
       name: form.name?.trim(),
-      slug:
-        form.slug?.trim() ||
-        String(form.name || "")
-          .toLowerCase()
-          .trim()
-          .replace(/\s+/g, "-")
-          .replace(/[^\w-]+/g, ""),
+      slug: form.slug?.trim() || buildSlug(form.name),
       description: form.description || "",
       imageUrl: form.imageUrl || "",
       sortOrder: Number(form.sortOrder || 0),
-      isActive: form.isActive,
+      isActive: Boolean(form.isActive),
     }),
     [form, restaurantId]
   );
@@ -196,13 +185,13 @@ export default function CreateCategoryModalParent({
 
       return getInitialForm(restaurantId);
     });
-
-    setCreatedCategory(null);
-    setStep("form");
   };
 
-  const getCreatedCategoryFromResponse = (res: any) => {
-    return res?.data?.data || res?.data || res?.category || res;
+  const handleClose = () => {
+    if (isBusy) return;
+
+    onOpenChange(false);
+    resetForm();
   };
 
   const handleSubmit = () => {
@@ -212,7 +201,7 @@ export default function CreateCategoryModalParent({
     }
 
     if (!payload.name) {
-      toast.error("Category name required");
+      toast.error("Category name is required");
       return;
     }
 
@@ -247,304 +236,164 @@ export default function CreateCategoryModalParent({
     }
 
     createMenuCategory(payload as any, {
-      onSuccess: (res: any) => {
-        const category = getCreatedCategoryFromResponse(res);
-
-        const normalizedCategory = {
-          ...payload,
-          ...category,
-          id: category?.id,
-          imageUrl: payload.imageUrl,
-          previewUrl: form.imagePreview || payload.imageUrl,
-        };
-
-        setCreatedCategory(normalizedCategory);
-        setStep("created");
+      onSuccess: () => {
         onSuccess?.();
+        onOpenChange(false);
+        resetForm();
         toast.success("Category created successfully");
       },
       onError: (err: any) => {
-        toast.error(
-          err?.response?.data?.message || "Failed to create category"
-        );
+        toast.error(err?.response?.data?.message || "Failed to create category");
       },
     });
   };
 
-  const handleClose = () => {
-    if (isBusy) return;
-
-    onOpenChange(false);
-    resetForm();
-  };
-
-  const handleAddVariation = () => {
-    if (!createdCategory?.id) {
-      toast.error("Category id is missing");
-      return;
-    }
-
-    setVariationModalOpen(true);
-  };
-
-  const handleSkipVariation = () => {
-    handleClose();
-  };
-
   return (
-    <>
-      <Dialog
-        open={open}
-        onOpenChange={(value) => {
-          if (!isBusy) {
-            if (!value) {
-              handleClose();
-              return;
-            }
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (isBusy) return;
 
-            onOpenChange(value);
-          }
-        }}
-      >
-        <DialogContent className="max-h-[95vh] max-w-[420px] overflow-auto rounded-[20px] bg-[#F5F5F5] p-6">
-          {step === "created" && !isEditMode ? (
-            <>
-              <DialogHeader className="space-y-1">
-                <DialogTitle className="text-2xl font-semibold">
-                  Category Created
-                </DialogTitle>
+        if (!value) {
+          handleClose();
+          return;
+        }
 
-                <p className="text-sm text-gray-500">
-                  Review the created category and choose the next step.
-                </p>
-              </DialogHeader>
+        onOpenChange(value);
+      }}
+    >
+      <DialogContent className="max-h-[95vh] max-w-[420px] overflow-auto rounded-[20px] bg-[#F5F5F5] p-6">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-2xl font-semibold">
+            {isEditMode ? "Update Category" : "Create Category"}
+          </DialogTitle>
 
-              <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
-                {(createdCategory?.previewUrl || createdCategory?.imageUrl) && (
-                  <div className="overflow-hidden rounded-[14px] border bg-gray-50">
-                    <img
-                      src={
-                        createdCategory?.previewUrl || createdCategory?.imageUrl
-                      }
-                      alt={createdCategory?.name || "Category preview"}
-                      className="h-[180px] w-full object-cover"
-                    />
-                  </div>
-                )}
+          <p className="text-sm text-gray-500">
+            {isEditMode
+              ? "Update restaurant category details"
+              : "Create restaurant category"}
+          </p>
+        </DialogHeader>
 
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase text-gray-400">
-                      Category Name
-                    </p>
-                    <p className="text-base font-semibold text-gray-900">
-                      {createdCategory?.name || "-"}
-                    </p>
-                  </div>
+        <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
+          <FormInput
+            label="Category Name"
+            placeholder="e.g Burgers"
+            value={form.name}
+            onChange={(v) => updateForm("name", v)}
+            required
+          />
 
-                  <div>
-                    <p className="text-xs font-medium uppercase text-gray-400">
-                      Slug
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {createdCategory?.slug || "-"}
-                    </p>
-                  </div>
+          <FormInput
+            label="Description"
+            placeholder="Short category description"
+            value={form.description}
+            onChange={(v) => updateForm("description", v)}
+          />
 
-                  <div>
-                    <p className="text-xs font-medium uppercase text-gray-400">
-                      Description
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {createdCategory?.description || "No description"}
-                    </p>
-                  </div>
+          <ImageDropzoneUpload
+            label="Image"
+            value={form.imageUrl}
+            previewUrl={form.imagePreview}
+            onChange={handleImageUrlChange}
+            onPreviewChange={handleImagePreviewChange}
+            onClear={handleClearImage}
+            disabled={isSubmitting}
+            onUploadingChange={setImageUploading}
+            previewAlt="Category preview"
+            previewHeightClassName="h-[180px]"
+            emptyTitle="Drag & drop category image here"
+          />
 
-                  <div className="flex items-center justify-between rounded-[12px] bg-[#F9FAFB] px-4 py-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase text-gray-400">
-                        Display Priority
-                      </p>
-                      <p className="text-sm font-medium text-gray-800">
-                        {SORT_ORDER_OPTIONS.find(
-                          (option) =>
-                            option.value === Number(createdCategory?.sortOrder)
-                        )?.label ||
-                          `Custom Order (${createdCategory?.sortOrder ?? 0})`}
-                      </p>
-                    </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Display Priority</label>
 
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${
-                        createdCategory?.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {createdCategory?.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                </div>
+            <div className="relative">
+              <select
+                value={String(form.sortOrder)}
+                onChange={(e) =>
+                  updateForm("sortOrder", Number(e.target.value))
+                }
+                disabled={isBusy}
+                className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] bg-white px-4 pr-12 text-sm text-gray-600 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {SORT_ORDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
 
-                <div className="rounded-[14px] border border-primary/15 bg-primary/5 p-4">
-                  <p className="text-sm font-semibold text-gray-900">
-                    Would you like to add variations to this category?
-                  </p>
-
-                  <div className="mt-4 flex gap-3">
-                    <Button
-                      type="button"
-                      onClick={handleAddVariation}
-                      className="flex-1 rounded-[10px] bg-primary hover:bg-primary/90"
-                    >
-                      Yes
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleSkipVariation}
-                      className="flex-1 rounded-[10px]"
-                    >
-                      No
-                    </Button>
-                  </div>
-                </div>
+              <div className="pointer-events-none absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-[10px] bg-primary">
+                <ChevronDown size={16} className="text-white" />
               </div>
-            </>
-          ) : (
-            <>
-              <DialogHeader className="space-y-1">
-                <DialogTitle className="text-2xl font-semibold">
-                  {isEditMode ? "Update Category" : "Create Category"}
-                </DialogTitle>
+            </div>
 
-                <p className="text-sm text-gray-500">
-                  {isEditMode
-                    ? "Update restaurant category details"
-                    : "Create restaurant category"}
-                </p>
-              </DialogHeader>
+            <p className="text-xs text-gray-500">
+              Top priority categories appear first in the menu.
+            </p>
+          </div>
 
-              <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
-                <FormInput
-                  label="Category Name"
-                  placeholder="e.g Burgers"
-                  value={form.name}
-                  onChange={(v) => updateForm("name", v)}
-                  required
-                />
+          <label className="flex cursor-pointer items-center justify-between rounded-[12px] border border-gray-100 bg-[#FAFAFA] px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-800">
+                Active Status
+              </p>
+              <p className="text-xs text-gray-500">
+                Show this category in active menu flows.
+              </p>
+            </div>
 
-                <FormInput
-                  label="Description"
-                  placeholder="Short category description"
-                  value={form.description}
-                  onChange={(v) => updateForm("description", v)}
-                />
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => updateForm("isActive", e.target.checked)}
+              disabled={isBusy}
+              className="h-4 w-4 accent-primary disabled:cursor-not-allowed"
+            />
+          </label>
+        </div>
 
-                <ImageDropzoneUpload
-                  label="Image"
-                  value={form.imageUrl}
-                  previewUrl={form.imagePreview}
-                  onChange={handleImageUrlChange}
-                  onPreviewChange={handleImagePreviewChange}
-                  onClear={handleClearImage}
-                  disabled={isSubmitting}
-                  onUploadingChange={setImageUploading}
-                  previewAlt="Category preview"
-                  previewHeightClassName="h-[180px]"
-                  emptyTitle="Drag & drop category image here"
-                />
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            className="rounded-[10px] px-6 py-2 text-[16px] text-gray-700"
+            onClick={handleClose}
+            disabled={isBusy}
+          >
+            Close
+          </Button>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Display Priority
-                  </label>
-
-                  <div className="relative">
-                    <select
-                      value={String(form.sortOrder)}
-                      onChange={(e) =>
-                        updateForm("sortOrder", Number(e.target.value))
-                      }
-                      disabled={isBusy}
-                      className="h-11 w-full appearance-none rounded-[10px] border border-[#BBBBBB] bg-white px-4 pr-12 text-sm text-gray-600 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {SORT_ORDER_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="pointer-events-none absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-[10px] bg-primary">
-                      <ChevronDown size={16} className="text-white" />
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-gray-500">
-                    Top priority categories appear first in the menu.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex items-center justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="rounded-[10px] px-6 py-2 text-[16px] text-gray-700"
-                  onClick={handleClose}
-                  disabled={isBusy}
-                >
-                  Close
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={handleSubmit}
-                  className="rounded-[10px] bg-primary px-6 py-2 text-[16px] hover:bg-primary/90"
-                  disabled={isBusy}
-                >
-                  {isBusy ? (
-                    <>
-                      <Loader2 className="mr-2 animate-spin" size={18} />
-                      {imageUploading
-                        ? "Uploading..."
-                        : isEditMode
-                        ? "Updating..."
-                        : "Creating..."}
-                    </>
-                  ) : isEditMode ? (
-                    <>
-                      <PlusCircle size={18} />
-                      Update
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle size={18} />
-                      Create
-                    </>
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <VariationModal
-        open={variationModalOpen}
-        onOpenChange={(value) => {
-          setVariationModalOpen(value);
-
-          if (!value) {
-            handleClose();
-          }
-        }}
-        item={createdCategory}
-        mode="create"
-        onSuccess={onSuccess}
-      />
-    </>
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            className="rounded-[10px] bg-primary px-6 py-2 text-[16px] hover:bg-primary/90"
+            disabled={isBusy}
+          >
+            {isBusy ? (
+              <>
+                <Loader2 className="mr-2 animate-spin" size={18} />
+                {imageUploading
+                  ? "Uploading..."
+                  : isEditMode
+                  ? "Updating..."
+                  : "Creating..."}
+              </>
+            ) : isEditMode ? (
+              <>
+                <PlusCircle size={18} />
+                Update
+              </>
+            ) : (
+              <>
+                <PlusCircle size={18} />
+                Create
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

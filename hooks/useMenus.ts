@@ -38,6 +38,7 @@ import {
   updateModifierGroup,
   updateRestaurantMenu,
 } from "@/services/menus";
+import { GetMenuVariationsParams, UpdateMenuVariationValues } from "@/validations/menus";
 
 /**
  * ==============================
@@ -140,17 +141,19 @@ export const useDeleteMenuItem = () => {
  * MENU VARIATIONS HOOKS
  * ==============================
  */
-
 export const useCreateMenuVariation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: createMenuVariation,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["menu-variations"] });
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+
       toast.success("Menu variation created successfully!");
     },
+
     onError: (err: any) => {
       toast.error(
         err?.response?.data?.message || "Failed to create menu variation"
@@ -158,14 +161,8 @@ export const useCreateMenuVariation = () => {
     },
   });
 };
-export const useGetMenuVariations = (params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  itemId?: string;
-  categoryId?: string;
-  isActive?: boolean;
-}) => {
+
+export const useGetMenuVariations = (params?: GetMenuVariationsParams) => {
   return useQuery({
     queryKey: [
       "menu-variations",
@@ -173,23 +170,35 @@ export const useGetMenuVariations = (params?: {
       params?.limit,
       params?.search,
       params?.itemId,
-      params?.categoryId,
+      params?.restaurantId,
       params?.isActive,
+      params?.categoryId,
     ],
+
     queryFn: () => getMenuVariations(params),
-    enabled: Boolean(params?.categoryId || params?.itemId || params?.search),
+
+    /**
+     * Generic variation listing should load without categoryId/itemId/search.
+     */
+    enabled: true,
   });
 };
 export const useUpdateMenuVariation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      updateMenuVariation(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateMenuVariationValues;
+    }) => updateMenuVariation(id, data),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["menu-variations"] });
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+
       toast.success("Menu variation updated successfully!");
     },
 
@@ -206,11 +215,14 @@ export const useDeleteMenuVariation = () => {
 
   return useMutation({
     mutationFn: deleteMenuVariation,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["menu-variations"] });
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+
       toast.success("Menu variation deleted successfully!");
     },
+
     onError: (err: any) => {
       toast.error(
         err?.response?.data?.message || "Failed to delete menu variation"
@@ -218,7 +230,6 @@ export const useDeleteMenuVariation = () => {
     },
   });
 };
-
 /**
  * ==============================
  * MODIFIER GROUPS HOOKS

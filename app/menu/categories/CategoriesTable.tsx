@@ -12,17 +12,61 @@ import {
 import DeleteDialog from "@/components/dialogs/delete-dialog";
 import { Eye, GripVertical, Loader2, Search } from "lucide-react";
 import CreateCategoryModalParent from "@/components/menu/listing/CreateCategoryModalParent";
-import VariationModal from "@/components/menu/listing/VariationModal";
 import { useRouter } from "next/navigation";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import InfiniteScrollFooter from "@/components/shared/infinite-scroll-footer";
 
 const PAGE_LIMIT = 10;
 
-export default function CategoriesTable({ refetchKey }: any) {
-  const { user } = useAuth();
+const extractResponseItems = (response: any) => {
+  if (!response) return null;
 
-  const restaurantId = user?.restaurantId || user?.tenantId || "";
+  const candidates = [
+    response?.data,
+    response?.data?.items,
+    response?.data?.categories,
+    response?.data?.data,
+    response?.data?.data?.items,
+    response?.data?.data?.categories,
+    response?.items,
+    response?.categories,
+    response,
+  ];
+
+  const raw = candidates.find((candidate) => Array.isArray(candidate));
+
+  return Array.isArray(raw) ? raw : [];
+};
+
+const extractResponseMeta = (response: any) => {
+  return (
+    response?.data?.pagination ||
+    response?.data?.meta ||
+    response?.data?.data?.pagination ||
+    response?.data?.data?.meta ||
+    response?.pagination ||
+    response?.meta ||
+    {}
+  );
+};
+
+const mergeUniqueById = (prev: any[], next: any[]) => {
+  const map = new Map<string, any>();
+
+  [...prev, ...next].forEach((item) => {
+    const id = String(item?.id || "");
+    if (!id) return;
+    map.set(id, item);
+  });
+
+  return Array.from(map.values());
+};
+
+export default function CategoriesTable({ refetchKey }: any) {
+  const { user, restaurantId: authRestaurantId } = useAuth();
+
+  const restaurantId =
+    authRestaurantId ?? user?.restaurantId ?? user?.tenantId ?? "";
 
   const router = useRouter();
 
@@ -41,27 +85,27 @@ export default function CategoriesTable({ refetchKey }: any) {
   const [selected, setSelected] = useState<any>(null);
   const [open, setOpen] = useState(false);
 
-  const [variationOpen, setVariationOpen] = useState(false);
-  const [selectedCategoryForVariation, setSelectedCategoryForVariation] =
-    useState<any>(null);
-
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const canFetchCategories = Boolean(restaurantId);
 
-  /* ================= DEBOUNCE SEARCH ================= */
+  /**
+   * Important:
+   * Do not clear allItems inside debounce.
+   * On initial mount, the empty search debounce can fire after the first
+   * successful API response and wipe the list.
+   */
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
+      const nextSearch = search.trim();
+
       setPage(1);
-      setAllItems([]);
-      setHasLoadedOnce(false);
+      setDebouncedSearch(nextSearch);
     }, 500);
 
     return () => clearTimeout(timer);
   }, [search]);
 
-  /* ================= FETCH ================= */
   const {
     data: response,
     isLoading,
@@ -70,7 +114,7 @@ export default function CategoriesTable({ refetchKey }: any) {
   } = useGetMenuCategories({
     page,
     limit,
-    search: debouncedSearch,
+    search: debouncedSearch || undefined,
     restaurantId: restaurantId || undefined,
   });
 
@@ -81,47 +125,34 @@ export default function CategoriesTable({ refetchKey }: any) {
     useReorderMenuCategories();
 
   const fetchedItems = useMemo<any[] | null>(() => {
-    if (!response) return null;
-
-    const rawItems =
-      response?.data?.items ||
-      response?.data?.categories ||
-      response?.data?.data ||
-      response?.items ||
-      response?.categories ||
-      response?.data ||
-      [];
-
-    return Array.isArray(rawItems) ? rawItems : [];
+    return extractResponseItems(response);
   }, [response]);
 
   const meta = useMemo(() => {
-    return (
-      response?.data?.pagination ||
-      response?.data?.meta ||
-      response?.pagination ||
-      response?.meta ||
-      {}
-    );
+    return extractResponseMeta(response);
   }, [response]);
 
   const pagination = useMemo(() => {
     const currentPage = Number(meta?.page ?? page);
     const pageSize = Number(meta?.limit ?? limit);
     const total = Number(meta?.total ?? 0);
+
     const totalPages = Number(
       meta?.totalPages ??
-        (total > 0 && pageSize > 0 ? Math.ceil(total / pageSize) : 1)
+        meta?.pages ??
+        (total > 0 && pageSize > 0 ? Math.ceil(total / pageSize) : 0)
     );
 
     return {
       page: currentPage,
       limit: pageSize || limit,
       total,
-      totalPages: totalPages || 1,
+      totalPages,
       hasNext:
         typeof meta?.hasNext === "boolean"
           ? meta.hasNext
+          : typeof meta?.hasMore === "boolean"
+          ? meta.hasMore
           : total > 0
           ? allItems.length < total
           : Boolean(fetchedItems && fetchedItems.length >= pageSize),
@@ -133,14 +164,20 @@ export default function CategoriesTable({ refetchKey }: any) {
   }, [meta, page, limit, allItems.length, fetchedItems]);
 
   const hasMore = useMemo(() => {
-    if (!hasLoadedOnce) return false;
+    if (!canFetchCategories || !hasLoadedOnce) return false;
 
     if (pagination.total > 0) {
       return allItems.length < pagination.total;
     }
 
     return Boolean(pagination.hasNext);
-  }, [hasLoadedOnce, pagination.total, pagination.hasNext, allItems.length]);
+  }, [
+    canFetchCategories,
+    hasLoadedOnce,
+    pagination.total,
+    pagination.hasNext,
+    allItems.length,
+  ]);
 
   const shouldShowInitialLoader =
     !canFetchCategories ||
@@ -154,9 +191,8 @@ export default function CategoriesTable({ refetchKey }: any) {
     !isFetching &&
     allItems.length === 0;
 
-  /* ================= MERGE FETCHED PAGES ================= */
   useEffect(() => {
-    if (!fetchedItems) return;
+    if (!canFetchCategories || fetchedItems === null) return;
 
     setHasLoadedOnce(true);
 
@@ -165,38 +201,43 @@ export default function CategoriesTable({ refetchKey }: any) {
         return fetchedItems;
       }
 
-      const map = new Map<string, any>();
-
-      [...prev, ...fetchedItems].forEach((item: any) => {
-        if (item?.id) {
-          map.set(String(item.id), item);
-        }
-      });
-
-      return Array.from(map.values());
+      return mergeUniqueById(prev, fetchedItems);
     });
-  }, [fetchedItems, page]);
+  }, [fetchedItems, page, canFetchCategories]);
 
-  /* ================= RESTAURANT READY ================= */
+  const resetAndFetchFirstPage = useCallback(() => {
+    setAllItems([]);
+    setHasLoadedOnce(false);
+
+    setPage((prev) => {
+      if (prev === 1) {
+        refetch();
+      }
+
+      return 1;
+    });
+  }, [refetch]);
+
   useEffect(() => {
     if (!restaurantId) return;
 
-    setPage(1);
-    setAllItems([]);
-    setHasLoadedOnce(false);
-    refetch();
-  }, [restaurantId, refetch]);
+    resetAndFetchFirstPage();
+  }, [restaurantId, resetAndFetchFirstPage]);
 
-  /* ================= EXTERNAL REFRESH ================= */
   useEffect(() => {
     if (!refetchKey) return;
 
-    setPage(1);
-    setHasLoadedOnce(false);
-    refetch();
-  }, [refetchKey, refetch]);
+    resetAndFetchFirstPage();
+  }, [refetchKey, resetAndFetchFirstPage]);
 
-  /* ================= INFINITE SCROLL ================= */
+  useEffect(() => {
+    return () => {
+      if (reorderTimerRef.current) {
+        clearTimeout(reorderTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleLoadMore = useCallback(() => {
     if (!hasMore || isFetching || isLoading) return;
 
@@ -210,29 +251,30 @@ export default function CategoriesTable({ refetchKey }: any) {
   }, [hasMore, isFetching, isLoading, pagination.totalPages]);
 
   const desktopLoadMoreRef = useInfiniteScroll<HTMLDivElement>({
-    enabled: hasMore && !isFetching && !isLoading,
+    enabled: canFetchCategories && hasMore && !isFetching && !isLoading,
     onLoadMore: handleLoadMore,
   });
 
   const mobileLoadMoreRef = useInfiniteScroll<HTMLDivElement>({
-    enabled: hasMore && !isFetching && !isLoading,
+    enabled: canFetchCategories && hasMore && !isFetching && !isLoading,
     onLoadMore: handleLoadMore,
   });
 
-  /* ================= DELETE ================= */
   const handleDelete = () => {
     if (!deleteId) return;
 
     deleteMenuCategory(deleteId, {
       onSuccess: () => {
-        setAllItems((prev) => prev.filter((item) => item.id !== deleteId));
+        setAllItems((prev) =>
+          prev.filter((item) => String(item.id) !== String(deleteId))
+        );
+
         setDeleteId(null);
         refetch();
       },
     });
   };
 
-  /* ================= REORDER ================= */
   const buildReorderPayload = (items: any[]) => ({
     items: items.map((item, index) => ({
       id: String(item.id),
@@ -258,8 +300,13 @@ export default function CategoriesTable({ refetchKey }: any) {
     if (fromId === toId) return;
 
     setAllItems((prev) => {
-      const fromIndex = prev.findIndex((item) => item.id === fromId);
-      const toIndex = prev.findIndex((item) => item.id === toId);
+      const fromIndex = prev.findIndex(
+        (item) => String(item.id) === String(fromId)
+      );
+
+      const toIndex = prev.findIndex(
+        (item) => String(item.id) === String(toId)
+      );
 
       if (fromIndex === -1 || toIndex === -1) {
         return prev;
@@ -291,14 +338,23 @@ export default function CategoriesTable({ refetchKey }: any) {
     setDraggedId(null);
   };
 
-  /* ================= REFRESH HELPERS ================= */
   const softRefresh = () => {
-    setPage(1);
-    setHasLoadedOnce(false);
-    refetch();
+    resetAndFetchFirstPage();
   };
 
-  /* ================= SKELETON ================= */
+  const handleManualSearch = () => {
+    if (!canFetchCategories) return;
+
+    const nextSearch = search.trim();
+
+    setPage(1);
+    setDebouncedSearch(nextSearch);
+
+    if (page === 1 && debouncedSearch === nextSearch) {
+      refetch();
+    }
+  };
+
   const SkeletonRow = () => (
     <tr>
       <td colSpan={6} className="py-6">
@@ -330,7 +386,6 @@ export default function CategoriesTable({ refetchKey }: any) {
 
   return (
     <div className="w-full">
-      {/* ================= SEARCH ================= */}
       <div className="mb-6 flex items-center gap-3">
         <div className="relative w-full max-w-[420px]">
           <Search
@@ -348,27 +403,20 @@ export default function CategoriesTable({ refetchKey }: any) {
 
         <Button
           disabled={!canFetchCategories}
-          onClick={() => {
-            if (!canFetchCategories) return;
-
-            setPage(1);
-            setHasLoadedOnce(false);
-            refetch();
-          }}
+          onClick={handleManualSearch}
           className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm"
         >
           Search
         </Button>
       </div>
 
-      {isReordering && (
+      {isReordering ? (
         <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
           <Loader2 size={14} className="animate-spin" />
           Saving category order...
         </div>
-      )}
+      ) : null}
 
-      {/* ================= DESKTOP TABLE ================= */}
       <div className="hidden overflow-x-auto rounded-[16px] bg-white md:block">
         <table className="w-full text-sm">
           <thead>
@@ -384,7 +432,9 @@ export default function CategoriesTable({ refetchKey }: any) {
 
           <tbody>
             {shouldShowInitialLoader ? (
-              Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+              Array.from({ length: 5 }).map((_, index) => (
+                <SkeletonRow key={index} />
+              ))
             ) : shouldShowEmpty ? (
               <tr>
                 <td colSpan={6}>
@@ -414,12 +464,15 @@ export default function CategoriesTable({ refetchKey }: any) {
                     <div className="flex items-center gap-3">
                       <img
                         src={item.imageUrl || "https://via.placeholder.com/40"}
-                        alt={item.name}
+                        alt={item.name || "Category"}
                         className="h-10 w-10 rounded-[10px] border object-cover"
+                        loading="lazy"
                       />
 
-                      <div>
-                        <span className="block font-medium">{item.name}</span>
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {item.name}
+                        </span>
 
                         {item.description ? (
                           <span className="line-clamp-1 text-xs text-gray-400">
@@ -467,6 +520,7 @@ export default function CategoriesTable({ refetchKey }: any) {
                           setOpen(true);
                         }}
                         className="text-gray-500 hover:text-primary"
+                        title="Edit"
                       >
                         <FaPen size={14} />
                       </button>
@@ -484,19 +538,9 @@ export default function CategoriesTable({ refetchKey }: any) {
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedCategoryForVariation(item);
-                          setVariationOpen(true);
-                        }}
-                        className="text-xs font-medium text-gray-500 hover:text-primary"
-                      >
-                        Variation
-                      </button>
-
-                      <button
-                        type="button"
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
+                        title="Delete"
                       >
                         <FaTrash size={14} />
                       </button>
@@ -508,7 +552,7 @@ export default function CategoriesTable({ refetchKey }: any) {
           </tbody>
         </table>
 
-        {!shouldShowInitialLoader && !shouldShowEmpty && allItems.length > 0 && (
+        {!shouldShowInitialLoader && !shouldShowEmpty && allItems.length > 0 ? (
           <InfiniteScrollFooter
             loadMoreRef={desktopLoadMoreRef}
             isFetching={isFetching && page > 1}
@@ -517,13 +561,14 @@ export default function CategoriesTable({ refetchKey }: any) {
             shown={allItems.length}
             label="categories"
           />
-        )}
+        ) : null}
       </div>
 
-      {/* ================= MOBILE CARDS ================= */}
       <div className="space-y-4 md:hidden">
         {shouldShowInitialLoader ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+          Array.from({ length: 4 }).map((_, index) => (
+            <SkeletonCard key={index} />
+          ))
         ) : shouldShowEmpty ? (
           <EmptyState />
         ) : (
@@ -549,8 +594,9 @@ export default function CategoriesTable({ refetchKey }: any) {
               <div className="flex gap-4">
                 <img
                   src={item.imageUrl || "https://via.placeholder.com/80"}
-                  alt={item.name}
+                  alt={item.name || "Category"}
                   className="h-20 w-20 rounded-[14px] object-cover"
+                  loading="lazy"
                 />
 
                 <div className="flex flex-1 flex-col justify-between">
@@ -591,6 +637,7 @@ export default function CategoriesTable({ refetchKey }: any) {
                           setOpen(true);
                         }}
                         className="text-gray-500 hover:text-primary"
+                        title="Edit"
                       >
                         <FaPen size={14} />
                       </button>
@@ -608,19 +655,9 @@ export default function CategoriesTable({ refetchKey }: any) {
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedCategoryForVariation(item);
-                          setVariationOpen(true);
-                        }}
-                        className="text-xs font-medium text-gray-500 hover:text-primary"
-                      >
-                        Variation
-                      </button>
-
-                      <button
-                        type="button"
                         onClick={() => setDeleteId(item.id)}
                         className="text-gray-500 hover:text-red-500"
+                        title="Delete"
                       >
                         <FaTrash size={14} />
                       </button>
@@ -632,7 +669,7 @@ export default function CategoriesTable({ refetchKey }: any) {
           ))
         )}
 
-        {!shouldShowInitialLoader && !shouldShowEmpty && allItems.length > 0 && (
+        {!shouldShowInitialLoader && !shouldShowEmpty && allItems.length > 0 ? (
           <InfiniteScrollFooter
             loadMoreRef={mobileLoadMoreRef}
             isFetching={isFetching && page > 1}
@@ -641,42 +678,33 @@ export default function CategoriesTable({ refetchKey }: any) {
             shown={allItems.length}
             label="categories"
           />
-        )}
+        ) : null}
       </div>
 
-      {/* ================= EDIT MODAL ================= */}
       <CreateCategoryModalParent
         open={open}
-        onOpenChange={(val) => {
-          setOpen(val);
-          if (!val) setSelected(null);
+        onOpenChange={(value) => {
+          setOpen(value);
+
+          if (!value) {
+            setSelected(null);
+          }
         }}
         initialData={selected}
         onSuccess={softRefresh}
       />
 
-      {/* ================= DELETE MODAL ================= */}
       <DeleteDialog
         open={!!deleteId}
         onOpenChange={(value) => {
-          if (!value) setDeleteId(null);
+          if (!value) {
+            setDeleteId(null);
+          }
         }}
         onConfirm={handleDelete}
         isLoading={isDeleting}
         title="Delete Category"
         description="Are you sure you want to delete this category? This action cannot be undone."
-      />
-
-      {/* ================= VARIATION MODAL ================= */}
-      <VariationModal
-        open={variationOpen}
-        onOpenChange={(val) => {
-          setVariationOpen(val);
-          if (!val) setSelectedCategoryForVariation(null);
-        }}
-        item={selectedCategoryForVariation}
-        mode="create"
-        onSuccess={softRefresh}
       />
     </div>
   );

@@ -18,30 +18,19 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
-import {
-  useCreateModifier,
-  useUpdateMenuVariation,
-  useUpdateModifier,
-} from "@/hooks/useMenus";
+import { useCreateModifier, useUpdateModifier } from "@/hooks/useMenus";
 import AsyncSelect from "@/components/ui/AsyncSelect";
-import { useGetModifierGroupCategories } from "@/hooks/useMenuCategories";
 import {
   blockInvalidNumberKeys,
   blockNegativeNumberPaste,
   sanitizeNonNegativeNumber,
 } from "@/utils/numberInput";
 
-type VariationPriceOverride = {
-  variationId: string;
-  priceDelta: string;
-};
-
 interface ModifierForm {
   modifierGroupIds: string[];
   name: string;
   priceDelta: string;
   sortOrder: number;
-  variationPriceOverrides: VariationPriceOverride[];
 }
 
 const SORT_ORDER_OPTIONS = [
@@ -56,7 +45,6 @@ const getEmptyForm = (): ModifierForm => ({
   name: "",
   priceDelta: "0",
   sortOrder: 0,
-  variationPriceOverrides: [],
 });
 
 export default function ModifierModal({
@@ -65,7 +53,9 @@ export default function ModifierModal({
   initialData,
   refresh,
 }: any) {
-  const { token, restaurantId } = useAuth();
+  const { token, restaurantId: authRestaurantId } = useAuth();
+  const restaurantId = authRestaurantId ?? undefined;
+
   const api = useApi(token);
 
   const { mutateAsync: createModifier, isPending: isCreating } =
@@ -74,57 +64,10 @@ export default function ModifierModal({
   const { mutateAsync: updateModifier, isPending: isUpdating } =
     useUpdateModifier();
 
-  const { mutateAsync: updateMenuVariation, isPending: isUpdatingVariation } =
-    useUpdateMenuVariation();
-
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
-  const selectedGroupId = selectedGroup?.id ? String(selectedGroup.id) : "";
-
-  const { data: modifierGroupCategoriesRes, isLoading: loadingCategories } =
-    useGetModifierGroupCategories(selectedGroupId);
-
-  const [variations, setVariations] = useState<any[]>([]);
-  const [loadingVariations, setLoadingVariations] = useState(false);
   const [form, setForm] = useState<ModifierForm>(getEmptyForm());
 
-  const isSubmitting = isCreating || isUpdating || isUpdatingVariation;
-
-  const linkedCategories = useMemo(() => {
-    const raw = Array.isArray(modifierGroupCategoriesRes?.data)
-      ? modifierGroupCategoriesRes.data
-      : Array.isArray(modifierGroupCategoriesRes)
-      ? modifierGroupCategoriesRes
-      : [];
-
-    return raw
-      .map((entry: any) => entry?.category || entry)
-      .filter((category: any) => category?.id);
-  }, [modifierGroupCategoriesRes]);
-
-  const normalizeExistingVariationOverrides = (
-    modifier: any,
-    groupVariations: any[]
-  ): VariationPriceOverride[] => {
-    const modifierId = String(modifier?.id || "");
-
-    return groupVariations.map((variation: any) => {
-      const existingOverrides = Array.isArray(variation?.modifierPriceOverrides)
-        ? variation.modifierPriceOverrides
-        : [];
-
-      const existing = existingOverrides.find(
-        (override: any) => String(override?.modifierId) === modifierId
-      );
-
-      return {
-        variationId: String(variation?.id),
-        priceDelta:
-          existing?.priceDelta !== undefined && existing?.priceDelta !== null
-            ? sanitizeNonNegativeNumber(String(existing.priceDelta))
-            : "",
-      };
-    });
-  };
+  const isSubmitting = isCreating || isUpdating;
 
   useEffect(() => {
     if (!open) return;
@@ -133,6 +76,7 @@ export default function ModifierModal({
       const resolvedGroup =
         initialData?.modifierGroup ||
         initialData?.modifierGroups?.[0] ||
+        initialData?.groupLinks?.[0]?.modifierGroup ||
         (initialData?.modifierGroupId
           ? {
               id: initialData.modifierGroupId,
@@ -140,112 +84,36 @@ export default function ModifierModal({
             }
           : null);
 
+      const resolvedGroupId = resolvedGroup?.id
+        ? String(resolvedGroup.id)
+        : initialData?.modifierGroupIds?.[0]
+        ? String(initialData.modifierGroupIds[0])
+        : "";
+
       setSelectedGroup(
-        resolvedGroup
+        resolvedGroupId
           ? {
-              id: String(resolvedGroup?.id || ""),
+              id: resolvedGroupId,
               name: resolvedGroup?.name || "Selected Group",
             }
           : null
       );
 
       setForm({
-        modifierGroupIds: resolvedGroup?.id ? [String(resolvedGroup.id)] : [],
+        modifierGroupIds: resolvedGroupId ? [resolvedGroupId] : [],
         name: initialData.name || "",
         priceDelta: sanitizeNonNegativeNumber(
           String(initialData.priceDelta ?? 0)
         ),
         sortOrder: Number(initialData.sortOrder || 0),
-        variationPriceOverrides: [],
       });
-    } else {
-      setSelectedGroup(null);
-      setForm(getEmptyForm());
-      setVariations([]);
+
+      return;
     }
+
+    setSelectedGroup(null);
+    setForm(getEmptyForm());
   }, [initialData, open]);
-
-  useEffect(() => {
-    if (!open || !selectedGroupId) {
-      setVariations([]);
-      return;
-    }
-
-    if (!linkedCategories.length) {
-      setVariations([]);
-      return;
-    }
-
-    const fetchVariationsForLinkedCategories = async () => {
-      setLoadingVariations(true);
-
-      try {
-        const variationResponses = await Promise.all(
-          linkedCategories.map(async (category: any) => {
-            const query = new URLSearchParams({
-              categoryId: String(category.id),
-              sortOrder: "DESC",
-            });
-
-            const res = await api.get(
-              `/v1/menu/variations?${query.toString()}`
-            );
-
-            const normalizedData = Array.isArray(res?.data)
-              ? res.data
-              : Array.isArray(res?.data?.data)
-              ? res.data.data
-              : Array.isArray(res?.data?.items)
-              ? res.data.items
-              : [];
-
-            return normalizedData.map((variation: any) => ({
-              ...variation,
-              categoryId: category.id,
-              categoryName: category.name,
-            }));
-          })
-        );
-
-        const mergedVariations = variationResponses.flat();
-
-        const uniqueVariations = Array.from(
-          new Map(
-            mergedVariations.map((variation: any) => [
-              String(variation.id),
-              variation,
-            ])
-          ).values()
-        );
-
-        setVariations(uniqueVariations);
-      } catch {
-        setVariations([]);
-        toast.error("Failed to load category variations");
-      } finally {
-        setLoadingVariations(false);
-      }
-    };
-
-    fetchVariationsForLinkedCategories();
-  }, [open, selectedGroupId, linkedCategories, token]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    setForm((prev): ModifierForm => ({
-      ...prev,
-      variationPriceOverrides:
-        initialData?.id && variations.length
-          ? normalizeExistingVariationOverrides(initialData, variations)
-          : variations.map(
-              (variation: any): VariationPriceOverride => ({
-                variationId: String(variation?.id),
-                priceDelta: "",
-              })
-            ),
-    }));
-  }, [variations, initialData, open]);
 
   const fetchModifierGroups = async ({
     search = "",
@@ -286,124 +154,19 @@ export default function ModifierModal({
   };
 
   const handleChange = (key: keyof ModifierForm, value: any) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
   const handleNumberChange = (key: "priceDelta", value: string) => {
     handleChange(key, sanitizeNonNegativeNumber(value));
   };
 
-  const handleVariationOverrideChange = (
-    variationId: string,
-    priceDelta: string
-  ) => {
-    const sanitizedPriceDelta = sanitizeNonNegativeNumber(priceDelta);
-
-    setForm((prev): ModifierForm => {
-      const exists = prev.variationPriceOverrides.some(
-        (override) => String(override.variationId) === String(variationId)
-      );
-
-      if (exists) {
-        return {
-          ...prev,
-          variationPriceOverrides: prev.variationPriceOverrides.map(
-            (override) =>
-              String(override.variationId) === String(variationId)
-                ? {
-                    ...override,
-                    priceDelta: sanitizedPriceDelta,
-                  }
-                : override
-          ),
-        };
-      }
-
-      return {
-        ...prev,
-        variationPriceOverrides: [
-          ...prev.variationPriceOverrides,
-          {
-            variationId,
-            priceDelta: sanitizedPriceDelta,
-          },
-        ],
-      };
-    });
-  };
-
   const canSubmit = useMemo(() => {
-    return !!form.name?.trim() && form.modifierGroupIds.length > 0;
+    return Boolean(form.name?.trim() && form.modifierGroupIds.length > 0);
   }, [form.name, form.modifierGroupIds]);
-
-  const normalizedVariationOverrides = useMemo(
-    () =>
-      form.variationPriceOverrides
-        .filter(
-          (override) =>
-            override.variationId &&
-            override.priceDelta !== "" &&
-            !Number.isNaN(Number(override.priceDelta))
-        )
-        .map((override) => ({
-          variationId: override.variationId,
-          priceDelta: Number(override.priceDelta),
-        })),
-    [form.variationPriceOverrides]
-  );
-
-  const patchVariationModifierOverrides = async (modifierId: string) => {
-    if (!modifierId || normalizedVariationOverrides.length === 0) return;
-
-    await Promise.all(
-      normalizedVariationOverrides.map(async (override) => {
-        const variation = variations.find(
-          (entry) => String(entry.id) === String(override.variationId)
-        );
-
-        if (!variation?.id) return;
-
-        const existingOverrides = Array.isArray(
-          variation?.modifierPriceOverrides
-        )
-          ? variation.modifierPriceOverrides
-          : [];
-
-        const nextOverrides = [
-          ...existingOverrides
-            .filter(
-              (entry: any) => String(entry?.modifierId) !== String(modifierId)
-            )
-            .map((entry: any) => ({
-              modifierId: String(entry.modifierId),
-              priceDelta: Number(entry.priceDelta),
-            })),
-          {
-            modifierId: String(modifierId),
-            priceDelta: Number(override.priceDelta),
-          },
-        ];
-
-        await updateMenuVariation({
-          id: String(variation.id),
-          data: {
-            modifierPriceOverrides: nextOverrides,
-          },
-        });
-      })
-    );
-  };
-
-  const getModifierIdFromResponse = (res: any) => {
-    return (
-      res?.data?.id ||
-      res?.data?.data?.id ||
-      res?.modifier?.id ||
-      res?.id ||
-      initialData?.id ||
-      ""
-    );
-  };
 
   const handleSubmit = async () => {
     if (!canSubmit) {
@@ -415,37 +178,17 @@ export default function ModifierModal({
     const sortOrder = Number(form.sortOrder);
 
     if (form.priceDelta === "" || Number.isNaN(priceDelta)) {
-      toast.error("Default price delta must be a valid number");
+      toast.error("Price delta must be a valid number");
       return;
     }
 
     if (priceDelta < 0) {
-      toast.error("Default price delta cannot be negative");
+      toast.error("Price delta cannot be negative");
       return;
     }
 
     if (Number.isNaN(sortOrder)) {
       toast.error("Display priority must be a valid number");
-      return;
-    }
-
-    const hasInvalidVariationOverride = form.variationPriceOverrides.some(
-      (override) =>
-        override.priceDelta !== "" && Number.isNaN(Number(override.priceDelta))
-    );
-
-    if (hasInvalidVariationOverride) {
-      toast.error("Variation override price must be a valid number");
-      return;
-    }
-
-    const hasNegativeVariationOverride = form.variationPriceOverrides.some(
-      (override) =>
-        override.priceDelta !== "" && Number(override.priceDelta) < 0
-    );
-
-    if (hasNegativeVariationOverride) {
-      toast.error("Variation override price cannot be negative");
       return;
     }
 
@@ -457,21 +200,13 @@ export default function ModifierModal({
         modifierGroupIds: form.modifierGroupIds,
       };
 
-      let modifierRes: any;
-
       if (initialData?.id) {
-        modifierRes = await updateModifier({
+        await updateModifier({
           id: initialData.id,
           data: modifierPayload,
         });
-
-        const modifierId = getModifierIdFromResponse(modifierRes);
-        await patchVariationModifierOverrides(modifierId);
       } else {
-        modifierRes = await createModifier(modifierPayload);
-
-        const modifierId = getModifierIdFromResponse(modifierRes);
-        await patchVariationModifierOverrides(modifierId);
+        await createModifier(modifierPayload);
       }
 
       refresh?.();
@@ -481,19 +216,13 @@ export default function ModifierModal({
     }
   };
 
-  const getVariationOverrideValue = (variationId: string) => {
-    const override = form.variationPriceOverrides.find(
-      (entry) => String(entry.variationId) === String(variationId)
-    );
-
-    return override?.priceDelta ?? "";
-  };
-
   return (
     <Dialog
       open={open}
       onOpenChange={(value) => {
-        if (!isSubmitting) onOpenChange(value);
+        if (!isSubmitting) {
+          onOpenChange(value);
+        }
       }}
     >
       <DialogContent className="max-h-[95vh] max-w-[520px] overflow-auto rounded-[20px] bg-[#F5F5F5] p-6">
@@ -503,7 +232,7 @@ export default function ModifierModal({
           </DialogTitle>
 
           <p className="text-sm text-gray-500">
-            Configure modifier details and variation-specific prices
+            Configure modifier details and assign it to a modifier group.
           </p>
         </DialogHeader>
 
@@ -520,9 +249,6 @@ export default function ModifierModal({
                   "modifierGroupIds",
                   group?.id ? [String(group.id)] : []
                 );
-
-                setVariations([]);
-                handleChange("variationPriceOverrides", []);
               }}
               placeholder="Select Group"
               fetchOptions={fetchModifierGroups}
@@ -534,14 +260,14 @@ export default function ModifierModal({
           <InputField
             label="Modifier Name"
             value={form.name}
-            onChange={(v: string) => handleChange("name", v)}
+            onChange={(value: string) => handleChange("name", value)}
           />
 
           <InputField
-            label="Default Price Delta"
+            label="Price Delta"
             type="number"
             value={form.priceDelta}
-            onChange={(v: string) => handleNumberChange("priceDelta", v)}
+            onChange={(value: string) => handleNumberChange("priceDelta", value)}
             onKeyDown={blockInvalidNumberKeys}
             onPaste={blockNegativeNumberPaste}
             min={0}
@@ -573,73 +299,6 @@ export default function ModifierModal({
             <p className="text-xs text-gray-500">
               Top priority modifiers appear first inside their group.
             </p>
-          </div>
-
-          <div className="rounded-[14px] border border-gray-200 bg-[#F9FAFB] p-4">
-            <div className="mb-3">
-              <p className="text-sm font-semibold text-gray-900">
-                Variation Price Overrides
-              </p>
-              <p className="text-xs text-gray-500">
-                Select a modifier group to load variations from its linked
-                categories. Leave empty to use the default price delta.
-              </p>
-            </div>
-
-            {loadingCategories || loadingVariations ? (
-              <div className="flex min-h-[90px] items-center justify-center text-gray-500">
-                <Loader2 className="animate-spin" size={20} />
-              </div>
-            ) : !selectedGroupId ? (
-              <div className="rounded-[12px] border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-500">
-                Select a modifier group first.
-              </div>
-            ) : linkedCategories.length === 0 ? (
-              <div className="rounded-[12px] border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-500">
-                No categories linked with this modifier group.
-              </div>
-            ) : variations.length === 0 ? (
-              <div className="rounded-[12px] border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-500">
-                No variations found for linked categories.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {variations.map((variation: any) => (
-                  <div
-                    key={variation.id}
-                    className="grid gap-2 rounded-[12px] bg-white p-3 sm:grid-cols-[1fr,140px]"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900">
-                        {variation?.name || "Unnamed Variation"}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {variation?.categoryName
-                          ? `${variation.categoryName} • `
-                          : ""}
-                        Base price: {variation?.price ?? 0}
-                      </p>
-                    </div>
-
-                    <input
-                      type="number"
-                      value={getVariationOverrideValue(String(variation.id))}
-                      onChange={(e) =>
-                        handleVariationOverrideChange(
-                          String(variation.id),
-                          e.target.value
-                        )
-                      }
-                      onKeyDown={blockInvalidNumberKeys}
-                      onPaste={blockNegativeNumberPaste}
-                      min={0}
-                      placeholder="Override"
-                      className="h-[38px] w-full rounded-[10px] border border-gray-300 px-3 text-sm outline-none focus:border-gray-400"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           <Button
@@ -686,6 +345,7 @@ function InputField({
   return (
     <div className="space-y-1">
       <p className="text-sm text-gray-600">{label}</p>
+
       <input
         type={type}
         value={value}

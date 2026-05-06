@@ -8,7 +8,11 @@ import { z } from "zod";
 
 const optionalString = (max?: number) => {
   let schema = z.string().trim();
-  if (max) schema = schema.max(max);
+
+  if (max) {
+    schema = schema.max(max);
+  }
+
   return schema.optional().or(z.literal(""));
 };
 
@@ -47,18 +51,21 @@ const optionalNumberFromInput = ({
             message: "Must be an integer",
           });
         }
+
         if (nonnegative && v < 0) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Must be greater than or equal to 0",
           });
         }
+
         if (min !== undefined && v < min) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: `Must be at least ${min}`,
           });
         }
+
         if (max !== undefined && v > max) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -69,12 +76,69 @@ const optionalNumberFromInput = ({
       .optional()
   );
 
+const requiredNumberFromInput = ({
+  min,
+  max,
+  integer = false,
+  nonnegative = false,
+  message = "Must be a number",
+}: {
+  min?: number;
+  max?: number;
+  integer?: boolean;
+  nonnegative?: boolean;
+  message?: string;
+} = {}) =>
+  z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      if (typeof val === "string") return Number(val);
+      return val;
+    },
+    z
+      .number({
+        required_error: message,
+        invalid_type_error: "Must be a number",
+      })
+      .refine((v) => !Number.isNaN(v), "Must be a valid number")
+      .superRefine((v, ctx) => {
+        if (integer && !Number.isInteger(v)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Must be an integer",
+          });
+        }
+
+        if (nonnegative && v < 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Must be greater than or equal to 0",
+          });
+        }
+
+        if (min !== undefined && v < min) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Must be at least ${min}`,
+          });
+        }
+
+        if (max !== undefined && v > max) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Must be at most ${max}`,
+          });
+        }
+      })
+  );
+
 const optionalStringArray = () =>
   z
     .union([z.array(z.string().trim()), z.string().trim()])
     .transform((val) => {
       if (Array.isArray(val)) return val.filter(Boolean);
       if (!val) return [];
+
       return val
         .split(",")
         .map((s) => s.trim())
@@ -93,6 +157,7 @@ const idSchema = z.string().trim().min(1, "Id is required");
 const buildCrudSchemas = <T extends z.ZodRawShape>(shape: T) => {
   const createSchema = z.object(shape);
   const updateSchema = createSchema.partial();
+
   return { createSchema, updateSchema };
 };
 
@@ -142,7 +207,7 @@ const menuItemShape = {
     .array(
       z.object({
         modifierId: idSchema,
-        priceDelta: optionalNumberFromInput({}).default(0),
+        priceDelta: optionalNumberFromInput({ min: 0 }).default(0),
       })
     )
     .optional()
@@ -160,6 +225,7 @@ export type UpdateMenuItemValues = z.infer<typeof updateMenuItemSchema>;
 /**
  * Bulk menu items
  */
+
 export const bulkMenuItemsSchema = z.object({
   items: z.array(menuItemSchema).min(1, "At least one item is required"),
 });
@@ -170,27 +236,32 @@ export type BulkMenuItemsValues = z.infer<typeof bulkMenuItemsSchema>;
  * ==============================
  * Menu Variation
  * ==============================
+ *
+ * Generic variation schema.
+ * No category relation in create/update payload.
+ * No old options/minSelect structure.
  */
-
-const variationOptionSchema = z.object({
-  name: requiredString("Option name is required"),
-  // priceAdjustment: optionalNumberFromInput({ min: 0 }).default(0),
-  sku: optionalString(100),
-  isDefault: optionalBoolean(false),
-  isActive: optionalBoolean(true),
-});
 
 const menuVariationShape = {
   name: requiredString("Variation name is required"),
   description: optionalString(300),
-  itemId: optionalString(),
-  minSelect: optionalNumberFromInput({ min: 0, integer: true }).default(0),
-  maxSelect: optionalNumberFromInput({ min: 1, integer: true }),
-  isRequired: optionalBoolean(false),
+
+  restaurantId: optionalString(),
+
+  price: requiredNumberFromInput({
+    min: 0,
+    nonnegative: true,
+    message: "Variation price is required",
+  }),
+
+  sortOrder: optionalNumberFromInput({
+    min: 0,
+    integer: true,
+    nonnegative: true,
+  }).default(0),
+
+  isDefault: optionalBoolean(false),
   isActive: optionalBoolean(true),
-  options: z
-    .array(variationOptionSchema)
-    .min(1, "At least one variation option is required"),
 };
 
 export const {
@@ -199,8 +270,24 @@ export const {
 } = buildCrudSchemas(menuVariationShape);
 
 export type MenuVariationValues = z.infer<typeof menuVariationSchema>;
-export type UpdateMenuVariationValues = z.infer<typeof updateMenuVariationSchema>;
 
+export type UpdateMenuVariationValues = z.infer<
+  typeof updateMenuVariationSchema
+>;
+export type GetMenuVariationsParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  itemId?: string;
+  restaurantId?: string;
+  isActive?: boolean;
+
+  /**
+   * Keep this only if some old screens still pass categoryId.
+   * Remove it after all old category-based variation screens are migrated.
+   */
+  categoryId?: string;
+};
 /**
  * ==============================
  * Modifier Group
@@ -210,11 +297,21 @@ export type UpdateMenuVariationValues = z.infer<typeof updateMenuVariationSchema
 const modifierGroupShape = {
   name: requiredString("Modifier group name is required"),
   description: optionalString(300),
-  minSelect: optionalNumberFromInput({ min: 0, integer: true }).default(0),
-  maxSelect: optionalNumberFromInput({ min: 1, integer: true }),
+
+  minSelect: optionalNumberFromInput({
+    min: 0,
+    integer: true,
+  }).default(0),
+
+  maxSelect: optionalNumberFromInput({
+    min: 1,
+    integer: true,
+  }),
+
   isRequired: optionalBoolean(false),
   isActive: optionalBoolean(true),
-  restaurantId: requiredString("Restaurant ID is required"), 
+
+  restaurantId: requiredString("Restaurant ID is required"),
 };
 
 export const {
@@ -223,7 +320,10 @@ export const {
 } = buildCrudSchemas(modifierGroupShape);
 
 export type ModifierGroupValues = z.infer<typeof modifierGroupSchema>;
-export type UpdateModifierGroupValues = z.infer<typeof updateModifierGroupSchema>;
+
+export type UpdateModifierGroupValues = z.infer<
+  typeof updateModifierGroupSchema
+>;
 
 /**
  * ==============================
@@ -233,13 +333,20 @@ export type UpdateModifierGroupValues = z.infer<typeof updateModifierGroupSchema
 
 const modifierShape = {
   name: requiredString("Modifier name is required"),
-  priceDelta: optionalNumberFromInput({ min: 0 }).default(0),
+
+  priceDelta: optionalNumberFromInput({
+    min: 0,
+  }).default(0),
+
   sortOrder: optionalNumberFromInput({
     min: 0,
     integer: true,
     nonnegative: true,
   }).default(0),
-  modifierGroupIds: z.array(idSchema).min(1, "At least one modifier group is required"),
+
+  modifierGroupIds: z
+    .array(idSchema)
+    .min(1, "At least one modifier group is required"),
 
   isActive: optionalBoolean(true),
 };
@@ -261,11 +368,15 @@ export type UpdateModifierValues = z.infer<typeof updateModifierSchema>;
 const restaurantMenuShape = {
   name: requiredString("Menu name is required"),
   description: optionalString(500),
+
   restaurantId: optionalString(),
+
   isActive: optionalBoolean(true),
   isDefault: optionalBoolean(false),
+
   startTime: optionalString(),
   endTime: optionalString(),
+
   availableDays: optionalStringArray(),
 };
 
@@ -275,7 +386,10 @@ export const {
 } = buildCrudSchemas(restaurantMenuShape);
 
 export type RestaurantMenuValues = z.infer<typeof restaurantMenuSchema>;
-export type UpdateRestaurantMenuValues = z.infer<typeof updateRestaurantMenuSchema>;
+
+export type UpdateRestaurantMenuValues = z.infer<
+  typeof updateRestaurantMenuSchema
+>;
 
 /**
  * ==============================
@@ -285,16 +399,26 @@ export type UpdateRestaurantMenuValues = z.infer<typeof updateRestaurantMenuSche
 
 export const linkMenuItemSchema = z.object({
   itemId: idSchema,
-  sortOrder: optionalNumberFromInput({ min: 0, integer: true }).default(0),
+
+  sortOrder: optionalNumberFromInput({
+    min: 0,
+    integer: true,
+  }).default(0),
+
   isAvailable: optionalBoolean(true),
 });
 
 export const updateLinkedMenuItemSchema = z.object({
-  sortOrder: optionalNumberFromInput({ min: 0, integer: true }),
+  sortOrder: optionalNumberFromInput({
+    min: 0,
+    integer: true,
+  }),
+
   isAvailable: z.boolean().optional(),
 });
 
 export type LinkMenuItemValues = z.infer<typeof linkMenuItemSchema>;
+
 export type UpdateLinkedMenuItemValues = z.infer<
   typeof updateLinkedMenuItemSchema
 >;

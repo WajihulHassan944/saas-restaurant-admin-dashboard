@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
-import { useGetMenuVariations } from "@/hooks/useMenus";
 import {
   blockInvalidNumberKeys,
   blockNegativeNumberPaste,
@@ -22,258 +21,87 @@ import {
 } from "@/utils/numberInput";
 
 const schema = z.object({
-  name: z.string().min(1, "Item name is required"),
-  categoryId: z.string().min(1, "Category is required"),
-  basePrice: z.string().min(1, "Base price is required"),
+  name: z.string().trim().min(1, "Item name is required"),
+  categoryId: z.string().trim().min(1, "Category is required"),
+  basePrice: z.string().trim().min(1, "Base price is required"),
 });
 
 type Field = keyof z.infer<typeof schema>;
-
-const toSafeString = (value: any) => {
-  if (value === undefined || value === null) return "";
-  return String(value);
-};
 
 const normalizeApiArray = (res: any) => {
   if (Array.isArray(res?.data)) return res.data;
   if (Array.isArray(res?.data?.data)) return res.data.data;
   if (Array.isArray(res?.data?.items)) return res.data.items;
+  if (Array.isArray(res?.items)) return res.items;
   return [];
 };
 
+const getStoredRestaurantId = () => {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const auth = JSON.parse(localStorage.getItem("auth") || "{}");
+    return auth?.user?.restaurantId || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
-  const { token, user } = useAuth();
+  const { token, user, restaurantId: authRestaurantId } = useAuth();
   const { get } = useApi(token);
 
-  const [errors, setErrors] = useState<any>({});
-  const [selectedCategory, setSelectedCategory] = useState<any>(null);
-
   const restaurantId =
-    user?.restaurantId ||
-    (typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("auth") || "{}")?.user?.restaurantId
-      : null);
+    authRestaurantId ?? user?.restaurantId ?? getStoredRestaurantId();
 
-  const { data: variationsResponse, isFetching: isFetchingVariations } =
-    useGetMenuVariations({
-      categoryId: form?.categoryId || undefined,
-      limit: 100,
-    });
-
-  const categoryVariations = useMemo(() => {
-    const raw = normalizeApiArray(variationsResponse);
-
-    const map = new Map<string, any>();
-
-    raw.forEach((variation: any) => {
-      if (!variation?.id) return;
-
-      map.set(String(variation.id), {
-        id: String(variation.id),
-        name: variation.name || "",
-        description: variation.description || "",
-        price: variation.price,
-        pickupPrice: variation.pickupPrice,
-        displayText: variation.displayText || "",
-        sortOrder: Number(variation.sortOrder || 0),
-      });
-    });
-
-    return Array.from(map.values()).sort(
-      (a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
-    );
-  }, [variationsResponse]);
-
-  useEffect(() => {
-    if (!form?.categoryId) {
-      setForm((prev: any) => ({
-        ...prev,
-        variationPriceOverrides: [],
-      }));
-      return;
-    }
-
-    if (!categoryVariations.length) return;
-
-    setForm((prev: any) => {
-      const existingOverrides = Array.isArray(prev.variationPriceOverrides)
-        ? prev.variationPriceOverrides
-        : [];
-
-      const existingMap = new Map(
-        existingOverrides
-          .filter((item: any) => item?.variationId)
-          .map((item: any) => [String(item.variationId), item])
-      );
-
-      const nextOverrides = categoryVariations.map((variation: any) => {
-        const existing = existingMap.get(String(variation.id));
-
-        return {
-          variationId: String(variation.id),
-
-          price:
-            existing?.price !== undefined && existing?.price !== null
-              ? String(existing.price)
-              : variation.price !== undefined && variation.price !== null
-              ? String(variation.price)
-              : "",
-
-          pickupPrice:
-            existing?.pickupPrice !== undefined &&
-            existing?.pickupPrice !== null
-              ? String(existing.pickupPrice)
-              : variation.pickupPrice !== undefined &&
-                variation.pickupPrice !== null
-              ? String(variation.pickupPrice)
-              : "",
-
-          displayText:
-            existing?.displayText !== undefined &&
-            existing?.displayText !== null
-              ? String(existing.displayText)
-              : variation.displayText || "",
-        };
-      });
-
-      return {
-        ...prev,
-        variationPriceOverrides: nextOverrides,
-      };
-    });
-  }, [form?.categoryId, categoryVariations.length, setForm]);
-
-  const variationPriceMap = useMemo(() => {
-    const map = new Map<string, any>();
-
-    if (Array.isArray(form?.variationPriceOverrides)) {
-      form.variationPriceOverrides.forEach((item: any) => {
-        if (!item?.variationId) return;
-        map.set(String(item.variationId), item);
-      });
-    }
-
-    return map;
-  }, [form?.variationPriceOverrides]);
-
-  const updateVariationOverride = (
-    variationId: string,
-    patch: Record<string, any>
-  ) => {
-    setForm((prev: any) => {
-      const current = Array.isArray(prev.variationPriceOverrides)
-        ? prev.variationPriceOverrides
-        : [];
-
-      const exists = current.some(
-        (item: any) => String(item.variationId) === String(variationId)
-      );
-
-      const next = exists
-        ? current.map((item: any) =>
-            String(item.variationId) === String(variationId)
-              ? {
-                  ...item,
-                  ...patch,
-                }
-              : item
-          )
-        : [
-            ...current,
-            {
-              variationId,
-              price: "",
-              pickupPrice: "",
-              displayText: "",
-              ...patch,
-            },
-          ];
-
-      return {
-        ...prev,
-        variationPriceOverrides: next,
-      };
-    });
-  };
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
 
   const validateField = (field: Field, value: any) => {
     try {
       schema.shape[field].parse(value);
 
-      setErrors((prev: any) => {
+      setErrors((prev) => {
         const copy = { ...prev };
         delete copy[field];
         return copy;
       });
     } catch (err: any) {
-      setErrors((prev: any) => ({
+      setErrors((prev) => ({
         ...prev,
         [field]: err.errors?.[0]?.message || "Invalid value",
       }));
     }
   };
 
-  const validateVariationPrices = () => {
-    if (!categoryVariations.length) return true;
-
-    const variationErrors: Record<string, string> = {};
-
-    for (const variation of categoryVariations) {
-      const override = variationPriceMap.get(String(variation.id));
-
-      if (
-        override?.price === "" ||
-        override?.price === undefined ||
-        override?.price === null ||
-        Number.isNaN(Number(override.price))
-      ) {
-        variationErrors[String(variation.id)] = "Price is required";
-      }
-
-      if (
-        override?.pickupPrice !== "" &&
-        override?.pickupPrice !== undefined &&
-        override?.pickupPrice !== null &&
-        Number.isNaN(Number(override.pickupPrice))
-      ) {
-        variationErrors[String(variation.id)] = "Pickup price must be valid";
-      }
-    }
-
-    if (Object.keys(variationErrors).length) {
-      setErrors((prev: any) => ({
-        ...prev,
-        variationPriceOverrides: variationErrors,
-      }));
-      return false;
-    }
-
-    setErrors((prev: any) => {
-      const copy = { ...prev };
-      delete copy.variationPriceOverrides;
-      return copy;
+  const validateStep = () => {
+    const result = schema.safeParse({
+      name: form?.name || "",
+      categoryId: form?.categoryId || "",
+      basePrice: form?.basePrice || "",
     });
 
-    return true;
-  };
-
-  const validateStep = () => {
-    const result = schema.safeParse(form);
-
     if (!result.success) {
-      const fieldErrors: any = {};
+      const fieldErrors: Record<string, string> = {};
 
       result.error.issues.forEach((err) => {
-        fieldErrors[err.path[0]] = err.message;
+        const key = String(err.path[0] || "");
+        if (key) fieldErrors[key] = err.message;
       });
 
       setErrors(fieldErrors);
       return false;
     }
 
-    const validVariationPrices = validateVariationPrices();
+    const basePrice = Number(form.basePrice);
 
-    if (!validVariationPrices) return false;
+    if (Number.isNaN(basePrice) || basePrice < 0) {
+      setErrors((prev) => ({
+        ...prev,
+        basePrice: "Base price must be a valid non-negative number",
+      }));
+      return false;
+    }
 
     setErrors({});
     return true;
@@ -316,16 +144,8 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
     const res = await get(`/v1/menu/categories?${params.toString()}`);
 
-    const normalizedData = Array.isArray(res?.data)
-      ? res.data
-      : Array.isArray(res?.data?.data)
-      ? res.data.data
-      : Array.isArray(res?.data?.items)
-      ? res.data.items
-      : [];
-
     return {
-      data: normalizedData,
+      data: normalizeApiArray(res),
       meta: res?.meta || res?.data?.meta || res?.data?.pagination || {},
     };
   };
@@ -351,23 +171,36 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         });
 
         const matched = res?.data?.find(
-          (cat: any) => String(cat.id) === String(form.categoryId)
+          (category: any) => String(category.id) === String(form.categoryId)
         );
 
         if (matched) {
           setSelectedCategory(matched);
-        } else if (form?.categoryId) {
-          setSelectedCategory({
-            id: form.categoryId,
-            name: form?.category?.name || "Selected Category",
-          });
+          return;
         }
+
+        setSelectedCategory({
+          id: form.categoryId,
+          name:
+            form?.category?.name ||
+            form?.menuCategory?.name ||
+            "Selected Category",
+        });
       } catch (error) {
         console.error("Failed to load selected category", error);
+
+        setSelectedCategory({
+          id: form.categoryId,
+          name:
+            form?.category?.name ||
+            form?.menuCategory?.name ||
+            "Selected Category",
+        });
       }
     };
 
     loadSelectedCategory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form?.categoryId]);
 
   const shouldShowSplitPizzaOption = useMemo(() => {
@@ -377,20 +210,29 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
     return itemName.includes("pizza") || categoryName.includes("pizza");
   }, [form?.name, selectedCategory?.name]);
 
+  const updateForm = (key: string, value: any) => {
+    setForm((prev: any) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
   return (
     <div className="space-y-5">
       <div className="space-y-2">
         <Label>Item Name</Label>
 
         <Input
-          value={form.name}
-          placeholder="eg. Greek Salad"
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          value={form.name || ""}
+          placeholder="e.g. Greek Salad"
+          onChange={(e) => updateForm("name", e.target.value)}
           onBlur={(e) => validateField("name", e.target.value)}
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
 
-        {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+        {errors.name ? (
+          <p className="text-xs text-red-500">{errors.name}</p>
+        ) : null}
       </div>
 
       <div className="space-y-2">
@@ -398,16 +240,17 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
         <AsyncSelect
           value={selectedCategory}
-          onChange={(val) => {
-            setSelectedCategory(val);
+          onChange={(value) => {
+            setSelectedCategory(value);
+
+            const categoryId = String(value?.id || "");
 
             setForm((prev: any) => ({
               ...prev,
-              categoryId: String(val?.id || ""),
-              variationPriceOverrides: [],
+              categoryId,
             }));
 
-            validateField("categoryId", String(val?.id || ""));
+            validateField("categoryId", categoryId);
           }}
           placeholder="Select category"
           fetchOptions={fetchCategories}
@@ -415,17 +258,18 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
           valueKey="id"
         />
 
-        {errors.categoryId && (
+        {errors.categoryId ? (
           <p className="text-xs text-red-500">{errors.categoryId}</p>
-        )}
+        ) : null}
       </div>
 
       <div className="space-y-2">
         <Label>Description</Label>
 
         <Textarea
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          value={form.description || ""}
+          placeholder="Write a short item description"
+          onChange={(e) => updateForm("description", e.target.value)}
           className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
         />
       </div>
@@ -435,14 +279,15 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
         <Input
           type="number"
-          value={form.basePrice}
-          onChange={(e) => {
-            const value = sanitizeNonNegativeNumber(e.target.value);
-
-            setForm({ ...form, basePrice: value });
-          }}
+          min={0}
+          value={form.basePrice || ""}
+          placeholder="0"
           onKeyDown={blockInvalidNumberKeys}
           onPaste={blockNegativeNumberPaste}
+          onChange={(e) => {
+            const value = sanitizeNonNegativeNumber(e.target.value);
+            updateForm("basePrice", value);
+          }}
           onBlur={(e) =>
             validateField(
               "basePrice",
@@ -450,148 +295,36 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
             )
           }
           className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-          min={0}
         />
 
-        {errors.basePrice && (
+        {errors.basePrice ? (
           <p className="text-xs text-red-500">{errors.basePrice}</p>
-        )}
+        ) : null}
       </div>
 
-      <div className="space-y-3 rounded-[16px] border border-gray-200 bg-gray-50 p-4">
-        <div>
-          <Label>Variation Pricing</Label>
-          <p className="mt-1 text-xs text-gray-500">
-            Variations are selected from the category, but prices are saved per
-            item.
-          </p>
-        </div>
+      {/* <div className="space-y-2">
+        <Label>SKU</Label>
 
-        {!form?.categoryId ? (
-          <p className="text-sm text-gray-500">
-            Select a category to configure variation prices.
-          </p>
-        ) : isFetchingVariations ? (
-          <p className="text-sm text-gray-500">Loading variations...</p>
-        ) : categoryVariations.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No active variations found for this category.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {categoryVariations.map((variation: any) => {
-              const override = variationPriceMap.get(String(variation.id)) || {
-                price: "",
-                pickupPrice: "",
-                displayText: "",
-              };
+        <Input
+          value={form.sku || ""}
+          placeholder="Optional item SKU"
+          onChange={(e) => updateForm("sku", e.target.value)}
+          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+        />
+      </div> */}
 
-              const variationError =
-                errors?.variationPriceOverrides?.[String(variation.id)];
-
-              return (
-                <div
-                  key={variation.id}
-                  className="rounded-[14px] border border-gray-200 bg-white p-3"
-                >
-                  <div className="mb-3">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {variation.name}
-                    </p>
-
-                    {variation.description ? (
-                      <p className="text-xs text-gray-500">
-                        {variation.description}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Variation Price</Label>
-
-                      <Input
-                        type="number"
-                        min={0}
-                        value={toSafeString(override.price)}
-                        onKeyDown={blockInvalidNumberKeys}
-                        onPaste={blockNegativeNumberPaste}
-                        onChange={(e) =>
-                          updateVariationOverride(String(variation.id), {
-                            price: sanitizeNonNegativeNumber(e.target.value),
-                          })
-                        }
-                        placeholder="eg. 12"
-                        className="h-[40px] rounded-[10px]"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs">Pickup Price</Label>
-
-                      <Input
-                        type="number"
-                        min={0}
-                        value={toSafeString(override.pickupPrice)}
-                        onKeyDown={blockInvalidNumberKeys}
-                        onPaste={blockNegativeNumberPaste}
-                        onChange={(e) =>
-                          updateVariationOverride(String(variation.id), {
-                            pickupPrice: sanitizeNonNegativeNumber(
-                              e.target.value
-                            ),
-                          })
-                        }
-                        placeholder="eg. 10"
-                        className="h-[40px] rounded-[10px]"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs">Display Text</Label>
-
-                      <Input
-                        value={toSafeString(override.displayText)}
-                        onChange={(e) =>
-                          updateVariationOverride(String(variation.id), {
-                            displayText: e.target.value,
-                          })
-                        }
-                        placeholder="eg. Small 10 inch"
-                        className="h-[40px] rounded-[10px]"
-                      />
-                    </div>
-                  </div>
-
-                  {variationError ? (
-                    <p className="mt-2 text-xs text-red-500">
-                      {variationError}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {shouldShowSplitPizzaOption && (
+      {shouldShowSplitPizzaOption ? (
         <label className="flex items-center gap-2 rounded-[12px] border border-gray-200 bg-white p-3 text-sm">
           <input
             type="checkbox"
             checked={Boolean(form.supportsSplitPizza)}
-            onChange={(e) =>
-              setForm((prev: any) => ({
-                ...prev,
-                supportsSplitPizza: e.target.checked,
-              }))
-            }
-            className="accent-[var(--primary)]"
+            onChange={(e) => updateForm("supportsSplitPizza", e.target.checked)}
+            className="accent-primary"
           />
 
           <span>Supports Split Pizza</span>
         </label>
-      )}
+      ) : null}
     </div>
   );
 });

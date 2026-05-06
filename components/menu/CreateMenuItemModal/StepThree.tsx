@@ -1,661 +1,1686 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, PlusCircle, Trash2, Link2 } from "lucide-react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Check,
+  Loader2,
+  Search,
+  Sparkles,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import useApi from "@/hooks/useApi";
-import { useGetModifiers } from "@/hooks/useMenus";
+import { useGetMenuVariations, useGetModifiers } from "@/hooks/useMenus";
+import {
+  blockInvalidNumberKeys,
+  blockNegativeNumberPaste,
+  sanitizeNonNegativeNumber,
+} from "@/utils/numberInput";
 
-type VariationForm = {
-  name: string;
-  description: string;
-  requiredModifierId: string;
-  price: string;
-  sku: string;
-  sortOrder: number;
-  isDefault: boolean;
-  isActive: boolean;
-};
-
-type Props = {
+type StepThreeProps = {
   form: any;
-  setForm: (value: any) => void;
-  item?: any;
-  menuItemId?: string;
+  setForm: React.Dispatch<React.SetStateAction<any>>;
 };
 
-const getInitialVariationForm = (): VariationForm => ({
-  name: "",
-  description: "",
-  requiredModifierId: "",
-  price: "",
-  sku: "",
-  sortOrder: 0,
-  isDefault: false,
-  isActive: true,
-});
+type SelectableEntity = {
+  id: string;
+  name: string;
+  description?: string;
+  price?: string | number;
+  priceDelta?: string | number;
+  isActive?: boolean;
+  sortOrder?: number;
+  modifierGroups?: any[];
+  groupLinks?: any[];
+};
 
-export default function StepThree({
-  form,
-  setForm,
-  item,
-  menuItemId,
-}: Props) {
-  const { token, user } = useAuth();
-  const api = useApi(token);
+type ModifierPriceOverride = {
+  modifierId: string;
+  priceDelta: string;
+};
 
-  console.log("item is", item);
+type VariationPriceOverride = {
+  variationId: string;
+  price: string;
+  pickupPrice: string;
+  displayText: string;
+  modifierPriceOverrides: ModifierPriceOverride[];
+};
 
-  const resolvedItemId = menuItemId || item?.id || form?.id;
+type FlatModifierVariationOverride = {
+  modifierId: string;
+  variationId: string;
+  priceDelta: string;
+};
 
-  const [variationForm, setVariationForm] = useState<VariationForm>(
-    getInitialVariationForm()
+const PAGE_LIMIT = 20;
+
+const normalizeArray = (value: any): any[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [];
+};
+
+const normalizeIds = (
+  sources: any[],
+  type: "variation" | "modifier"
+): string[] => {
+  const ids = new Set<string>();
+
+  sources.forEach((source) => {
+    normalizeArray(source).forEach((entry) => {
+      if (entry === null || entry === undefined) return;
+
+      if (typeof entry === "string" || typeof entry === "number") {
+        ids.add(String(entry));
+        return;
+      }
+
+      if (type === "variation") {
+        const id = entry?.variationId || entry?.variation?.id || entry?.id;
+        if (id) ids.add(String(id));
+        return;
+      }
+
+      const id = entry?.modifierId || entry?.modifier?.id || entry?.id;
+      if (id) ids.add(String(id));
+    });
+  });
+
+  return Array.from(ids);
+};
+
+const extractResponseItems = (response: any, entityKey: string) => {
+  if (!response) return [];
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  const candidates = [
+    response?.data?.items,
+    response?.data?.[entityKey],
+    response?.data?.data?.items,
+    response?.data?.data?.[entityKey],
+    response?.data?.data,
+    response?.items,
+    response?.[entityKey],
+    response?.data,
+    response,
+  ];
+
+  const raw = candidates.find((candidate) => Array.isArray(candidate));
+
+  return Array.isArray(raw) ? raw : [];
+};
+
+const getPaginationHasMore = ({
+  response,
+  page,
+  limit,
+  receivedCount,
+}: {
+  response: any;
+  page: number;
+  limit: number;
+  receivedCount: number;
+}) => {
+  const source =
+    response?.data?.pagination ||
+    response?.data?.meta ||
+    response?.pagination ||
+    response?.meta ||
+    {};
+
+  if (typeof source?.hasNext === "boolean") return source.hasNext;
+  if (typeof source?.hasMore === "boolean") return source.hasMore;
+
+  const currentPage = Number(source?.page ?? page);
+  const totalPages = Number(source?.totalPages ?? source?.pages ?? 0);
+  const total = Number(source?.total ?? 0);
+
+  if (totalPages > 0) return currentPage < totalPages;
+  if (total > 0) return page * limit < total;
+
+  return receivedCount >= limit;
+};
+
+const mergeUniqueById = <T extends { id?: string }>(prev: T[], next: T[]) => {
+  const map = new Map<string, T>();
+
+  [...prev, ...next].forEach((item) => {
+    const id = String(item?.id || "");
+    if (!id) return;
+    map.set(id, item);
+  });
+
+  return Array.from(map.values());
+};
+
+const getModifierGroupNames = (modifier: any) => {
+  const directGroups = Array.isArray(modifier?.modifierGroups)
+    ? modifier.modifierGroups
+    : [];
+
+  const linkedGroups = Array.isArray(modifier?.groupLinks)
+    ? modifier.groupLinks
+        .map((link: any) => link?.modifierGroup)
+        .filter(Boolean)
+    : [];
+
+  const unique = new Map<string, any>();
+
+  [...directGroups, ...linkedGroups].forEach((group: any) => {
+    const id = String(group?.id || "");
+    if (!id) return;
+    if (!unique.has(id)) unique.set(id, group);
+  });
+
+  return Array.from(unique.values())
+    .map((group: any) => group?.name)
+    .filter(Boolean);
+};
+
+const formatAmount = (value: any) => {
+  const numeric = Number(value ?? 0);
+  if (Number.isNaN(numeric)) return "0.00";
+  return numeric.toFixed(2);
+};
+
+const hasPositiveAmount = (value: any) => {
+  const numeric = Number(value ?? 0);
+  return !Number.isNaN(numeric) && numeric > 0;
+};
+
+const isValidNonNegativeNumber = (value: any) => {
+  if (value === "" || value === null || value === undefined) return false;
+
+  const numeric = Number(value);
+
+  return !Number.isNaN(numeric) && numeric >= 0;
+};
+
+const getModifierBasePrice = (modifier?: SelectableEntity) => {
+  return sanitizeNonNegativeNumber(String(modifier?.priceDelta ?? 0));
+};
+
+const getItemBasePrice = (form: any) => {
+  return sanitizeNonNegativeNumber(String(form?.basePrice ?? "0")) || "0";
+};
+
+const normalizeTopLevelModifierOverrides = (
+  raw: any[]
+): ModifierPriceOverride[] => {
+  return normalizeArray(raw)
+    .filter((entry) => entry?.modifierId && !entry?.variationId)
+    .map((entry) => ({
+      modifierId: String(entry.modifierId),
+      priceDelta: sanitizeNonNegativeNumber(String(entry.priceDelta ?? "")),
+    }));
+};
+
+const normalizeFlatModifierVariationOverrides = (
+  raw: any[]
+): FlatModifierVariationOverride[] => {
+  return normalizeArray(raw)
+    .filter((entry) => entry?.modifierId && entry?.variationId)
+    .map((entry) => ({
+      modifierId: String(entry.modifierId),
+      variationId: String(entry.variationId),
+      priceDelta: sanitizeNonNegativeNumber(String(entry.priceDelta ?? "")),
+    }));
+};
+
+const normalizeNestedModifierOverrides = (
+  raw: any[]
+): ModifierPriceOverride[] => {
+  return normalizeArray(raw)
+    .filter((entry) => entry?.modifierId)
+    .map((entry) => ({
+      modifierId: String(entry.modifierId),
+      priceDelta: sanitizeNonNegativeNumber(String(entry.priceDelta ?? "")),
+    }));
+};
+
+const normalizeVariationPriceOverrides = (
+  raw: any[]
+): VariationPriceOverride[] => {
+  return normalizeArray(raw)
+    .filter((entry) => entry?.variationId)
+    .map((entry) => ({
+      variationId: String(entry.variationId),
+      price:
+        entry?.price !== undefined && entry?.price !== null
+          ? sanitizeNonNegativeNumber(String(entry.price))
+          : "",
+      pickupPrice:
+        entry?.pickupPrice !== undefined && entry?.pickupPrice !== null
+          ? sanitizeNonNegativeNumber(String(entry.pickupPrice))
+          : "",
+      displayText:
+        entry?.displayText !== undefined && entry?.displayText !== null
+          ? String(entry.displayText)
+          : "",
+      modifierPriceOverrides: normalizeNestedModifierOverrides(
+        entry?.modifierPriceOverrides
+      ),
+    }));
+};
+
+const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
+  const { restaurantId: authRestaurantId } = useAuth();
+  const restaurantId = authRestaurantId ?? undefined;
+  const canFetchOptions = Boolean(restaurantId);
+
+  const [variationSearch, setVariationSearch] = useState("");
+  const [modifierSearch, setModifierSearch] = useState("");
+
+  const [debouncedVariationSearch, setDebouncedVariationSearch] = useState("");
+  const [debouncedModifierSearch, setDebouncedModifierSearch] = useState("");
+
+  const [variationPage, setVariationPage] = useState(1);
+  const [modifierPage, setModifierPage] = useState(1);
+
+  const [variationOptions, setVariationOptions] = useState<SelectableEntity[]>(
+    []
   );
-  const [addingVariation, setAddingVariation] = useState(false);
+  const [modifierOptions, setModifierOptions] = useState<SelectableEntity[]>(
+    []
+  );
 
-  const [groups, setGroups] = useState<any[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState("");
-  const [modifierSortOrder, setModifierSortOrder] = useState(0);
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const [addingModifier, setAddingModifier] = useState(false);
+  const [variationHasMore, setVariationHasMore] = useState(true);
+  const [modifierHasMore, setModifierHasMore] = useState(true);
 
-  const [localVariations, setLocalVariations] = useState<any[]>([]);
-  const [localModifierGroups, setLocalModifierGroups] = useState<any[]>([]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const nextSearch = variationSearch.trim();
 
-  const attachedModifierIds = useMemo(() => {
-    return new Set((localModifierGroups || []).map((g: any) => String(g.id)));
-  }, [localModifierGroups]);
+      setVariationPage(1);
+      setVariationHasMore(true);
+      setDebouncedVariationSearch(nextSearch);
+    }, 350);
 
-  const attachedGroupIds = useMemo(() => {
-    return (localModifierGroups || []).map((g: any) =>
-      String(g?.id || g?.modifierGroupId || "")
+    return () => clearTimeout(timer);
+  }, [variationSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const nextSearch = modifierSearch.trim();
+
+      setModifierPage(1);
+      setModifierHasMore(true);
+      setDebouncedModifierSearch(nextSearch);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [modifierSearch]);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    setVariationPage(1);
+    setModifierPage(1);
+
+    setVariationOptions([]);
+    setModifierOptions([]);
+
+    setVariationHasMore(true);
+    setModifierHasMore(true);
+  }, [restaurantId]);
+
+  const selectedVariationIds = useMemo(() => {
+    if (Array.isArray(form?.variationIds)) {
+      return normalizeIds([form.variationIds], "variation");
+    }
+
+    return normalizeIds(
+      [
+        form?.variations,
+        form?.itemVariations,
+        form?.variationLinks,
+        form?.variationPriceOverrides,
+      ],
+      "variation"
     );
-  }, [localModifierGroups]);
+  }, [
+    form?.variationIds,
+    form?.variations,
+    form?.itemVariations,
+    form?.variationLinks,
+    form?.variationPriceOverrides,
+  ]);
 
-  const [modifierPage] = useState(1);
-  const [modifierLimit] = useState(100);
-  const [modifierSearch] = useState("");
+  const selectedModifierIds = useMemo(() => {
+    if (Array.isArray(form?.modifierIds)) {
+      return normalizeIds([form.modifierIds], "modifier");
+    }
+
+    const nestedModifierOverrides = normalizeArray(
+      form?.variationPriceOverrides
+    ).flatMap((entry) => entry?.modifierPriceOverrides || []);
+
+    return normalizeIds(
+      [
+        form?.modifiers,
+        form?.itemModifiers,
+        form?.modifierLinks,
+        form?.modifierPriceOverrides,
+        nestedModifierOverrides,
+      ],
+      "modifier"
+    );
+  }, [
+    form?.modifierIds,
+    form?.modifiers,
+    form?.itemModifiers,
+    form?.modifierLinks,
+    form?.modifierPriceOverrides,
+    form?.variationPriceOverrides,
+  ]);
+
+  const {
+    data: variationsResponse,
+    isLoading: loadingVariations,
+    isFetching: fetchingVariations,
+  } = useGetMenuVariations({
+    page: variationPage,
+    limit: PAGE_LIMIT,
+    restaurantId,
+    search: debouncedVariationSearch || undefined,
+  });
 
   const {
     data: modifiersResponse,
-    isLoading: loadingRequiredModifiers,
-    isFetching: fetchingRequiredModifiers,
-    refetch: refetchModifiers,
+    isLoading: loadingModifiers,
+    isFetching: fetchingModifiers,
   } = useGetModifiers({
     page: modifierPage,
-    limit: modifierLimit,
-    search: modifierSearch,
+    limit: PAGE_LIMIT,
+    restaurantId,
+    search: debouncedModifierSearch || undefined,
   });
-useEffect(() => {
-  if (resolvedItemId) {
-    refetchModifiers();
-  }
-}, [resolvedItemId, refetchModifiers]);
-
-  const modifierItems = useMemo(() => {
-    if (!modifiersResponse) return [];
-
-    return (
-      modifiersResponse?.data?.items ||
-      modifiersResponse?.data?.modifiers ||
-      modifiersResponse?.data?.data ||
-      modifiersResponse?.items ||
-      modifiersResponse?.modifiers ||
-      modifiersResponse?.data ||
-      []
-    );
-  }, [modifiersResponse]);
-
-const availableRequiredModifiers = useMemo(() => {
-  if (!Array.isArray(modifierItems) || modifierItems.length === 0) return [];
-
-  return modifierItems.map((modifier: any) => ({
-    ...modifier,
-    groupName: modifier?.modifierGroup?.name || "",
-  }));
-}, [modifierItems]);
-  useEffect(() => {
-    const initialVariations =
-      item?.variations || item?.menuVariations || item?.sizes || [];
-
-    const initialModifierGroups =
-      item?.modifierGroups ||
-      item?.attachedModifierGroups ||
-      item?.modifier_groups ||
-      item?.modifierLinks?.map((link: any) => ({
-        ...(link?.modifierGroup || {}),
-        linkId: link?.id,
-        modifierGroupId: link?.modifierGroupId,
-        sortOrder: link?.sortOrder ?? link?.modifierGroup?.sortOrder ?? 0,
-        menuItemId: link?.menuItemId,
-        isAttached: true,
-      })) ||
-      [];
-
-    setLocalVariations(Array.isArray(initialVariations) ? initialVariations : []);
-    setLocalModifierGroups(
-      Array.isArray(initialModifierGroups) ? initialModifierGroups : []
-    );
-  }, [item]);
 
   useEffect(() => {
-    if (!user?.restaurantId || !token) return;
-    fetchGroups();
-  }, [user?.restaurantId, token]);
+    if (!canFetchOptions || !variationsResponse) return;
 
-  const fetchGroups = async () => {
-    if (!user?.restaurantId) return;
+    const nextItems = extractResponseItems(variationsResponse, "variations");
 
-    setLoadingGroups(true);
-
-    const res = await api.get(
-      `/v1/menu/modifier-groups?restaurantId=${user.restaurantId}`
+    setVariationOptions((prev) =>
+      variationPage === 1 ? nextItems : mergeUniqueById(prev, nextItems)
     );
 
-    setLoadingGroups(false);
+    setVariationHasMore(
+      getPaginationHasMore({
+        response: variationsResponse,
+        page: variationPage,
+        limit: PAGE_LIMIT,
+        receivedCount: nextItems.length,
+      })
+    );
+  }, [variationsResponse, variationPage, canFetchOptions]);
 
-    if (!res) {
-      toast.error("Failed to load modifier groups");
-      return;
-    }
+  useEffect(() => {
+    if (!canFetchOptions || !modifiersResponse) return;
 
-    if (res.error) {
-      toast.error(res.error || "Failed to load modifier groups");
-      return;
-    }
+    const nextItems = extractResponseItems(modifiersResponse, "modifiers");
 
-    const groupList = Array.isArray(res?.data) ? res.data : [];
-    setGroups(groupList);
-  };
+    setModifierOptions((prev) =>
+      modifierPage === 1 ? nextItems : mergeUniqueById(prev, nextItems)
+    );
 
-  const handleVariationChange = (
-    key: keyof VariationForm,
-    value: string | number | boolean
-  ) => {
-    setVariationForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
+    setModifierHasMore(
+      getPaginationHasMore({
+        response: modifiersResponse,
+        page: modifierPage,
+        limit: PAGE_LIMIT,
+        receivedCount: nextItems.length,
+      })
+    );
+  }, [modifiersResponse, modifierPage, canFetchOptions]);
 
-  const resetVariationForm = () => {
-    setVariationForm(getInitialVariationForm());
-  };
+  const variationMap = useMemo(() => {
+    const map = new Map<string, SelectableEntity>();
 
-  const handleAddVariation = async () => {
-    if (!resolvedItemId) {
-      toast.error("Please save the menu item first");
-      return;
-    }
+    variationOptions.forEach((item: any) => {
+      if (item?.id) map.set(String(item.id), item);
+    });
 
-    if (!variationForm.name.trim()) {
-      toast.error("Variation name is required");
-      return;
-    }
+    normalizeArray(form?.variations).forEach((item: any) => {
+      if (item?.id) map.set(String(item.id), item);
 
-    if (variationForm.price === "" || Number(variationForm.price) < 0) {
-      toast.error("Valid variation price is required");
-      return;
-    }
-
-    setAddingVariation(true);
-
-    const payload = {
-      menuItemId: resolvedItemId,
-      name: variationForm.name.trim(),
-      description: variationForm.description?.trim() || "",
-      requiredModifierId: variationForm.requiredModifierId || "",
-      sku: variationForm.sku?.trim() || "",
-      price: Number(variationForm.price),
-      sortOrder: Number(variationForm.sortOrder || 0),
-      isDefault: variationForm.isDefault,
-      isActive: variationForm.isActive,
-    };
-
-    const res = await api.post("/v1/menu/variations", payload);
-
-    setAddingVariation(false);
-
-    if (!res) {
-      toast.error("Something went wrong while adding variation");
-      return;
-    }
-
-    if (res.error) {
-      toast.error(res.error || "Failed to add variation");
-      return;
-    }
-
-    const createdVariation = res?.data?.data || res?.data || payload;
-
-    setLocalVariations((prev) => [createdVariation, ...prev]);
-
-    setForm((prev: any) => ({
-      ...prev,
-      sizes: [createdVariation, ...(prev?.sizes || [])],
-    }));
-
-    toast.success("Variation added successfully");
-    resetVariationForm();
-  };
-
-  const handleAttachModifierGroup = async () => {
-    if (!resolvedItemId) {
-      toast.error("Please save the menu item first");
-      return;
-    }
-
-    if (!selectedGroup) {
-      toast.error("Please select a modifier group");
-      return;
-    }
-
-    if (attachedModifierIds.has(String(selectedGroup))) {
-      toast.error("This modifier group is already attached");
-      return;
-    }
-
-    setAddingModifier(true);
-
-    const res = await api.post(
-      `/v1/menu/items/${resolvedItemId}/modifier-groups/${selectedGroup}`,
-      {
-        sortOrder: Number(modifierSortOrder || 0),
+      if (item?.variation?.id) {
+        map.set(String(item.variation.id), item.variation);
       }
-    );
+    });
 
-    setAddingModifier(false);
+    normalizeArray(form?.itemVariations).forEach((item: any) => {
+      if (item?.id) map.set(String(item.id), item);
 
-    if (!res) {
-      toast.error("Something went wrong while attaching modifier group");
-      return;
-    }
+      if (item?.variation?.id) {
+        map.set(String(item.variation.id), item.variation);
+      }
+    });
 
-    if (res.error) {
-      toast.error(res.error || "Failed to attach modifier group");
-      return;
-    }
+    return map;
+  }, [variationOptions, form?.variations, form?.itemVariations]);
 
-    const selectedGroupData = groups.find(
-      (g) => String(g.id) === String(selectedGroup)
-    );
+  const modifierMap = useMemo(() => {
+    const map = new Map<string, SelectableEntity>();
 
-    if (selectedGroupData) {
-      const attachedGroup = {
-        ...selectedGroupData,
-        sortOrder: Number(modifierSortOrder || 0),
-      };
+    modifierOptions.forEach((item: any) => {
+      if (item?.id) map.set(String(item.id), item);
+    });
 
-      setLocalModifierGroups((prev) => [attachedGroup, ...prev]);
+    normalizeArray(form?.modifiers).forEach((item: any) => {
+      if (item?.id) map.set(String(item.id), item);
 
-      setForm((prev: any) => ({
-        ...prev,
-        addons: [attachedGroup, ...(prev?.addons || [])],
-      }));
-    }
+      if (item?.modifier?.id) {
+        map.set(String(item.modifier.id), item.modifier);
+      }
+    });
 
-    toast.success("Modifier group attached successfully");
-    setSelectedGroup("");
-    setModifierSortOrder(0);
-  };
+    normalizeArray(form?.modifierLinks).forEach((link: any) => {
+      if (link?.modifier?.id) {
+        map.set(String(link.modifier.id), link.modifier);
+      }
+    });
 
-  const handleRemoveLocalVariation = (index: number) => {
-    setLocalVariations((prev) => prev.filter((_, i) => i !== index));
-    setForm((prev: any) => ({
-      ...prev,
-      sizes: (prev?.sizes || []).filter((_: any, i: number) => i !== index),
-    }));
-  };
+    return map;
+  }, [modifierOptions, form?.modifiers, form?.modifierLinks]);
 
-  const handleRemoveLocalModifier = (groupId: string | number) => {
-    setLocalModifierGroups((prev) =>
-      prev.filter(
-        (g) =>
-          String(g?.id || g?.modifierGroupId || "") !== String(groupId)
-      )
-    );
+  const selectedVariations = useMemo(
+    () =>
+      selectedVariationIds.map((id) => ({
+        id,
+        name: variationMap.get(id)?.name || `Variation ${id}`,
+        ...variationMap.get(id),
+      })),
+    [selectedVariationIds, variationMap]
+  );
 
-    setForm((prev: any) => ({
-      ...prev,
-      addons: (prev?.addons || []).filter(
-        (g: any) =>
-          String(g?.id || g?.modifierGroupId || "") !== String(groupId)
-      ),
-    }));
+  const selectedModifiers = useMemo(
+    () =>
+      selectedModifierIds.map((id) => ({
+        id,
+        name: modifierMap.get(id)?.name || `Modifier ${id}`,
+        ...modifierMap.get(id),
+      })),
+    [selectedModifierIds, modifierMap]
+  );
 
-    setVariationForm((prev) => {
-      const selectedModifierStillExists = availableRequiredModifiers.some(
-        (modifier: any) =>
-          String(modifier.id) === String(prev.requiredModifierId) &&
-          String(modifier?.modifierGroupId || modifier?.modifierGroup?.id || "") !==
-            String(groupId)
+  const topLevelModifierOverrides = useMemo(
+    () => normalizeTopLevelModifierOverrides(form?.modifierPriceOverrides),
+    [form?.modifierPriceOverrides]
+  );
+
+  const variationPriceOverrides = useMemo(
+    () => normalizeVariationPriceOverrides(form?.variationPriceOverrides),
+    [form?.variationPriceOverrides]
+  );
+
+  useEffect(() => {
+    setForm((prev: any) => {
+      const basePrice = getItemBasePrice(prev);
+
+      const currentTopOverrides = normalizeTopLevelModifierOverrides(
+        prev?.modifierPriceOverrides
       );
 
-      return selectedModifierStillExists
-        ? prev
-        : { ...prev, requiredModifierId: "" };
+      const oldFlatVariationModifierOverrides =
+        normalizeFlatModifierVariationOverrides(prev?.modifierPriceOverrides);
+
+      const currentVariationOverrides = normalizeVariationPriceOverrides(
+        prev?.variationPriceOverrides
+      );
+
+      const nextTopModifierOverrides: ModifierPriceOverride[] =
+        selectedModifierIds.map((modifierId) => {
+          const existing = currentTopOverrides.find(
+            (entry) => String(entry.modifierId) === String(modifierId)
+          );
+
+          const modifier = modifierMap.get(String(modifierId));
+          const defaultPrice = getModifierBasePrice(modifier);
+
+          return {
+            modifierId: String(modifierId),
+            priceDelta:
+              existing?.priceDelta !== undefined &&
+              existing?.priceDelta !== null &&
+              existing.priceDelta !== ""
+                ? existing.priceDelta
+                : defaultPrice,
+          };
+        });
+
+      const nextVariationOverrides: VariationPriceOverride[] =
+        selectedVariationIds.map((variationId) => {
+          const existing = currentVariationOverrides.find(
+            (entry) => String(entry.variationId) === String(variationId)
+          );
+
+          const variation = variationMap.get(String(variationId));
+
+          const nestedModifierOverrides = selectedModifierIds.map(
+            (modifierId) => {
+              const existingNested = existing?.modifierPriceOverrides?.find(
+                (entry) => String(entry.modifierId) === String(modifierId)
+              );
+
+              const oldFlat = oldFlatVariationModifierOverrides.find(
+                (entry) =>
+                  String(entry.variationId) === String(variationId) &&
+                  String(entry.modifierId) === String(modifierId)
+              );
+
+              const topLevel = nextTopModifierOverrides.find(
+                (entry) => String(entry.modifierId) === String(modifierId)
+              );
+
+              const modifier = modifierMap.get(String(modifierId));
+              const defaultPrice =
+                topLevel?.priceDelta !== undefined &&
+                topLevel?.priceDelta !== null &&
+                topLevel.priceDelta !== ""
+                  ? topLevel.priceDelta
+                  : getModifierBasePrice(modifier);
+
+              return {
+                modifierId: String(modifierId),
+                priceDelta:
+                  existingNested?.priceDelta !== undefined &&
+                  existingNested?.priceDelta !== null &&
+                  existingNested.priceDelta !== ""
+                    ? existingNested.priceDelta
+                    : oldFlat?.priceDelta !== undefined &&
+                      oldFlat?.priceDelta !== null &&
+                      oldFlat.priceDelta !== ""
+                    ? oldFlat.priceDelta
+                    : defaultPrice,
+              };
+            }
+          );
+
+          return {
+            variationId: String(variationId),
+            price:
+              existing?.price !== undefined &&
+              existing?.price !== null &&
+              existing.price !== ""
+                ? existing.price
+                : basePrice,
+            pickupPrice:
+              existing?.pickupPrice !== undefined &&
+              existing?.pickupPrice !== null
+                ? existing.pickupPrice
+                : "",
+            displayText:
+              existing?.displayText !== undefined &&
+              existing?.displayText !== null &&
+              existing.displayText !== ""
+                ? existing.displayText
+                : variation?.name || "",
+            modifierPriceOverrides: nestedModifierOverrides,
+          };
+        });
+
+      const nextState = {
+        ...prev,
+        variationIds: selectedVariationIds,
+        modifierIds: selectedModifierIds,
+        modifierPriceOverrides: nextTopModifierOverrides,
+        variationPriceOverrides: nextVariationOverrides,
+      };
+
+      const didChange =
+        JSON.stringify(prev?.variationIds || []) !==
+          JSON.stringify(nextState.variationIds) ||
+        JSON.stringify(prev?.modifierIds || []) !==
+          JSON.stringify(nextState.modifierIds) ||
+        JSON.stringify(
+          normalizeTopLevelModifierOverrides(prev?.modifierPriceOverrides)
+        ) !== JSON.stringify(nextState.modifierPriceOverrides) ||
+        JSON.stringify(
+          normalizeVariationPriceOverrides(prev?.variationPriceOverrides)
+        ) !== JSON.stringify(nextState.variationPriceOverrides);
+
+      return didChange ? nextState : prev;
+    });
+  }, [
+    selectedVariationIds.join("|"),
+    selectedModifierIds.join("|"),
+    variationMap,
+    modifierMap,
+    form?.basePrice,
+    setForm,
+  ]);
+
+  const validateStep = () => {
+    if (!restaurantId) {
+      toast.error("Restaurant id is missing");
+      return false;
+    }
+
+    const basePrice = getItemBasePrice(form);
+
+    if (!isValidNonNegativeNumber(basePrice)) {
+      toast.error("Base price must be a valid non-negative number");
+      return false;
+    }
+
+    const normalizedTopModifierOverrides = normalizeTopLevelModifierOverrides(
+      form?.modifierPriceOverrides
+    );
+
+    const normalizedVariationOverrides = normalizeVariationPriceOverrides(
+      form?.variationPriceOverrides
+    );
+
+    for (const modifierId of selectedModifierIds) {
+      const override = normalizedTopModifierOverrides.find(
+        (entry) => String(entry.modifierId) === String(modifierId)
+      );
+
+      const priceDelta = override?.priceDelta ?? "0";
+
+      if (!isValidNonNegativeNumber(priceDelta)) {
+        toast.error("Modifier prices must be valid non-negative numbers");
+        return false;
+      }
+    }
+
+    for (const variationId of selectedVariationIds) {
+      const override = normalizedVariationOverrides.find(
+        (entry) => String(entry.variationId) === String(variationId)
+      );
+
+      const variationPrice =
+        override?.price !== undefined &&
+        override?.price !== null &&
+        override.price !== ""
+          ? override.price
+          : basePrice;
+
+      if (!isValidNonNegativeNumber(variationPrice)) {
+        toast.error("Variation prices must be valid non-negative numbers");
+        return false;
+      }
+
+      if (
+        override?.pickupPrice !== "" &&
+        override?.pickupPrice !== undefined &&
+        override?.pickupPrice !== null &&
+        !isValidNonNegativeNumber(override.pickupPrice)
+      ) {
+        toast.error("Variation pickup prices must be valid non-negative numbers");
+        return false;
+      }
+
+      if (selectedModifierIds.length > 0) {
+        for (const modifierId of selectedModifierIds) {
+          const nestedOverride = override?.modifierPriceOverrides?.find(
+            (entry) => String(entry.modifierId) === String(modifierId)
+          );
+
+          const topLevel = normalizedTopModifierOverrides.find(
+            (entry) => String(entry.modifierId) === String(modifierId)
+          );
+
+          const priceDelta =
+            nestedOverride?.priceDelta !== undefined &&
+            nestedOverride?.priceDelta !== null &&
+            nestedOverride.priceDelta !== ""
+              ? nestedOverride.priceDelta
+              : topLevel?.priceDelta || "0";
+
+          if (!isValidNonNegativeNumber(priceDelta)) {
+            toast.error(
+              "Modifier variation prices must be valid non-negative numbers"
+            );
+            return false;
+          }
+        }
+      }
+    }
+
+    const finalTopOverrides = selectedModifierIds.map((modifierId) => {
+      const existing = normalizedTopModifierOverrides.find(
+        (entry) => String(entry.modifierId) === String(modifierId)
+      );
+
+      return {
+        modifierId: String(modifierId),
+        priceDelta: existing?.priceDelta || "0",
+      };
+    });
+
+    const finalVariationOverrides = selectedVariationIds.map((variationId) => {
+      const existing = normalizedVariationOverrides.find(
+        (entry) => String(entry.variationId) === String(variationId)
+      );
+
+      const variation = variationMap.get(String(variationId));
+
+      return {
+        variationId: String(variationId),
+        price: existing?.price || basePrice,
+        pickupPrice: existing?.pickupPrice || "",
+        displayText: existing?.displayText || variation?.name || "",
+        modifierPriceOverrides: selectedModifierIds.map((modifierId) => {
+          const nestedExisting = existing?.modifierPriceOverrides?.find(
+            (entry) => String(entry.modifierId) === String(modifierId)
+          );
+
+          const topLevel = finalTopOverrides.find(
+            (entry) => String(entry.modifierId) === String(modifierId)
+          );
+
+          return {
+            modifierId: String(modifierId),
+            priceDelta: nestedExisting?.priceDelta || topLevel?.priceDelta || "0",
+          };
+        }),
+      };
+    });
+
+    setForm((prev: any) => ({
+      ...prev,
+      variationIds: selectedVariationIds,
+      modifierIds: selectedModifierIds,
+      modifierPriceOverrides: finalTopOverrides,
+      variationPriceOverrides: finalVariationOverrides,
+    }));
+
+    return true;
+  };
+
+  useImperativeHandle(ref, () => ({
+    validateStep,
+  }));
+
+  const toggleSelection = (
+    field: "variationIds" | "modifierIds",
+    id: string
+  ) => {
+    setForm((prev: any) => {
+      const currentIds =
+        field === "variationIds"
+          ? normalizeIds([prev?.variationIds], "variation")
+          : normalizeIds([prev?.modifierIds], "modifier");
+
+      const exists = currentIds.includes(id);
+
+      const nextIds = exists
+        ? currentIds.filter((entry) => entry !== id)
+        : [...currentIds, id];
+
+      return {
+        ...prev,
+        [field]: nextIds,
+      };
     });
   };
 
-  const availableGroups = useMemo(() => {
-    return groups.filter(
-      (g) =>
-        !attachedModifierIds.has(String(g?.id || g?.modifierGroupId || ""))
-    );
-  }, [groups, attachedModifierIds]);
-  return (
-    <div className="mt-4 space-y-6">
-      {!resolvedItemId && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          Save the menu item in Step 2 first. After that, you can add variations
-          and modifier groups here.
-        </div>
-      )}
+  const clearSelection = (field: "variationIds" | "modifierIds") => {
+    setForm((prev: any) => ({
+      ...prev,
+      [field]: [],
+    }));
+  };
 
-      {/* ================= VARIATIONS ================= */}
-      <div className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Add Variations
-            </h3>
-            <p className="text-sm text-gray-500">
-              Create item-level pricing options like Small, Medium, Large.
-            </p>
-          </div>
-        </div>
+  const handleTopLevelModifierChange = ({
+    modifierId,
+    priceDelta,
+  }: {
+    modifierId: string;
+    priceDelta: string;
+  }) => {
+    const sanitized = sanitizeNonNegativeNumber(priceDelta);
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Variation Name</Label>
-            <Input
-              placeholder="e.g. Small, Medium, Large"
-              value={variationForm.name}
-              onChange={(e) => handleVariationChange("name", e.target.value)}
-            />
-          </div>
+    setForm((prev: any) => {
+      const current = normalizeTopLevelModifierOverrides(
+        prev?.modifierPriceOverrides
+      );
 
-          <div className="space-y-2">
-            <Label>Price</Label>
-            <Input
-              type="number"
-              placeholder="Enter price"
-              value={variationForm.price}
-              onChange={(e) => handleVariationChange("price", e.target.value)}
-            />
-          </div>
+      const exists = current.some(
+        (entry) => String(entry.modifierId) === String(modifierId)
+      );
 
-          <div className="space-y-2 md:col-span-2">
-            <Label>Description</Label>
-            <Input
-              placeholder="Enter variation description"
-              value={variationForm.description}
-              onChange={(e) =>
-                handleVariationChange("description", e.target.value)
-              }
-            />
-          </div>
+      const next = exists
+        ? current.map((entry) =>
+            String(entry.modifierId) === String(modifierId)
+              ? {
+                  ...entry,
+                  priceDelta: sanitized,
+                }
+              : entry
+          )
+        : [
+            ...current,
+            {
+              modifierId,
+              priceDelta: sanitized,
+            },
+          ];
 
-          <div className="space-y-2">
-            <Label>Sort Order</Label>
-            <Input
-              type="number"
-              placeholder="0"
-              value={String(variationForm.sortOrder)}
-              onChange={(e) =>
-                handleVariationChange("sortOrder", Number(e.target.value))
-              }
-            />
-          </div>
+      return {
+        ...prev,
+        modifierPriceOverrides: next,
+      };
+    });
+  };
 
-          <div className="space-y-2">
-            <Label>Required Modifier</Label>
-            <select
-              value={variationForm.requiredModifierId}
-              onChange={(e) =>
-                handleVariationChange("requiredModifierId", e.target.value)
-              }
-              className="h-[40px] w-full rounded-[10px] border border-gray-300 bg-white px-3 outline-none focus:border-gray-400"
-              disabled={!resolvedItemId || loadingRequiredModifiers}
-            >
-          <option value="">
-  {loadingRequiredModifiers || fetchingRequiredModifiers
-    ? "Loading modifiers..."
-    : availableRequiredModifiers.length === 0
-    ? "No modifiers found"
-    : "Select required modifier"}
-</option>
+  const handleVariationFieldChange = ({
+    variationId,
+    key,
+    value,
+  }: {
+    variationId: string;
+    key: "price" | "pickupPrice" | "displayText";
+    value: string;
+  }) => {
+    const nextValue =
+      key === "displayText" ? value : sanitizeNonNegativeNumber(value);
 
-              {availableRequiredModifiers.map((modifier: any) => (
-                <option key={modifier.id} value={modifier.id}>
-                  {modifier.groupName
-                    ? `${modifier.groupName} - ${modifier.name}`
-                    : modifier.name}
-                </option>
-              ))}
-            </select>
-          </div>
+    setForm((prev: any) => {
+      const current = normalizeVariationPriceOverrides(
+        prev?.variationPriceOverrides
+      );
 
-          <div className="space-y-2">
-            <Label>SKU (Optional)</Label>
-            <Input
-              placeholder="Unique SKU"
-              value={variationForm.sku}
-              onChange={(e) => handleVariationChange("sku", e.target.value)}
-            />
-          </div>
-        </div>
+      const exists = current.some(
+        (entry) => String(entry.variationId) === String(variationId)
+      );
 
-        <div className="mt-4 flex flex-wrap items-center gap-6 text-sm text-gray-600">
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={variationForm.isDefault}
-              onChange={(e) =>
-                handleVariationChange("isDefault", e.target.checked)
-              }
-              className="accent-primary"
-            />
-            Default
-          </label>
+      const next = exists
+        ? current.map((entry) =>
+            String(entry.variationId) === String(variationId)
+              ? {
+                  ...entry,
+                  [key]: nextValue,
+                }
+              : entry
+          )
+        : [
+            ...current,
+            {
+              variationId,
+              price: key === "price" ? nextValue : getItemBasePrice(prev),
+              pickupPrice: key === "pickupPrice" ? nextValue : "",
+              displayText: key === "displayText" ? nextValue : "",
+              modifierPriceOverrides: [],
+            },
+          ];
 
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={variationForm.isActive}
-              onChange={(e) =>
-                handleVariationChange("isActive", e.target.checked)
-              }
-              className="accent-primary"
-            />
-            Active
-          </label>
-        </div>
+      return {
+        ...prev,
+        variationPriceOverrides: next,
+      };
+    });
+  };
 
-        <div className="mt-5">
-          <Button
-            type="button"
-            onClick={handleAddVariation}
-            disabled={addingVariation || !resolvedItemId}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 text-white hover:bg-primary/90"
-          >
-            {addingVariation ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving Variation...
-              </>
-            ) : (
-              <>
-                <PlusCircle className="h-4 w-4" />
-                Add Variation
-              </>
-            )}
-          </Button>
-        </div>
+  const handleNestedModifierChange = ({
+    variationId,
+    modifierId,
+    priceDelta,
+  }: {
+    variationId: string;
+    modifierId: string;
+    priceDelta: string;
+  }) => {
+    const sanitized = sanitizeNonNegativeNumber(priceDelta);
 
-        <div className="mt-5 space-y-3">
-          {localVariations.length === 0 ? (
-            <div className="rounded-xl border border-dashed px-4 py-6 text-sm text-gray-500">
-              No variations added yet.
-            </div>
-          ) : (
-            localVariations.map((variation, index) => (
-              <div
-                key={variation?.id || `${variation?.name}-${index}`}
-                className="flex items-center justify-between rounded-xl border px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-gray-900">
-                    {variation?.name || "-"}
-                  </p>
-                  <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
-                    <span>Price: {variation?.price ?? 0}</span>
-                    {variation?.description ? (
-                      <span>Description: {variation.description}</span>
-                    ) : null}
-                    {variation?.requiredModifierId ? (
-                      <span>
-                        Required Modifier: {variation.requiredModifierId}
-                      </span>
-                    ) : null}
-                    {variation?.sku ? <span>SKU: {variation.sku}</span> : null}
-                    <span>Sort: {variation?.sortOrder ?? 0}</span>
-                    {variation?.isDefault ? <span>Default</span> : null}
-                    {variation?.isActive === false ? (
-                      <span>Inactive</span>
-                    ) : null}
-                  </div>
-                </div>
+    setForm((prev: any) => {
+      const current = normalizeVariationPriceOverrides(
+        prev?.variationPriceOverrides
+      );
 
-                {!variation?.id ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveLocalVariation(index)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      const variationExists = current.some(
+        (entry) => String(entry.variationId) === String(variationId)
+      );
 
-      {/* ================= MODIFIER GROUPS ================= */}
-      <div className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Add Modifiers
-            </h3>
-            <p className="text-sm text-gray-500">
-              Attach modifier groups like Extras, Sauces, Toppings, Add-ons.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Modifier Group</Label>
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
-              disabled={loadingGroups || !resolvedItemId}
-              className="h-[40px] w-full rounded-[10px] border border-gray-300 bg-white px-3 outline-none focus:border-gray-400"
-            >
-              <option value="">
-                {loadingGroups ? "Loading groups..." : "Select Group"}
-              </option>
-
-              {availableGroups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Sort Order</Label>
-            <Input
-              type="number"
-              value={String(modifierSortOrder)}
-              onChange={(e) => setModifierSortOrder(Number(e.target.value))}
-              disabled={!resolvedItemId}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <Button
-            type="button"
-            onClick={handleAttachModifierGroup}
-            disabled={
-              addingModifier ||
-              loadingGroups ||
-              !resolvedItemId ||
-              !selectedGroup
+      const next = variationExists
+        ? current.map((variation) => {
+            if (String(variation.variationId) !== String(variationId)) {
+              return variation;
             }
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 text-white hover:bg-primary/90"
-          >
-            {addingModifier ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Adding Modifier...
-              </>
-            ) : (
-              <>
-                <Link2 className="h-4 w-4" />
-                Add Modifier Group
-              </>
-            )}
-          </Button>
-        </div>
 
-        <div className="mt-5 space-y-3">
-          {localModifierGroups.length === 0 ? (
-            <div className="rounded-xl border border-dashed px-4 py-6 text-sm text-gray-500">
-              No modifier groups attached yet.
-            </div>
-          ) : (
-            localModifierGroups.map((group) => (
-              <div
-                key={group?.id}
-                className="flex items-center justify-between rounded-xl border px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-gray-900">
-                    {group?.name || "-"}
-                  </p>
-                  <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
-                    <span>Sort: {group?.sortOrder ?? 0}</span>
-                    {group?.isActive === false ? <span>Inactive</span> : null}
-                  </div>
-                </div>
+            const nested = normalizeNestedModifierOverrides(
+              variation.modifierPriceOverrides
+            );
 
-                {/* {!group?.pivot?.id ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveLocalModifier(group.id)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                ) : null} */}
-              </div>
-            ))
-          )}
+            const modifierExists = nested.some(
+              (entry) => String(entry.modifierId) === String(modifierId)
+            );
+
+            const nextNested = modifierExists
+              ? nested.map((entry) =>
+                  String(entry.modifierId) === String(modifierId)
+                    ? {
+                        ...entry,
+                        priceDelta: sanitized,
+                      }
+                    : entry
+                )
+              : [
+                  ...nested,
+                  {
+                    modifierId,
+                    priceDelta: sanitized,
+                  },
+                ];
+
+            return {
+              ...variation,
+              modifierPriceOverrides: nextNested,
+            };
+          })
+        : [
+            ...current,
+            {
+              variationId,
+              price: getItemBasePrice(prev),
+              pickupPrice: "",
+              displayText: "",
+              modifierPriceOverrides: [
+                {
+                  modifierId,
+                  priceDelta: sanitized,
+                },
+              ],
+            },
+          ];
+
+      return {
+        ...prev,
+        variationPriceOverrides: next,
+      };
+    });
+  };
+
+  const loadMoreVariations = () => {
+    if (!variationHasMore || fetchingVariations || loadingVariations) return;
+    setVariationPage((prev) => prev + 1);
+  };
+
+  const loadMoreModifiers = () => {
+    if (!modifierHasMore || fetchingModifiers || loadingModifiers) return;
+    setModifierPage((prev) => prev + 1);
+  };
+
+  return (
+    <div className="w-full min-w-0 space-y-6 overflow-hidden">
+      <div className="rounded-[18px] border border-primary/10 bg-primary/5 p-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary text-white">
+            <Sparkles size={18} />
+          </div>
+
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-gray-900">
+              Item Configuration
+            </h3>
+
+            <p className="mt-1 text-sm text-gray-600">
+              Select reusable variations and modifiers, then configure item-level
+              variation prices and modifier prices.
+            </p>
+          </div>
         </div>
       </div>
+
+      <InfiniteMultiSelectSection
+        title="Assign Variations"
+        description="Choose one or more size, portion, or serving options for this item."
+        icon={<SlidersHorizontal size={18} />}
+        searchValue={variationSearch}
+        onSearchChange={setVariationSearch}
+        searchPlaceholder="Search variations..."
+        loading={
+          (loadingVariations || fetchingVariations) &&
+          variationOptions.length === 0
+        }
+        loadingMore={variationPage > 1 && fetchingVariations}
+        hasMore={variationHasMore}
+        onLoadMore={loadMoreVariations}
+        items={variationOptions}
+        selectedIds={selectedVariationIds}
+        selectedMap={variationMap}
+        emptyTitle="No variations found"
+        emptyDescription="Create master variations first, then attach them to this item."
+        onToggle={(id) => toggleSelection("variationIds", id)}
+        onClear={() => clearSelection("variationIds")}
+        renderMeta={(item) => (
+          <>
+            {hasPositiveAmount(item?.price) ? (
+              <span>Base: ${formatAmount(item?.price)}</span>
+            ) : null}
+            {item?.isActive === false ? (
+              <span>Inactive</span>
+            ) : (
+              <span>Active</span>
+            )}
+          </>
+        )}
+      />
+
+      <InfiniteMultiSelectSection
+        title="Assign Modifiers"
+        description="Choose add-ons or extras that should be available for this item only."
+        icon={<Sparkles size={18} />}
+        searchValue={modifierSearch}
+        onSearchChange={setModifierSearch}
+        searchPlaceholder="Search modifiers..."
+        loading={
+          (loadingModifiers || fetchingModifiers) &&
+          modifierOptions.length === 0
+        }
+        loadingMore={modifierPage > 1 && fetchingModifiers}
+        hasMore={modifierHasMore}
+        onLoadMore={loadMoreModifiers}
+        items={modifierOptions}
+        selectedIds={selectedModifierIds}
+        selectedMap={modifierMap}
+        emptyTitle="No modifiers found"
+        emptyDescription="Create master modifiers first, then attach them to this item."
+        onToggle={(id) => toggleSelection("modifierIds", id)}
+        onClear={() => clearSelection("modifierIds")}
+        renderMeta={(item) => {
+          const groups = getModifierGroupNames(item);
+
+          return (
+            <>
+              {hasPositiveAmount(item?.priceDelta) ? (
+                <span>Base delta: ${formatAmount(item?.priceDelta)}</span>
+              ) : null}
+
+              {groups.length ? (
+                <span title={groups.join(", ")}>
+                  Group: {groups[0]}
+                  {groups.length > 1 ? ` +${groups.length - 1}` : ""}
+                </span>
+              ) : (
+                <span>No group</span>
+              )}
+            </>
+          );
+        }}
+      />
+
+      <ModifierBasePriceSection
+        modifiers={selectedModifiers}
+        overrides={topLevelModifierOverrides}
+        onChange={handleTopLevelModifierChange}
+      />
+
+      <VariationPricingMatrix
+        basePrice={getItemBasePrice(form)}
+        variations={selectedVariations}
+        modifiers={selectedModifiers}
+        variationOverrides={variationPriceOverrides}
+        topLevelModifierOverrides={topLevelModifierOverrides}
+        onVariationChange={handleVariationFieldChange}
+        onNestedModifierChange={handleNestedModifierChange}
+      />
     </div>
+  );
+});
+
+StepThree.displayName = "StepThree";
+
+export default StepThree;
+
+type InfiniteMultiSelectSectionProps = {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  items: SelectableEntity[];
+  selectedIds: string[];
+  selectedMap: Map<string, SelectableEntity>;
+  emptyTitle: string;
+  emptyDescription: string;
+  onToggle: (id: string) => void;
+  onClear: () => void;
+  renderMeta: (item: SelectableEntity) => React.ReactNode;
+};
+
+function InfiniteMultiSelectSection({
+  title,
+  description,
+  icon,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
+  loading,
+  loadingMore,
+  hasMore,
+  onLoadMore,
+  items,
+  selectedIds,
+  selectedMap,
+  emptyTitle,
+  emptyDescription,
+  onToggle,
+  onClear,
+  renderMeta,
+}: InfiniteMultiSelectSectionProps) {
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const el = event.currentTarget;
+
+    if (el.scrollHeight - el.scrollTop <= el.clientHeight + 32) {
+      if (hasMore && !loading && !loadingMore) {
+        onLoadMore();
+      }
+    }
+  };
+
+  return (
+    <section className="w-full min-w-0 overflow-hidden rounded-[20px] border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-gray-100 text-gray-700">
+            {icon}
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold text-gray-900">
+                {title}
+              </h3>
+
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                {selectedIds.length} selected
+              </span>
+            </div>
+
+            <p className="mt-1 text-sm text-gray-500">{description}</p>
+          </div>
+        </div>
+
+        {selectedIds.length > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClear}
+            className="h-[38px] shrink-0 rounded-[12px] border-gray-200 text-sm"
+          >
+            Clear
+          </Button>
+        ) : null}
+      </div>
+
+      {selectedIds.length > 0 ? (
+        <div className="mb-4 flex max-h-[92px] flex-wrap gap-2 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]">
+          {selectedIds.map((id) => {
+            const item = selectedMap.get(String(id));
+
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onToggle(String(id))}
+                className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/10"
+              >
+                <span className="max-w-[180px] truncate">
+                  {item?.name || `Selected ${id}`}
+                </span>
+                <X size={14} className="shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="relative mb-4">
+        <Search
+          size={18}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+        />
+
+        <Input
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={searchPlaceholder}
+          className="h-[44px] rounded-[14px] border-gray-200 bg-[#FAFAFA] pl-11 text-sm focus:border-primary focus:ring-primary/15"
+        />
+      </div>
+
+      <div className="w-full min-w-0 overflow-hidden rounded-[16px] border border-gray-100 bg-[#FAFAFA] p-3">
+        {loading ? (
+          <div className="flex min-h-[170px] items-center justify-center text-gray-500">
+            <Loader2 className="mr-2 animate-spin" size={20} />
+            Loading options...
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex min-h-[170px] flex-col items-center justify-center rounded-[14px] border border-dashed border-gray-200 bg-white p-6 text-center">
+            <p className="text-sm font-semibold text-gray-900">{emptyTitle}</p>
+            <p className="mt-1 max-w-[320px] text-sm text-gray-500">
+              {emptyDescription}
+            </p>
+          </div>
+        ) : (
+          <div
+            className="grid max-h-[330px] gap-3 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
+            onScroll={handleScroll}
+          >
+            {items.map((item) => {
+              const id = String(item?.id || "");
+              const selected = selectedIds.includes(id);
+
+              if (!id) return null;
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onToggle(id)}
+                  className={`w-full min-w-0 rounded-[14px] border bg-white p-4 text-left transition ${
+                    selected
+                      ? "border-primary shadow-sm ring-2 ring-primary/10"
+                      : "border-gray-100 hover:border-primary/30 hover:shadow-sm"
+                  }`}
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border ${
+                        selected
+                          ? "border-primary bg-primary text-white"
+                          : "border-gray-300 bg-white text-transparent"
+                      }`}
+                    >
+                      <Check size={14} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="max-w-full truncate text-sm font-semibold text-gray-900">
+                          {item?.name || "Unnamed"}
+                        </p>
+
+                        {item?.isActive === false ? (
+                          <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                            Inactive
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {item?.description ? (
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+                          {item.description}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-2 flex min-w-0 flex-wrap gap-2 text-xs text-gray-500">
+                        {renderMeta(item)}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+
+            {loadingMore ? (
+              <div className="flex items-center justify-center py-3 text-sm text-gray-500">
+                <Loader2 className="mr-2 animate-spin" size={16} />
+                Loading more...
+              </div>
+            ) : null}
+
+            {!loadingMore && hasMore ? (
+              <button
+                type="button"
+                onClick={onLoadMore}
+                className="rounded-[12px] border border-dashed border-gray-200 bg-white py-2 text-center text-xs font-medium text-gray-500 transition hover:border-primary/30 hover:text-primary"
+              >
+                Load more
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ModifierBasePriceSection({
+  modifiers,
+  overrides,
+  onChange,
+}: {
+  modifiers: SelectableEntity[];
+  overrides: ModifierPriceOverride[];
+  onChange: (payload: { modifierId: string; priceDelta: string }) => void;
+}) {
+  const getValue = (modifier: SelectableEntity) => {
+    const existing = overrides.find(
+      (entry) => String(entry.modifierId) === String(modifier.id)
+    );
+
+    if (existing) return existing.priceDelta;
+
+    return getModifierBasePrice(modifier);
+  };
+
+  if (!modifiers.length) return null;
+
+  return (
+    <section className="w-full min-w-0 overflow-hidden rounded-[20px] border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="mb-5">
+        <h3 className="text-base font-semibold text-gray-900">
+          Modifier Base Prices
+        </h3>
+
+        <p className="mt-1 text-sm text-gray-500">
+          These prices are saved as item-level modifier overrides and are also
+          used as defaults for variation-specific modifier prices.
+        </p>
+      </div>
+
+      <div className="grid gap-3">
+        {modifiers.map((modifier) => (
+          <div
+            key={modifier.id}
+            className="grid w-full min-w-0 gap-3 rounded-[14px] border border-gray-100 bg-[#FAFAFA] p-3 sm:grid-cols-[minmax(0,1fr)_150px]"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-gray-900">
+                {modifier.name}
+              </p>
+
+              {hasPositiveAmount(modifier.priceDelta) ? (
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Master delta: ${formatAmount(modifier.priceDelta)}
+                </p>
+              ) : null}
+            </div>
+
+            <Input
+              type="number"
+              min={0}
+              value={getValue(modifier)}
+              onKeyDown={blockInvalidNumberKeys}
+              onPaste={blockNegativeNumberPaste}
+              onChange={(event) =>
+                onChange({
+                  modifierId: String(modifier.id),
+                  priceDelta: event.target.value,
+                })
+              }
+              placeholder="0"
+              className="h-[40px] min-w-0 rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function VariationPricingMatrix({
+  basePrice,
+  variations,
+  modifiers,
+  variationOverrides,
+  topLevelModifierOverrides,
+  onVariationChange,
+  onNestedModifierChange,
+}: {
+  basePrice: string;
+  variations: SelectableEntity[];
+  modifiers: SelectableEntity[];
+  variationOverrides: VariationPriceOverride[];
+  topLevelModifierOverrides: ModifierPriceOverride[];
+  onVariationChange: (payload: {
+    variationId: string;
+    key: "price" | "pickupPrice" | "displayText";
+    value: string;
+  }) => void;
+  onNestedModifierChange: (payload: {
+    variationId: string;
+    modifierId: string;
+    priceDelta: string;
+  }) => void;
+}) {
+  const getVariationOverride = (variationId: string) => {
+    return variationOverrides.find(
+      (entry) => String(entry.variationId) === String(variationId)
+    );
+  };
+
+  const getNestedModifierValue = (
+    variationId: string,
+    modifier: SelectableEntity
+  ) => {
+    const variationOverride = getVariationOverride(variationId);
+
+    const nested = variationOverride?.modifierPriceOverrides?.find(
+      (entry) => String(entry.modifierId) === String(modifier.id)
+    );
+
+    if (nested) return nested.priceDelta;
+
+    const topLevel = topLevelModifierOverrides.find(
+      (entry) => String(entry.modifierId) === String(modifier.id)
+    );
+
+    if (topLevel) return topLevel.priceDelta;
+
+    return getModifierBasePrice(modifier);
+  };
+
+  if (!variations.length) {
+    return (
+      <section className="rounded-[20px] border border-dashed border-gray-200 bg-white p-6 text-center shadow-sm">
+        <p className="text-sm font-semibold text-gray-900">
+          No variation pricing yet
+        </p>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Select variations to configure item-level variation prices.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="w-full min-w-0 overflow-hidden rounded-[20px] border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="mb-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-base font-semibold text-gray-900">
+            Variation Pricing
+          </h3>
+
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+            {variations.length} selected
+          </span>
+        </div>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Variation price defaults to the item base price. You can override it
+          for each selected variation.
+        </p>
+      </div>
+
+      <div className="max-h-[620px] space-y-4 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]">
+        {variations.map((variation) => {
+          const override = getVariationOverride(String(variation.id));
+
+          const variationPrice =
+            override?.price !== undefined &&
+            override?.price !== null &&
+            override.price !== ""
+              ? override.price
+              : basePrice;
+
+          return (
+            <div
+              key={variation.id}
+              className="w-full min-w-0 rounded-[18px] border border-gray-100 bg-[#FAFAFA] p-4"
+            >
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h4 className="truncate text-sm font-semibold text-gray-900">
+                    {variation.name}
+                  </h4>
+
+                  {hasPositiveAmount(variation?.price) ? (
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Master price: ${formatAmount(variation.price)}
+                    </p>
+                  ) : null}
+                </div>
+
+                {variation?.isActive === false ? (
+                  <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
+                    Inactive
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                    Active
+                  </span>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500">
+                    Variation Price
+                  </p>
+
+                  <Input
+                    type="number"
+                    min={0}
+                    value={variationPrice}
+                    onKeyDown={blockInvalidNumberKeys}
+                    onPaste={blockNegativeNumberPaste}
+                    onChange={(event) =>
+                      onVariationChange({
+                        variationId: String(variation.id),
+                        key: "price",
+                        value: event.target.value,
+                      })
+                    }
+                    placeholder={basePrice || "0"}
+                    className="h-[40px] rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500">
+                    Pickup Price
+                  </p>
+
+                  <Input
+                    type="number"
+                    min={0}
+                    value={override?.pickupPrice || ""}
+                    onKeyDown={blockInvalidNumberKeys}
+                    onPaste={blockNegativeNumberPaste}
+                    onChange={(event) =>
+                      onVariationChange({
+                        variationId: String(variation.id),
+                        key: "pickupPrice",
+                        value: event.target.value,
+                      })
+                    }
+                    placeholder="Optional"
+                    className="h-[40px] rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500">
+                    Display Text
+                  </p>
+
+                  <Input
+                    value={override?.displayText || ""}
+                    onChange={(event) =>
+                      onVariationChange({
+                        variationId: String(variation.id),
+                        key: "displayText",
+                        value: event.target.value,
+                      })
+                    }
+                    placeholder={variation.name}
+                    className="h-[40px] rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+                  />
+                </div>
+              </div>
+
+              {modifiers.length > 0 ? (
+                <div className="mt-4 rounded-[14px] border border-gray-100 bg-white p-3">
+                  <div className="mb-3">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Modifier prices for {variation.name}
+                    </p>
+
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Prefilled from item-level modifier base prices.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {modifiers.map((modifier) => (
+                      <div
+                        key={`${variation.id}-${modifier.id}`}
+                        className="grid w-full min-w-0 gap-3 rounded-[12px] border border-gray-100 bg-[#FAFAFA] p-3 sm:grid-cols-[minmax(0,1fr)_150px]"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {modifier.name}
+                          </p>
+
+                          {hasPositiveAmount(modifier.priceDelta) ? (
+                            <p className="mt-0.5 text-xs text-gray-500">
+                              Master delta: ${formatAmount(modifier.priceDelta)}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <Input
+                          type="number"
+                          min={0}
+                          value={getNestedModifierValue(
+                            String(variation.id),
+                            modifier
+                          )}
+                          onKeyDown={blockInvalidNumberKeys}
+                          onPaste={blockNegativeNumberPaste}
+                          onChange={(event) =>
+                            onNestedModifierChange({
+                              variationId: String(variation.id),
+                              modifierId: String(modifier.id),
+                              priceDelta: event.target.value,
+                            })
+                          }
+                          placeholder="0"
+                          className="h-[40px] min-w-0 rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

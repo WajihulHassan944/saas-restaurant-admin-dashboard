@@ -61,16 +61,23 @@ export const menuItems: MenuItem[] = [
         icon: ClipboardList,
         section: "main",
       },
-      {
-        title: "Modifier Groups",
-        href: "/menu/modifier-groups",
-        icon: Layers,
-        section: "main",
-      },
+
+      // {
+      //   title: "Modifier Groups",
+      //   href: "/menu/modifier-groups",
+      //   icon: Layers,
+      //   section: "main",
+      // },
       {
         title: "Modifiers",
         href: "/menu/modifier",
         icon: Tags,
+        section: "main",
+      },
+        {
+        title: "Variations",
+        href: "/menu/variations",
+        icon: ClipboardList,
         section: "main",
       },
       {

@@ -1,6 +1,7 @@
 import api from "@/lib/axios";
 import {
   BulkMenuItemsValues,
+  GetMenuVariationsParams,
   LinkMenuItemValues,
   MenuItemValues,
   MenuVariationValues,
@@ -61,27 +62,19 @@ export const deleteMenuItem = async (id: string) => {
  * MENU VARIATIONS APIS
  * ==============================
  */
-
 export const createMenuVariation = async (payload: MenuVariationValues) => {
   const { data } = await api.post("/menu/variations", payload);
   return data;
 };
 
-export const getMenuVariations = async (params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  itemId?: string;
-  isActive?: boolean;
-  categoryId?: string;
-}) => {
+export const getMenuVariations = async (params?: GetMenuVariationsParams) => {
   const { data } = await api.get("/menu/variations", { params });
   return data;
 };
 
 export const updateMenuVariation = async (
   id: string,
-  payload: Partial<UpdateMenuVariationValues>
+  payload: UpdateMenuVariationValues
 ) => {
   const { data } = await api.patch(`/menu/variations/${id}`, payload);
   return data;
