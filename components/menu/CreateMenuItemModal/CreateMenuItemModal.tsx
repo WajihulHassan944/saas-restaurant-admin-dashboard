@@ -63,24 +63,58 @@ const normalizeIds = (sources: any[], type: EntityType): string[] => {
         return;
       }
 
+      const modifierId =
+        entry?.modifierId || entry?.modifier?.id || entry?.menuModifier?.id;
+
+      const variationId =
+        entry?.variationId || entry?.variation?.id || entry?.menuVariation?.id;
+
       if (type === "variation") {
+        /**
+         * Important:
+         * Never use entry.id as a variation id for modifier override records.
+         * Example bad record:
+         * {
+         *   id: "modifierPriceOverrideId",
+         *   modifierId: "...",
+         *   priceDelta: "..."
+         * }
+         */
+        if (modifierId && !variationId) return;
+
         const id =
-          entry?.variationId ||
-          entry?.variation?.id ||
-          entry?.menuVariation?.id ||
-          entry?.id;
+          variationId ||
+          /**
+           * Allow real variation objects only.
+           * A real variation usually has name/categoryId/sku/description/isActive.
+           */
+          (entry?.name !== undefined ||
+          entry?.categoryId !== undefined ||
+          entry?.sku !== undefined ||
+          entry?.description !== undefined ||
+          entry?.isActive !== undefined
+            ? entry?.id
+            : undefined);
 
         if (id) ids.add(String(id));
         return;
       }
 
-      const id =
-        entry?.modifierId ||
-        entry?.modifier?.id ||
-        entry?.menuModifier?.id ||
-        entry?.id;
+      if (type === "modifier") {
+        const id =
+          modifierId ||
+          /**
+           * Allow real modifier objects only.
+           */
+          (entry?.name !== undefined ||
+          entry?.priceDelta !== undefined ||
+          entry?.restaurantId !== undefined ||
+          entry?.isActive !== undefined
+            ? entry?.id
+            : undefined);
 
-      if (id) ids.add(String(id));
+        if (id) ids.add(String(id));
+      }
     });
   });
 
@@ -186,39 +220,135 @@ const mergeModifierOverrides = (
   return Array.from(map.values());
 };
 
+
 const normalizeVariationPriceOverrides = ({
   rawVariationOverrides,
   rawFlatModifierOverrides,
+  menuItemId,
 }: {
   rawVariationOverrides: any[];
   rawFlatModifierOverrides: any[];
+  menuItemId?: string;
 }): VariationPriceOverride[] => {
   const map = new Map<string, VariationPriceOverride>();
 
-  normalizeArray(rawVariationOverrides).forEach((entry) => {
-    const variationId =
-      entry?.variationId || entry?.variation?.id || entry?.menuVariation?.id || entry?.id;
+  const getVariationId = (entry: any) =>
+    entry?.variationId ||
+    entry?.variation?.id ||
+    entry?.menuVariation?.id ||
+    entry?.id;
 
+  const getVariationSource = (entry: any) =>
+    entry?.variation || entry?.menuVariation || entry;
+
+  const getItemSpecificVariationOverride = (
+    entry: any,
+    variationId: string
+  ) => {
+    const variationSource = getVariationSource(entry);
+
+    const candidates = [
+      ...normalizeArray(entry?.itemPriceOverrides),
+      ...normalizeArray(entry?.variation?.itemPriceOverrides),
+      ...normalizeArray(entry?.menuVariation?.itemPriceOverrides),
+      ...normalizeArray(variationSource?.itemPriceOverrides),
+    ];
+
+    if (!candidates.length) return null;
+
+    const matchingVariation = candidates.filter((override) => {
+      const overrideVariationId =
+        override?.variationId ||
+        override?.variation?.id ||
+        override?.menuVariation?.id;
+
+      return String(overrideVariationId || "") === String(variationId);
+    });
+
+    if (!matchingVariation.length) return null;
+
+    if (menuItemId) {
+      const itemSpecific = matchingVariation.find(
+        (override) => String(override?.menuItemId || "") === String(menuItemId)
+      );
+
+      if (itemSpecific) return itemSpecific;
+    }
+
+    return matchingVariation[0];
+  };
+
+  const getNestedModifierOverrides = (entry: any) => {
+    const directNested = normalizeNestedModifierPriceOverrides(
+      entry?.modifierPriceOverrides
+    );
+
+    const variationNested = normalizeNestedModifierPriceOverrides(
+      entry?.variation?.modifierPriceOverrides ||
+        entry?.menuVariation?.modifierPriceOverrides
+    );
+
+    const sourceNested = normalizeNestedModifierPriceOverrides(
+      getVariationSource(entry)?.modifierPriceOverrides
+    );
+
+    return mergeModifierOverrides(
+      mergeModifierOverrides(variationNested, sourceNested),
+      directNested
+    );
+  };
+
+  normalizeArray(rawVariationOverrides).forEach((entry) => {
+    const variationId = getVariationId(entry);
     if (!variationId) return;
 
     const id = String(variationId);
+    const existing = map.get(id);
+    const variationSource = getVariationSource(entry);
+    const itemSpecificOverride = getItemSpecificVariationOverride(entry, id);
+
+    const isVariationOverrideEntry = Boolean(entry?.variationId);
+
+    const price =
+      isVariationOverrideEntry
+        ? entry?.price ?? itemSpecificOverride?.price ?? variationSource?.price
+        : itemSpecificOverride?.price ?? entry?.price ?? variationSource?.price;
+
+    const pickupPrice =
+      isVariationOverrideEntry
+        ? entry?.pickupPrice ??
+          itemSpecificOverride?.pickupPrice ??
+          variationSource?.pickupPrice
+        : itemSpecificOverride?.pickupPrice ??
+          entry?.pickupPrice ??
+          variationSource?.pickupPrice;
+
+    const displayText =
+      isVariationOverrideEntry
+        ? entry?.displayText ??
+          itemSpecificOverride?.displayText ??
+          variationSource?.displayText
+        : itemSpecificOverride?.displayText ??
+          entry?.displayText ??
+          variationSource?.displayText;
 
     map.set(id, {
       variationId: id,
       price:
-        entry?.price !== undefined && entry?.price !== null
-          ? String(entry.price)
-          : "",
+        price !== undefined && price !== null
+          ? String(price)
+          : existing?.price || "",
       pickupPrice:
-        entry?.pickupPrice !== undefined && entry?.pickupPrice !== null
-          ? String(entry.pickupPrice)
-          : "",
+        pickupPrice !== undefined && pickupPrice !== null
+          ? String(pickupPrice)
+          : existing?.pickupPrice || "",
       displayText:
-        entry?.displayText !== undefined && entry?.displayText !== null
-          ? String(entry.displayText)
-          : "",
-      modifierPriceOverrides: normalizeNestedModifierPriceOverrides(
-        entry?.modifierPriceOverrides
+        displayText !== undefined && displayText !== null
+          ? String(displayText)
+          : existing?.displayText || "",
+      modifierPriceOverrides: mergeModifierOverrides(
+        existing?.modifierPriceOverrides || [],
+        getNestedModifierOverrides(entry)
       ),
     });
   });
@@ -245,14 +375,15 @@ const normalizeVariationPriceOverrides = ({
         displayText: "",
         modifierPriceOverrides: fallbackNested,
       });
+
       return;
     }
 
     map.set(String(entry.variationId), {
       ...existing,
       modifierPriceOverrides: mergeModifierOverrides(
-        fallbackNested,
-        existing.modifierPriceOverrides
+        existing.modifierPriceOverrides,
+        fallbackNested
       ),
     });
   });
@@ -260,24 +391,25 @@ const normalizeVariationPriceOverrides = ({
   return Array.from(map.values());
 };
 
+
 const getRawVariationOverrideSource = (initialData?: any) => {
-  if (Array.isArray(initialData?.variationPriceOverrides)) {
-    return initialData.variationPriceOverrides;
-  }
+  const variationLinks = normalizeArray(initialData?.variationLinks).map(
+    (link) => link?.variation || link
+  );
 
-  if (Array.isArray(initialData?.variations)) {
-    return initialData.variations;
-  }
-
-  if (Array.isArray(initialData?.itemVariations)) {
-    return initialData.itemVariations;
-  }
-
-  if (Array.isArray(initialData?.variationLinks)) {
-    return initialData.variationLinks;
-  }
-
-  return [];
+  /**
+   * Order matters:
+   * - generic/fallback variation objects first
+   * - item-specific variationPriceOverrides last
+   *
+   * This allows item-specific edit values to win.
+   */
+  return [
+    ...variationLinks,
+    ...normalizeArray(initialData?.itemVariations),
+    ...normalizeArray(initialData?.variations),
+    ...normalizeArray(initialData?.variationPriceOverrides),
+  ];
 };
 
 const getNestedModifierOverridesFromVariations = (variationOverrides: any[]) => {
@@ -293,9 +425,10 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
   );
 
   const normalizedVariationOverrides = normalizeVariationPriceOverrides({
-    rawVariationOverrides,
-    rawFlatModifierOverrides,
-  });
+  rawVariationOverrides,
+  rawFlatModifierOverrides,
+  menuItemId: initialData?.id,
+});
 
   const nestedModifierOverrides = getNestedModifierOverridesFromVariations(
     normalizedVariationOverrides
@@ -355,17 +488,16 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
         ? String(initialData.depositAmount)
         : "",
 
-    variationIds: normalizeIds(
-      [
-        initialData?.variationIds,
-        initialData?.variations,
-        initialData?.itemVariations,
-        initialData?.variationLinks,
-        normalizedVariationOverrides,
-        rawFlatModifierOverrides,
-      ],
-      "variation"
-    ),
+   variationIds: normalizeIds(
+  [
+    initialData?.variationIds,
+    initialData?.variations,
+    initialData?.itemVariations,
+    initialData?.variationLinks,
+    normalizedVariationOverrides,
+  ],
+  "variation"
+),
 
     modifierIds: normalizeIds(
       [
@@ -501,13 +633,14 @@ export default function CreateMenuItemModal({
   );
 
   const selectedVariationPriceOverrides = useMemo(
-    () =>
-      normalizeVariationPriceOverrides({
-        rawVariationOverrides: form?.variationPriceOverrides,
-        rawFlatModifierOverrides: [],
-      }),
-    [form?.variationPriceOverrides]
-  );
+  () =>
+    normalizeVariationPriceOverrides({
+      rawVariationOverrides: form?.variationPriceOverrides,
+      rawFlatModifierOverrides: [],
+      menuItemId: initialData?.id,
+    }),
+  [form?.variationPriceOverrides, initialData?.id]
+);
 
   const buildPayload = () => {
     const generatedSlug = form.slug?.trim() || buildSlug(form.name);

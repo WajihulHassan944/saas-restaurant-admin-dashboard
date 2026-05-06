@@ -165,8 +165,8 @@ export default function ModifierModal({
   };
 
   const canSubmit = useMemo(() => {
-    return Boolean(form.name?.trim() && form.modifierGroupIds.length > 0);
-  }, [form.name, form.modifierGroupIds]);
+    return Boolean(form.name?.trim());
+  }, [form.name]);
 
   const handleSubmit = async () => {
     if (!canSubmit) {
