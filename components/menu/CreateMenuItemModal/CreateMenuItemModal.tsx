@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import StepOne from "./StepOne";
 import StepTwo from "./StepTwo";
 import StepThree from "./StepThree";
+import StepFour from "./stepFour";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateMenuItem, useUpdateMenuItem } from "@/hooks/useMenus";
@@ -37,6 +38,16 @@ type VariationPriceOverride = {
   pickupPrice: string;
   displayText: string;
   modifierPriceOverrides: ModifierPriceOverride[];
+};
+
+type EntitySnapshot = {
+  id: string;
+  name: string;
+  description?: string;
+  price?: string | number;
+  priceDelta?: string | number;
+  isActive?: boolean;
+  sortOrder?: number;
 };
 
 const buildSlug = (value: string) =>
@@ -121,6 +132,103 @@ const normalizeIds = (sources: any[], type: EntityType): string[] => {
   return Array.from(ids);
 };
 
+const hasUsableName = (value: any) => {
+  return typeof value === "string" && value.trim().length > 0;
+};
+
+const getEntitySnapshot = (
+  entry: any,
+  type: EntityType
+): EntitySnapshot | null => {
+  if (!entry) return null;
+
+  const source =
+    type === "variation"
+      ? entry?.variation || entry?.menuVariation || entry
+      : entry?.modifier || entry?.menuModifier || entry;
+
+  const id =
+    type === "variation"
+      ? entry?.variationId ||
+        entry?.variation?.id ||
+        entry?.menuVariation?.id ||
+        source?.id
+      : entry?.modifierId ||
+        entry?.modifier?.id ||
+        entry?.menuModifier?.id ||
+        source?.id;
+
+  const name =
+    type === "variation"
+      ? source?.name || entry?.displayText || entry?.name
+      : source?.name || entry?.name;
+
+  if (!id || !hasUsableName(name)) return null;
+
+  return {
+    id: String(id),
+    name: String(name),
+    description: source?.description,
+    price: source?.price ?? entry?.price,
+    priceDelta: source?.priceDelta ?? entry?.priceDelta,
+    isActive:
+      typeof source?.isActive === "boolean"
+        ? source.isActive
+        : typeof entry?.isActive === "boolean"
+        ? entry.isActive
+        : undefined,
+    sortOrder: source?.sortOrder ?? entry?.sortOrder,
+  };
+};
+
+const collectEntitySnapshots = (
+  sources: any[],
+  type: EntityType
+): EntitySnapshot[] => {
+  const map = new Map<string, EntitySnapshot>();
+
+  sources.forEach((source) => {
+    normalizeArray(source).forEach((entry) => {
+      const snapshot = getEntitySnapshot(entry, type);
+
+      if (snapshot?.id) {
+        const id = String(snapshot.id);
+        const generatedFallback =
+          type === "variation" ? `Variation ${id}` : `Modifier ${id}`;
+        const existing = map.get(id);
+
+        if (!existing || snapshot.name !== generatedFallback) {
+          map.set(id, snapshot);
+        }
+      }
+
+      if (type === "variation" && entry?.variation) {
+        const nested = getEntitySnapshot(entry.variation, type);
+        if (nested?.id) {
+          const id = String(nested.id);
+          const existing = map.get(id);
+          if (!existing || nested.name !== `Variation ${id}`) {
+            map.set(id, nested);
+          }
+        }
+      }
+
+      if (type === "modifier" && entry?.modifier) {
+        const nested = getEntitySnapshot(entry.modifier, type);
+        if (nested?.id) {
+          const id = String(nested.id);
+          const existing = map.get(id);
+          if (!existing || nested.name !== `Modifier ${id}`) {
+            map.set(id, nested);
+          }
+        }
+      }
+    });
+  });
+
+  return Array.from(map.values());
+};
+
 const toNumberOrZero = (value: any) => {
   if (value === "" || value === undefined || value === null) return 0;
 
@@ -129,7 +237,9 @@ const toNumberOrZero = (value: any) => {
   return Number.isNaN(numeric) ? 0 : numeric;
 };
 
-const normalizeModifierPriceOverrides = (raw: any[]): ModifierPriceOverride[] => {
+const normalizeModifierPriceOverrides = (
+  raw: any[]
+): ModifierPriceOverride[] => {
   return normalizeArray(raw)
     .filter((entry) => {
       const modifierId =
@@ -219,7 +329,6 @@ const mergeModifierOverrides = (
 
   return Array.from(map.values());
 };
-
 
 const normalizeVariationPriceOverrides = ({
   rawVariationOverrides,
@@ -425,10 +534,10 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
   );
 
   const normalizedVariationOverrides = normalizeVariationPriceOverrides({
-  rawVariationOverrides,
-  rawFlatModifierOverrides,
-  menuItemId: initialData?.id,
-});
+    rawVariationOverrides,
+    rawFlatModifierOverrides,
+    menuItemId: initialData?.id,
+  });
 
   const nestedModifierOverrides = getNestedModifierOverridesFromVariations(
     normalizedVariationOverrides
@@ -488,20 +597,41 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
         ? String(initialData.depositAmount)
         : "",
 
-   variationIds: normalizeIds(
-  [
-    initialData?.variationIds,
-    initialData?.variations,
-    initialData?.itemVariations,
-    initialData?.variationLinks,
-    normalizedVariationOverrides,
-  ],
-  "variation"
-),
+    variationIds: normalizeIds(
+      [
+        initialData?.variationIds,
+        initialData?.variations,
+        initialData?.itemVariations,
+        initialData?.variationLinks,
+        normalizedVariationOverrides,
+      ],
+      "variation"
+    ),
 
     modifierIds: normalizeIds(
       [
         initialData?.modifierIds,
+        initialData?.modifiers,
+        initialData?.itemModifiers,
+        initialData?.modifierLinks,
+        normalizeModifierPriceOverrides(rawFlatModifierOverrides),
+        nestedModifierOverrides,
+      ],
+      "modifier"
+    ),
+
+    selectedVariationOptions: collectEntitySnapshots(
+      [
+        initialData?.variations,
+        initialData?.itemVariations,
+        initialData?.variationLinks,
+        normalizedVariationOverrides,
+      ],
+      "variation"
+    ),
+
+    selectedModifierOptions: collectEntitySnapshots(
+      [
         initialData?.modifiers,
         initialData?.itemModifiers,
         initialData?.modifierLinks,
@@ -633,14 +763,14 @@ export default function CreateMenuItemModal({
   );
 
   const selectedVariationPriceOverrides = useMemo(
-  () =>
-    normalizeVariationPriceOverrides({
-      rawVariationOverrides: form?.variationPriceOverrides,
-      rawFlatModifierOverrides: [],
-      menuItemId: initialData?.id,
-    }),
-  [form?.variationPriceOverrides, initialData?.id]
-);
+    () =>
+      normalizeVariationPriceOverrides({
+        rawVariationOverrides: form?.variationPriceOverrides,
+        rawFlatModifierOverrides: [],
+        menuItemId: initialData?.id,
+      }),
+    [form?.variationPriceOverrides, initialData?.id]
+  );
 
   const buildPayload = () => {
     const generatedSlug = form.slug?.trim() || buildSlug(form.name);
@@ -762,7 +892,7 @@ export default function CreateMenuItemModal({
       if (!valid) return;
     }
 
-    if (currentStep < 3) {
+    if (currentStep < 4) {
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -773,10 +903,10 @@ export default function CreateMenuItemModal({
     }
   };
 
-const resetAndClose = () => {
-  setForm(getInitialForm(restaurantId, initialData));
-  setCurrentStep(1);
-};
+  const resetAndClose = () => {
+    setForm(getInitialForm(restaurantId, initialData));
+    setCurrentStep(1);
+  };
   const closeOnly = () => {
     setForm(getInitialForm(restaurantId));
     setCurrentStep(1);
@@ -854,7 +984,7 @@ const resetAndClose = () => {
         }
       }}
     >
-      <DialogContent className="max-h-[95vh] w-[calc(100vw-24px)] max-w-[760px] overflow-hidden rounded-[24px] bg-[#F5F5F5] p-0">
+      <DialogContent className="max-h-[95vh] w-[calc(100vw-24px)] max-w-[920px] overflow-hidden rounded-[24px] bg-[#F5F5F5] p-0">
         <div className="max-h-[95vh] overflow-y-auto overflow-x-hidden p-5 sm:p-8 [scrollbar-width:thin]">
           <DialogHeader>
             <DialogTitle className="text-[24px] font-semibold sm:text-[26px]">
@@ -862,8 +992,8 @@ const resetAndClose = () => {
             </DialogTitle>
 
             <p className="text-sm text-gray-500">
-              Add item details, upload media, then assign reusable variations
-              and modifiers.
+              Add item details, upload media, configure variations, then assign
+              modifier pricing.
             </p>
 
             <StepProgress currentStep={currentStep} />
@@ -885,6 +1015,10 @@ const resetAndClose = () => {
 
             {currentStep === 3 && (
               <StepThree ref={stepRef} form={form} setForm={setForm} />
+            )}
+
+            {currentStep === 4 && (
+              <StepFour ref={stepRef} form={form} setForm={setForm} />
             )}
           </div>
 
@@ -912,10 +1046,10 @@ const resetAndClose = () => {
 
               <Button
                 className="h-[44px] rounded-[12px] bg-primary px-10 text-white hover:bg-primary/90"
-                onClick={currentStep < 3 ? nextStep : handleSubmit}
+                onClick={currentStep < 4 ? nextStep : handleSubmit}
                 disabled={isSubmitting}
               >
-                {currentStep < 3
+                {currentStep < 4
                   ? "Next"
                   : isSubmitting
                   ? isEditMode
@@ -934,7 +1068,12 @@ const resetAndClose = () => {
 }
 
 function StepProgress({ currentStep }: { currentStep: number }) {
-  const steps = ["Basic Details", "Media & Extra Info", "Assign Options"];
+  const steps = [
+    "Basic Details",
+    "Media & Extra Info",
+    "Variations",
+    "Modifiers",
+  ];
   const totalSteps = steps.length;
 
   const activeWidth =
@@ -949,7 +1088,7 @@ function StepProgress({ currentStep }: { currentStep: number }) {
         style={{ width: `${activeWidth}%` }}
       />
 
-      <div className="relative z-10 grid grid-cols-3 gap-2">
+      <div className="relative z-10 grid grid-cols-4 gap-2">
         {steps.map((label, index) => {
           const step = index + 1;
           const isActive = currentStep >= step;

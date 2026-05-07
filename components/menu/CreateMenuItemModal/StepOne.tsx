@@ -313,7 +313,6 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         />
       </div> */}
 
-      {shouldShowSplitPizzaOption ? (
         <label className="flex items-center gap-2 rounded-[12px] border border-gray-200 bg-white p-3 text-sm">
           <input
             type="checkbox"
@@ -324,7 +323,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
 
           <span>Supports Split Pizza</span>
         </label>
-      ) : null}
+    
     </div>
   );
 });
