@@ -34,10 +34,13 @@ export const getMenuItems = async (params?: {
   restaurantId?: string;
   categoryId?: string;
   menuId?: string;
+  includeAll?: boolean;
+  inactive?: boolean;
 }) => {
   const { data } = await api.get("/menu/items", { params });
   return data;
 };
+
 
 export const bulkCreateMenuItems = async (payload: BulkMenuItemsValues) => {
   const { data } = await api.post("/menu/items/bulk", payload);

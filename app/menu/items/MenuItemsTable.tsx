@@ -10,12 +10,42 @@ import {
   useReorderMenuItems,
 } from "@/hooks/useMenus";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
-import { GripVertical, Loader2, Search } from "lucide-react";
+import {
+  Filter,
+  GripVertical,
+  Loader2,
+  RefreshCcw,
+  Search,
+} from "lucide-react";
 import CreateMenuItemModal from "@/components/menu/CreateMenuItemModal/CreateMenuItemModal";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import InfiniteScrollFooter from "@/components/shared/infinite-scroll-footer";
 
 const PAGE_LIMIT = 10;
+
+type MenuItemStatusFilter = "active" | "all" | "inactive";
+
+const STATUS_FILTER_OPTIONS: Array<{
+  label: string;
+  value: MenuItemStatusFilter;
+  helper: string;
+}> = [
+  {
+    label: "Active",
+    value: "active",
+    helper: "Only active items",
+  },
+  {
+    label: "All",
+    value: "all",
+    helper: "Active + inactive",
+  },
+  {
+    label: "Inactive",
+    value: "inactive",
+    helper: "Only inactive items",
+  },
+];
 
 const extractResponseItems = (response: any) => {
   if (!response) return null;
@@ -65,12 +95,15 @@ export default function MenuItemsTable({ refetchKey }: any) {
     authRestaurantId ?? user?.restaurantId ?? user?.tenantId ?? "";
 
   const reorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const querySignatureRef = useRef<string>("");
 
   const [page, setPage] = useState(1);
   const [limit] = useState(PAGE_LIMIT);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<MenuItemStatusFilter>("active");
 
   const [allItems, setAllItems] = useState<any[]>([]);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -82,6 +115,17 @@ export default function MenuItemsTable({ refetchKey }: any) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const canFetchItems = Boolean(restaurantId);
+
+  const activeStatusOption = useMemo(
+    () =>
+      STATUS_FILTER_OPTIONS.find((option) => option.value === statusFilter) ||
+      STATUS_FILTER_OPTIONS[0],
+    [statusFilter]
+  );
+
+  const hasActiveFilters = useMemo(() => {
+    return Boolean(search.trim() || debouncedSearch || statusFilter !== "active");
+  }, [search, debouncedSearch, statusFilter]);
 
   /**
    * Important:
@@ -100,17 +144,44 @@ export default function MenuItemsTable({ refetchKey }: any) {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const menuItemQueryParams = useMemo(
+    () => ({
+      page,
+      limit,
+      search: debouncedSearch || undefined,
+      restaurantId: restaurantId || undefined,
+      includeAll: statusFilter === "all" ? true : undefined,
+      inactive: statusFilter === "inactive" ? true : undefined,
+    }),
+    [page, limit, debouncedSearch, restaurantId, statusFilter]
+  );
+
+  const querySignature = useMemo(
+    () =>
+      JSON.stringify({
+        restaurantId: restaurantId || "",
+        search: debouncedSearch || "",
+        statusFilter,
+      }),
+    [restaurantId, debouncedSearch, statusFilter]
+  );
+
+  useEffect(() => {
+    if (!canFetchItems) return;
+    if (querySignatureRef.current === querySignature) return;
+
+    querySignatureRef.current = querySignature;
+    setAllItems([]);
+    setHasLoadedOnce(false);
+    setPage(1);
+  }, [querySignature, canFetchItems]);
+
   const {
     data: response,
     isLoading,
     isFetching,
     refetch,
-  } = useGetMenuItems({
-    page,
-    limit,
-    search: debouncedSearch || undefined,
-    restaurantId: restaurantId || undefined,
-  } as any);
+  } = useGetMenuItems(menuItemQueryParams as any);
 
   const { mutate: deleteMenuItem, isPending: isDeleting } =
     useDeleteMenuItem();
@@ -341,6 +412,22 @@ export default function MenuItemsTable({ refetchKey }: any) {
     }
   };
 
+  const handleStatusChange = (value: MenuItemStatusFilter) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setDebouncedSearch("");
+    setStatusFilter("active");
+    setPage(1);
+
+    if (!hasActiveFilters) {
+      refetch();
+    }
+  };
+
   const SkeletonRow = () => (
     <tr>
       <td colSpan={7} className="py-6">
@@ -367,33 +454,122 @@ export default function MenuItemsTable({ refetchKey }: any) {
   );
 
   const EmptyTableState = () => (
-    <div className="py-10 text-center text-gray-400">No menu items found</div>
+    <div className="py-10 text-center text-gray-400">
+      No menu items found
+      {hasActiveFilters ? " for the selected filters" : ""}
+    </div>
   );
 
   return (
     <div className="w-full">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="relative w-full max-w-[420px]">
-          <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-            size={18}
-          />
+      <div className="mb-6 rounded-[20px] border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+              <Filter size={18} />
+            </div>
 
-          <input
-            placeholder="Search menu items..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-[44px] w-full rounded-[14px] border border-gray-200 bg-[#FAFAFA] pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Menu Item Filters
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Filter menu items by keyword and active status. Current view: {" "}
+                <span className="font-medium text-gray-700">
+                  {activeStatusOption.helper}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-600">
+              Showing {allItems.length}
+              {pagination.total > 0 ? ` of ${pagination.total}` : ""}
+            </span>
+
+            {isFetching && !shouldShowInitialLoader ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">
+                <Loader2 size={12} className="animate-spin" />
+                Refreshing
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        <Button
-          disabled={!canFetchItems}
-          onClick={handleManualSearch}
-          className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm"
-        >
-          Search
-        </Button>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px_auto_auto] lg:items-end">
+          <div className="min-w-0">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              Search
+            </label>
+
+            <div className="relative">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+
+              <input
+                placeholder="Search by item name, SKU, category..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleManualSearch();
+                  }
+                }}
+                className="h-[44px] w-full rounded-[14px] border border-gray-200 bg-[#FAFAFA] pl-11 pr-4 text-sm text-gray-800 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
+              />
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              Status
+            </label>
+
+            <div className="grid grid-cols-3 gap-2 rounded-[14px] bg-[#F7F7F7] p-1">
+              {STATUS_FILTER_OPTIONS.map((option) => {
+                const isActive = statusFilter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleStatusChange(option.value)}
+                    disabled={!canFetchItems}
+                    className={`h-[38px] rounded-[11px] px-3 text-xs font-semibold transition ${
+                      isActive
+                        ? "bg-white text-primary shadow-sm ring-1 ring-primary/10"
+                        : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <Button
+            disabled={!canFetchItems}
+            onClick={handleManualSearch}
+            className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm hover:bg-primary/90"
+          >
+            Search
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canFetchItems || (!hasActiveFilters && !isFetching)}
+            onClick={handleResetFilters}
+            className="h-[44px] rounded-[14px] border-gray-200 px-4 text-gray-700"
+          >
+            <RefreshCcw size={15} className="mr-2" />
+            Reset
+          </Button>
+        </div>
       </div>
 
       {isReordering ? (
@@ -543,7 +719,7 @@ export default function MenuItemsTable({ refetchKey }: any) {
           ))
         ) : shouldShowEmpty ? (
           <div className="py-10 text-center text-gray-400">
-            No menu items found
+            No menu items found{hasActiveFilters ? " for the selected filters" : ""}
           </div>
         ) : (
           allItems.map((item: any) => (

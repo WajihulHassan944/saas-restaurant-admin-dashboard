@@ -68,6 +68,8 @@ export const useGetMenuItems = (params?: {
   restaurantId?: string;
   categoryId?: string;
   menuId?: string;
+  includeAll?: boolean;
+  inactive?: boolean;
 }) => {
   return useQuery({
     queryKey: [
@@ -78,10 +80,14 @@ export const useGetMenuItems = (params?: {
       params?.restaurantId,
       params?.categoryId,
       params?.menuId,
+      params?.includeAll,
+      params?.inactive,
     ],
     queryFn: () => getMenuItems(params),
   });
 };
+
+
 export const useBulkCreateMenuItems = () => {
   const queryClient = useQueryClient();
 
