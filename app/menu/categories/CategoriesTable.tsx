@@ -5,12 +5,19 @@ import { Button } from "@/components/ui/button";
 import { FaPen, FaTrash } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   useDeleteMenuCategory,
   useGetMenuCategories,
   useReorderMenuCategories,
+  useUpdateMenuCategory,
 } from "@/hooks/useMenuCategories";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
-import { Eye, GripVertical, Loader2, Search } from "lucide-react";
+import { Eye, GripVertical, Loader2, MoreVertical, Search } from "lucide-react";
 import CreateCategoryModalParent from "@/components/menu/listing/CreateCategoryModalParent";
 import { useRouter } from "next/navigation";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -64,6 +71,8 @@ const mergeUniqueById = (prev: any[], next: any[]) => {
 
 export default function CategoriesTable({ refetchKey }: any) {
   const { user, restaurantId: authRestaurantId } = useAuth();
+const [statusFilter, setStatusFilter] = useState("all");
+const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
 
   const restaurantId =
     authRestaurantId ?? user?.restaurantId ?? user?.tenantId ?? "";
@@ -106,24 +115,34 @@ export default function CategoriesTable({ refetchKey }: any) {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const {
-    data: response,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useGetMenuCategories({
-    page,
-    limit,
-    search: debouncedSearch || undefined,
-    restaurantId: restaurantId || undefined,
-  });
+const {
+  data: response,
+  isLoading,
+  isFetching,
+  refetch,
+} = useGetMenuCategories({
+  page,
+  limit,
+  search: debouncedSearch || undefined,
+  restaurantId: restaurantId || undefined,
+  sortOrder,
+
+  // only include inactive when "all" selected
+  includeInactive: statusFilter === "all",
+
+  inactive:
+    statusFilter === "all"
+      ? undefined
+      : statusFilter === "inactive",
+});
+
 
   const { mutate: deleteMenuCategory, isPending: isDeleting } =
     useDeleteMenuCategory();
 
   const { mutate: reorderCategories, isPending: isReordering } =
     useReorderMenuCategories();
-
+const { mutate: updateCategoryStatus } = useUpdateMenuCategory();
   const fetchedItems = useMemo<any[] | null>(() => {
     return extractResponseItems(response);
   }, [response]);
@@ -386,29 +405,58 @@ export default function CategoriesTable({ refetchKey }: any) {
 
   return (
     <div className="w-full">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="relative w-full max-w-[420px]">
-          <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-            size={18}
-          />
+    <div className="mb-6 rounded-[18px] border bg-white p-4 shadow-sm">
+  <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+    <div className="relative flex-1">
+      <Search
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+        size={18}
+      />
 
-          <input
-            placeholder="Search categories..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-[44px] w-full rounded-[14px] border border-gray-200 bg-[#FAFAFA] pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
+      <input
+        placeholder="Search categories..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="h-[44px] w-full rounded-[14px] border border-gray-200 bg-[#FAFAFA] pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+      />
+    </div>
 
-        <Button
-          disabled={!canFetchCategories}
-          onClick={handleManualSearch}
-          className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm"
-        >
-          Search
-        </Button>
-      </div>
+    <select
+      value={statusFilter}
+      onChange={(e) => {
+        setStatusFilter(e.target.value);
+        setPage(1);
+      }}
+      className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm focus:outline-none"
+    >
+      <option value="all">Status</option>
+      <option value="all">Active</option>
+      <option value="active">Inactive</option>
+    </select>
+
+    {/* <select
+      value={sortOrder}
+      onChange={(e) => {
+        setSortOrder(e.target.value as "ASC" | "DESC");
+        setPage(1);
+      }}
+      className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm focus:outline-none"
+    >
+      <option value="DESC">Newest First</option>
+      <option value="ASC">Oldest First</option>
+    </select> */}
+
+    
+
+    <Button
+      disabled={!canFetchCategories}
+      onClick={handleManualSearch}
+      className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm"
+    >
+      Search
+    </Button>
+  </div>
+</div>
 
       {isReordering ? (
         <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
@@ -511,41 +559,70 @@ export default function CategoriesTable({ refetchKey }: any) {
                     </span>
                   </td>
 
-                  <td className="px-2 text-center">
-                    <div className="flex justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelected(item);
-                          setOpen(true);
-                        }}
-                        className="text-gray-500 hover:text-primary"
-                        title="Edit"
-                      >
-                        <FaPen size={14} />
-                      </button>
+                <td className="px-2 text-center">
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button
+        className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100"
+        type="button"
+      >
+        <MoreVertical size={18} />
+      </button>
+    </DropdownMenuTrigger>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(`/menu/categories/${item.id}`)
-                        }
-                        className="text-gray-500 hover:text-primary"
-                        title="View Details"
-                      >
-                        <Eye size={16} />
-                      </button>
+    <DropdownMenuContent align="end" className="w-[180px]">
+      <DropdownMenuItem
+        onClick={() => {
+          setSelected(item);
+          setOpen(true);
+        }}
+        className="cursor-pointer"
+      >
+        <FaPen className="mr-2" size={12} />
+        Edit
+      </DropdownMenuItem>
 
-                      <button
-                        type="button"
-                        onClick={() => setDeleteId(item.id)}
-                        className="text-gray-500 hover:text-red-500"
-                        title="Delete"
-                      >
-                        <FaTrash size={14} />
-                      </button>
-                    </div>
-                  </td>
+      <DropdownMenuItem
+        onClick={() =>
+          router.push(`/menu/categories/${item.id}`)
+        }
+        className="cursor-pointer"
+      >
+        <Eye className="mr-2 h-4 w-4" />
+        View Details
+      </DropdownMenuItem>
+
+      <DropdownMenuItem
+        onClick={() => {
+          updateCategoryStatus(
+            {
+              id: item.id,
+              data: {
+                isActive: !item.isActive,
+              },
+            },
+            {
+              onSuccess: () => {
+                softRefresh();
+              },
+            }
+          );
+        }}
+        className="cursor-pointer"
+      >
+        {item.isActive ? "Deactivate" : "Activate"}
+      </DropdownMenuItem>
+
+      <DropdownMenuItem
+        onClick={() => setDeleteId(item.id)}
+        className="cursor-pointer text-red-500 focus:text-red-500"
+      >
+        <FaTrash className="mr-2" size={12} />
+        Delete
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</td>
                 </tr>
               ))
             )}
@@ -629,39 +706,68 @@ export default function CategoriesTable({ refetchKey }: any) {
                       {item.isActive ? "Active" : "Inactive"}
                     </span>
 
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelected(item);
-                          setOpen(true);
-                        }}
-                        className="text-gray-500 hover:text-primary"
-                        title="Edit"
-                      >
-                        <FaPen size={14} />
-                      </button>
+                  <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <button
+      className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100"
+      type="button"
+    >
+      <MoreVertical size={18} />
+    </button>
+  </DropdownMenuTrigger>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(`/menu/categories/${item.id}`)
-                        }
-                        className="text-gray-500 hover:text-primary"
-                        title="View Details"
-                      >
-                        <Eye size={16} />
-                      </button>
+  <DropdownMenuContent align="end" className="w-[180px]">
+    <DropdownMenuItem
+      onClick={() => {
+        setSelected(item);
+        setOpen(true);
+      }}
+      className="cursor-pointer"
+    >
+      <FaPen className="mr-2" size={12} />
+      Edit
+    </DropdownMenuItem>
 
-                      <button
-                        type="button"
-                        onClick={() => setDeleteId(item.id)}
-                        className="text-gray-500 hover:text-red-500"
-                        title="Delete"
-                      >
-                        <FaTrash size={14} />
-                      </button>
-                    </div>
+    <DropdownMenuItem
+      onClick={() =>
+        router.push(`/menu/categories/${item.id}`)
+      }
+      className="cursor-pointer"
+    >
+      <Eye className="mr-2 h-4 w-4" />
+      View Details
+    </DropdownMenuItem>
+
+    <DropdownMenuItem
+      onClick={() => {
+        updateCategoryStatus(
+          {
+            id: item.id,
+            data: {
+              isActive: !item.isActive,
+            },
+          },
+          {
+            onSuccess: () => {
+              softRefresh();
+            },
+          }
+        );
+      }}
+      className="cursor-pointer"
+    >
+      {item.isActive ? "Deactivate" : "Activate"}
+    </DropdownMenuItem>
+
+    <DropdownMenuItem
+      onClick={() => setDeleteId(item.id)}
+      className="cursor-pointer text-red-500 focus:text-red-500"
+    >
+      <FaTrash className="mr-2" size={12} />
+      Delete
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
                   </div>
                 </div>
               </div>

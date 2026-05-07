@@ -16,13 +16,18 @@ export const createMenuCategory = async (payload: MenuCategoryValues) => {
   return data;
 };
 
+
 export const getMenuCategories = async (params?: {
   page?: number;
   limit?: number;
   search?: string;
   restaurantId?: string;
   parentCategoryId?: string;
-  isActive?: boolean;
+  inactive?: boolean;
+  menuId?: string;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
+  includeInactive?: boolean;
 }) => {
   const { data } = await api.get("/menu/categories", { params });
   return data;

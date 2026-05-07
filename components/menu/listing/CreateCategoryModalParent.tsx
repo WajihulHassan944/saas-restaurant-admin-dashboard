@@ -305,7 +305,7 @@ const restaurantId = authRestaurantId ?? undefined;
             emptyTitle="Drag & drop category image here"
           />
 
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <label className="text-sm font-medium">Display Priority</label>
 
             <div className="relative">
@@ -332,7 +332,7 @@ const restaurantId = authRestaurantId ?? undefined;
             <p className="text-xs text-gray-500">
               Top priority categories appear first in the menu.
             </p>
-          </div>
+          </div> */}
 
           <label className="flex cursor-pointer items-center justify-between rounded-[12px] border border-gray-100 bg-[#FAFAFA] px-4 py-3">
             <div>

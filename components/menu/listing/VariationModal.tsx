@@ -187,7 +187,7 @@ const { restaurantId } = useAuth();
 
     const price = Number(form.price);
 
-    if (form.price === "" || Number.isNaN(price)) {
+    if (Number.isNaN(price)) {
       return "Price must be a valid number";
     }
 

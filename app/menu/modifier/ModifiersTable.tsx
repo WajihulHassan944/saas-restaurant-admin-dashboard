@@ -19,7 +19,8 @@ export default function ModifiersTable() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
 
-  const { restaurantId } = useAuth();
+  const { restaurantId: authRestaurantId } = useAuth();
+  const restaurantId = authRestaurantId ?? undefined;
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -49,8 +50,8 @@ export default function ModifiersTable() {
   } = useGetModifiers({
     page,
     limit,
-    search: debouncedSearch,
-    ...(restaurantId ? { restaurantId } : {}),
+    search: debouncedSearch || undefined,
+    restaurantId,
   });
 
   useEffect(() => {
@@ -67,20 +68,25 @@ export default function ModifiersTable() {
   const items = useMemo(() => {
     if (!response) return [];
 
-    return (
+    const raw =
       response?.data?.items ||
       response?.data?.modifiers ||
       response?.data?.data ||
       response?.items ||
       response?.modifiers ||
       response?.data ||
-      []
-    );
+      [];
+
+    return Array.isArray(raw) ? raw : [];
   }, [response]);
 
   const pagination = useMemo(() => {
     const source =
-      response?.data?.pagination || response?.pagination || response?.meta || {};
+      response?.data?.pagination ||
+      response?.data?.meta ||
+      response?.pagination ||
+      response?.meta ||
+      {};
 
     const total = Number(source?.total ?? items.length ?? 0);
     const currentPage = Number(source?.page ?? page);
@@ -88,8 +94,8 @@ export default function ModifiersTable() {
 
     const totalPages = Number(
       source?.totalPages ??
-        (pageSize > 0 ? Math.ceil(total / pageSize) : 1) ??
-        1
+        source?.pages ??
+        (pageSize > 0 ? Math.ceil(total / pageSize) : 1)
     );
 
     return {
@@ -98,9 +104,18 @@ export default function ModifiersTable() {
       total,
       limit: pageSize || limit,
       hasNext: source?.hasNext ?? currentPage < (totalPages || 1),
-      hasPrevious: source?.hasPrevious ?? currentPage > 1,
+      hasPrevious:
+        source?.hasPrevious ?? source?.hasPrev ?? currentPage > 1,
     };
   }, [response, items.length, page, limit]);
+
+  const formatPrice = (value: any) => {
+    const numeric = Number(value ?? 0);
+
+    if (Number.isNaN(numeric)) return "0.00";
+
+    return numeric.toFixed(2);
+  };
 
   const handleDelete = () => {
     if (!deleteId) return;
@@ -122,67 +137,12 @@ export default function ModifiersTable() {
     });
   };
 
-  const getModifierGroupNames = (item: any) => {
-    const fromModifierGroups = Array.isArray(item?.modifierGroups)
-      ? item.modifierGroups
-      : [];
-
-    const fromGroupLinks = Array.isArray(item?.groupLinks)
-      ? item.groupLinks
-          .map((link: any) => link?.modifierGroup)
-          .filter(Boolean)
-      : [];
-
-    const rawGroups = [...fromModifierGroups, ...fromGroupLinks];
-
-    const uniqueMap = new Map<string, any>();
-
-    rawGroups.forEach((group: any) => {
-      const id = String(group?.id || "");
-      if (!id) return;
-
-      if (!uniqueMap.has(id)) {
-        uniqueMap.set(id, group);
-      }
-    });
-
-    return Array.from(uniqueMap.values())
-      .map((group: any) => group?.name)
-      .filter(Boolean);
-  };
-
-  const getModifierGroupDisplay = (item: any) => {
-    const groupNames = getModifierGroupNames(item);
-
-    if (!groupNames.length) {
-      return {
-        primary: "No group",
-        secondary: "",
-        all: [],
-      };
-    }
-
-    if (groupNames.length === 1) {
-      return {
-        primary: groupNames[0],
-        secondary: "",
-        all: groupNames,
-      };
-    }
-
-    return {
-      primary: groupNames[0],
-      secondary: `+${groupNames.length - 1} more`,
-      all: groupNames,
-    };
-  };
-
   const SkeletonRow = () => (
     <tr>
-      <td colSpan={6} className="py-6">
+      <td colSpan={4} className="py-6">
         <div className="flex animate-pulse items-center gap-3">
-          <div className="h-4 w-[140px] rounded bg-gray-200" />
-          <div className="h-4 w-[100px] rounded bg-gray-200" />
+          <div className="h-4 w-[160px] rounded bg-gray-200" />
+          <div className="h-4 w-[90px] rounded bg-gray-200" />
           <div className="h-4 w-[70px] rounded bg-gray-200" />
           <div className="h-4 w-[50px] rounded bg-gray-200" />
         </div>
@@ -193,17 +153,26 @@ export default function ModifiersTable() {
   const SkeletonCard = () => (
     <div className="animate-pulse rounded-[18px] border bg-white p-4 shadow-sm">
       <div className="space-y-3">
-        <div className="h-4 w-[140px] rounded bg-gray-200" />
-        <div className="h-3 w-[100px] rounded bg-gray-200" />
-        <div className="h-3 w-[80px] rounded bg-gray-200" />
+        <div className="h-4 w-[150px] rounded bg-gray-200" />
+        <div className="h-3 w-[90px] rounded bg-gray-200" />
+        <div className="h-3 w-[70px] rounded bg-gray-200" />
       </div>
     </div>
   );
 
+  const isTableLoading = isLoading || isFetching;
+
   return (
     <div className="w-full">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[18px] font-semibold text-gray-900">Modifiers</h2>
+        <div>
+          <h2 className="text-[18px] font-semibold text-gray-900">
+            Modifiers
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage reusable item add-ons and base prices.
+          </p>
+        </div>
 
         <Button
           onClick={() => {
@@ -233,7 +202,8 @@ export default function ModifiersTable() {
 
         <Button
           onClick={() => refetch()}
-          className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm"
+          disabled={!restaurantId}
+          className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm disabled:opacity-60"
         >
           Search
         </Button>
@@ -244,167 +214,41 @@ export default function ModifiersTable() {
           <thead>
             <tr className="border-b text-left text-gray-500">
               <th className="px-2 py-3">Name</th>
-              <th className="px-2">Groups</th>
-              <th className="px-2 text-center">Price</th>
-              <th className="px-2 text-center">Sort</th>
+              <th className="px-2 text-center">Base Price</th>
               <th className="px-2 text-center">Status</th>
               <th className="px-2 text-center">Actions</th>
             </tr>
           </thead>
 
           <tbody>
-            {isLoading || isFetching ? (
-              Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+            {isTableLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <SkeletonRow key={index} />
+              ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-gray-400">
+                <td colSpan={4} className="py-10 text-center text-gray-400">
                   No modifiers found
                 </td>
               </tr>
             ) : (
-              items.map((item: any) => {
-                const groupDisplay = getModifierGroupDisplay(item);
-
-                return (
-                  <tr key={item.id} className="border-b hover:bg-gray-50">
-                    <td className="px-2 py-4">
-                      <div className="flex flex-col">
-                        <span className="block font-medium">{item.name}</span>
-                      </div>
-                    </td>
-
-                    <td className="px-2">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-gray-800">
-                          {groupDisplay.primary}
-                        </span>
-
-                        {groupDisplay.secondary ? (
-                          <span
-                            className="text-xs text-gray-500"
-                            title={groupDisplay.all.join(", ")}
-                          >
-                            {groupDisplay.secondary}
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-
-                    <td className="px-2 text-center">
-                      ${item.priceDelta ?? 0}
-                    </td>
-
-                    <td className="px-2 text-center">
-                      {item.sortOrder ?? "-"}
-                    </td>
-
-                    <td className="px-2 text-center">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                          item.isActive
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {item.isActive ? "Active" : "Inactive"}
+              items.map((item: any) => (
+                <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <td className="px-2 py-4">
+                    <div className="flex flex-col">
+                      <span className="block font-medium text-gray-900">
+                        {item.name || "-"}
                       </span>
-                    </td>
+                    </div>
+                  </td>
 
-                    <td className="px-2 text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelected(item);
-                            setOpen(true);
-                          }}
-                          className="text-gray-500 hover:text-primary"
-                          aria-label="Edit modifier"
-                        >
-                          <FaPen size={14} />
-                        </button>
+                  <td className="px-2 text-center font-medium text-gray-900">
+                    ${formatPrice(item.priceDelta)}
+                  </td>
 
-                        <button
-                          type="button"
-                          onClick={() => setDeleteId(item.id)}
-                          className="text-gray-500 hover:text-red-500"
-                          aria-label="Delete modifier"
-                        >
-                          <FaTrash size={14} />
-                        </button>
-
-                        <ActionDropdown
-                          item={item}
-                          isOpen={openActionId === item.id}
-                          isDuplicating={isDuplicating}
-                          onToggle={() =>
-                            setOpenActionId((prev) =>
-                              prev === item.id ? null : item.id
-                            )
-                          }
-                          onClose={() => setOpenActionId(null)}
-                          onDuplicate={handleDuplicate}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-
-        <div className="mt-4 px-2 pb-2">
-          <PaginationSection {...pagination} onPageChange={setPage} />
-        </div>
-      </div>
-
-      <div className="space-y-4 md:hidden">
-        {isLoading || isFetching ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
-        ) : items.length === 0 ? (
-          <div className="py-10 text-center text-gray-400">
-            No modifiers found
-          </div>
-        ) : (
-          items.map((item: any) => {
-            const groupDisplay = getModifierGroupDisplay(item);
-
-            return (
-              <div
-                key={item.id}
-                className="rounded-[18px] border bg-white p-4 shadow-sm"
-              >
-                <div className="flex flex-1 flex-col justify-between gap-3">
-                  <div>
-                    <h3 className="text-[16px] font-semibold text-gray-900">
-                      {item.name}
-                    </h3>
-
-                    <p
-                      className="text-sm text-gray-500"
-                      title={groupDisplay.all.join(", ")}
-                    >
-                      {groupDisplay.primary}
-                      {groupDisplay.secondary
-                        ? ` (${groupDisplay.secondary})`
-                        : ""}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-primary">
-                      ${item.priceDelta ?? 0}
-                    </span>
-
-                    <span className="text-xs text-gray-500">
-                      Sort: {item.sortOrder ?? "-"}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between">
+                  <td className="px-2 text-center">
                     <span
-                      className={`rounded-full px-2 py-1 text-xs ${
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
                         item.isActive
                           ? "bg-green-100 text-green-700"
                           : "bg-gray-100 text-gray-600"
@@ -412,8 +256,10 @@ export default function ModifiersTable() {
                     >
                       {item.isActive ? "Active" : "Inactive"}
                     </span>
+                  </td>
 
-                    <div className="flex items-center gap-3">
+                  <td className="px-2 text-center">
+                    <div className="flex items-center justify-center gap-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -448,11 +294,96 @@ export default function ModifiersTable() {
                         onDuplicate={handleDuplicate}
                       />
                     </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        <div className="mt-4 px-2 pb-2">
+          <PaginationSection {...pagination} onPageChange={setPage} />
+        </div>
+      </div>
+
+      <div className="space-y-4 md:hidden">
+        {isTableLoading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <SkeletonCard key={index} />
+          ))
+        ) : items.length === 0 ? (
+          <div className="py-10 text-center text-gray-400">
+            No modifiers found
+          </div>
+        ) : (
+          items.map((item: any) => (
+            <div
+              key={item.id}
+              className="rounded-[18px] border bg-white p-4 shadow-sm"
+            >
+              <div className="flex flex-1 flex-col justify-between gap-3">
+                <div>
+                  <h3 className="text-[16px] font-semibold text-gray-900">
+                    {item.name || "-"}
+                  </h3>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-primary">
+                    ${formatPrice(item.priceDelta)}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between">
+                  <span
+                    className={`rounded-full px-2 py-1 text-xs ${
+                      item.isActive
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {item.isActive ? "Active" : "Inactive"}
+                  </span>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelected(item);
+                        setOpen(true);
+                      }}
+                      className="text-gray-500 hover:text-primary"
+                      aria-label="Edit modifier"
+                    >
+                      <FaPen size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeleteId(item.id)}
+                      className="text-gray-500 hover:text-red-500"
+                      aria-label="Delete modifier"
+                    >
+                      <FaTrash size={14} />
+                    </button>
+
+                    <ActionDropdown
+                      item={item}
+                      isOpen={openActionId === item.id}
+                      isDuplicating={isDuplicating}
+                      onToggle={() =>
+                        setOpenActionId((prev) =>
+                          prev === item.id ? null : item.id
+                        )
+                      }
+                      onClose={() => setOpenActionId(null)}
+                      onDuplicate={handleDuplicate}
+                    />
                   </div>
                 </div>
               </div>
-            );
-          })
+            </div>
+          ))
         )}
 
         <PaginationSection {...pagination} onPageChange={setPage} />
@@ -460,12 +391,15 @@ export default function ModifiersTable() {
 
       <ModifierModal
         open={open}
-        onOpenChange={(val: boolean) => {
-          setOpen(val);
-          if (!val) setSelected(null);
+        onOpenChange={(value: boolean) => {
+          setOpen(value);
+          if (!value) setSelected(null);
         }}
         initialData={selected}
-        refresh={() => refetch()}
+        refresh={() => {
+          setRefreshKey((prev) => prev + 1);
+          refetch();
+        }}
       />
 
       <DeleteDialog
@@ -507,8 +441,8 @@ function ActionDropdown({
     <div ref={dropdownRef} className="relative flex justify-center">
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
+        onClick={(event) => {
+          event.stopPropagation();
           onToggle();
         }}
         className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
@@ -522,9 +456,9 @@ function ActionDropdown({
           <button
             type="button"
             disabled={isDuplicating}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
 
               if (isDuplicating) return;
 

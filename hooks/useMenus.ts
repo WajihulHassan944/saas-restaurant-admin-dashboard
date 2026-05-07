@@ -162,25 +162,25 @@ export const useCreateMenuVariation = () => {
   });
 };
 
-export const useGetMenuVariations = (params?: GetMenuVariationsParams) => {
+export const useGetMenuVariations = (params?: {
+  page?: number;
+  limit?: number;
+  restaurantId?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}) => {
   return useQuery({
     queryKey: [
       "menu-variations",
       params?.page,
       params?.limit,
-      params?.search,
-      params?.itemId,
       params?.restaurantId,
-      params?.isActive,
-      params?.categoryId,
+      params?.search,
+      params?.sortBy,
+      params?.sortOrder,
     ],
-
     queryFn: () => getMenuVariations(params),
-
-    /**
-     * Generic variation listing should load without categoryId/itemId/search.
-     */
-    enabled: true,
   });
 };
 export const useUpdateMenuVariation = () => {

@@ -773,7 +773,11 @@ export default function CreateMenuItemModal({
     }
   };
 
-  const resetAndClose = () => {
+const resetAndClose = () => {
+  setForm(getInitialForm(restaurantId, initialData));
+  setCurrentStep(1);
+};
+  const closeOnly = () => {
     setForm(getInitialForm(restaurantId));
     setCurrentStep(1);
     onOpenChange(false);
@@ -815,7 +819,7 @@ export default function CreateMenuItemModal({
         {
           onSuccess: () => {
             onSuccess?.();
-            resetAndClose();
+            closeOnly();
           },
           onError: (err: any) => {
             toast.error(
@@ -831,7 +835,7 @@ export default function CreateMenuItemModal({
     createMenuItem(payload as any, {
       onSuccess: () => {
         onSuccess?.();
-        resetAndClose();
+        closeOnly();
       },
       onError: (err: any) => {
         toast.error(

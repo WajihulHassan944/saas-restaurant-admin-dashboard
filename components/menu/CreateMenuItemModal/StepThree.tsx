@@ -40,8 +40,6 @@ type SelectableEntity = {
   priceDelta?: string | number;
   isActive?: boolean;
   sortOrder?: number;
-  modifierGroups?: any[];
-  groupLinks?: any[];
 };
 
 type ModifierPriceOverride = {
@@ -86,12 +84,35 @@ const normalizeIds = (
       }
 
       if (type === "variation") {
-        const id = entry?.variationId || entry?.variation?.id || entry?.id;
+        const modifierId = entry?.modifierId || entry?.modifier?.id;
+        const variationId = entry?.variationId || entry?.variation?.id;
+
+        if (modifierId && !variationId) return;
+
+        const id =
+          variationId ||
+          (entry?.name !== undefined ||
+          entry?.categoryId !== undefined ||
+          entry?.sku !== undefined ||
+          entry?.description !== undefined ||
+          entry?.isActive !== undefined
+            ? entry?.id
+            : undefined);
+
         if (id) ids.add(String(id));
         return;
       }
 
-      const id = entry?.modifierId || entry?.modifier?.id || entry?.id;
+      const id =
+        entry?.modifierId ||
+        entry?.modifier?.id ||
+        (entry?.name !== undefined ||
+        entry?.priceDelta !== undefined ||
+        entry?.restaurantId !== undefined ||
+        entry?.isActive !== undefined
+          ? entry?.id
+          : undefined);
+
       if (id) ids.add(String(id));
     });
   });
@@ -164,30 +185,6 @@ const mergeUniqueById = <T extends { id?: string }>(prev: T[], next: T[]) => {
   });
 
   return Array.from(map.values());
-};
-
-const getModifierGroupNames = (modifier: any) => {
-  const directGroups = Array.isArray(modifier?.modifierGroups)
-    ? modifier.modifierGroups
-    : [];
-
-  const linkedGroups = Array.isArray(modifier?.groupLinks)
-    ? modifier.groupLinks
-        .map((link: any) => link?.modifierGroup)
-        .filter(Boolean)
-    : [];
-
-  const unique = new Map<string, any>();
-
-  [...directGroups, ...linkedGroups].forEach((group: any) => {
-    const id = String(group?.id || "");
-    if (!id) return;
-    if (!unique.has(id)) unique.set(id, group);
-  });
-
-  return Array.from(unique.values())
-    .map((group: any) => group?.name)
-    .filter(Boolean);
 };
 
 const formatAmount = (value: any) => {
@@ -276,6 +273,34 @@ const normalizeVariationPriceOverrides = (
     }));
 };
 
+const getInvalidVariationIdsFromModifierOverrideRecords = (form: any) => {
+  const invalidIds = new Set<string>();
+
+  normalizeArray(form?.modifierPriceOverrides).forEach((entry) => {
+    const isTopLevelModifierOverride =
+      entry?.id && entry?.modifierId && !entry?.variationId;
+
+    if (isTopLevelModifierOverride) {
+      invalidIds.add(String(entry.id));
+    }
+  });
+
+  normalizeArray(form?.variationPriceOverrides).forEach((variationOverride) => {
+    normalizeArray(variationOverride?.modifierPriceOverrides).forEach(
+      (modifierOverride) => {
+        const isNestedModifierOverride =
+          modifierOverride?.id && modifierOverride?.modifierId;
+
+        if (isNestedModifierOverride) {
+          invalidIds.add(String(modifierOverride.id));
+        }
+      }
+    );
+  });
+
+  return invalidIds;
+};
+
 const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
   const { restaurantId: authRestaurantId } = useAuth();
   const restaurantId = authRestaurantId ?? undefined;
@@ -338,25 +363,29 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
   }, [restaurantId]);
 
   const selectedVariationIds = useMemo(() => {
-    if (Array.isArray(form?.variationIds)) {
-      return normalizeIds([form.variationIds], "variation");
-    }
+    const invalidVariationIds =
+      getInvalidVariationIdsFromModifierOverrideRecords(form);
 
-    return normalizeIds(
-      [
-        form?.variations,
-        form?.itemVariations,
-        form?.variationLinks,
-        form?.variationPriceOverrides,
-      ],
-      "variation"
-    );
+    const rawIds = Array.isArray(form?.variationIds)
+      ? normalizeIds([form.variationIds], "variation")
+      : normalizeIds(
+          [
+            form?.variations,
+            form?.itemVariations,
+            form?.variationLinks,
+            form?.variationPriceOverrides,
+          ],
+          "variation"
+        );
+
+    return rawIds.filter((id) => !invalidVariationIds.has(String(id)));
   }, [
     form?.variationIds,
     form?.variations,
     form?.itemVariations,
     form?.variationLinks,
     form?.variationPriceOverrides,
+    form?.modifierPriceOverrides,
   ]);
 
   const selectedModifierIds = useMemo(() => {
@@ -372,7 +401,6 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
       [
         form?.modifiers,
         form?.itemModifiers,
-        form?.modifierLinks,
         form?.modifierPriceOverrides,
         nestedModifierOverrides,
       ],
@@ -382,7 +410,6 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
     form?.modifierIds,
     form?.modifiers,
     form?.itemModifiers,
-    form?.modifierLinks,
     form?.modifierPriceOverrides,
     form?.variationPriceOverrides,
   ]);
@@ -470,8 +497,19 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
       }
     });
 
+    normalizeArray(form?.variationPriceOverrides).forEach((entry: any) => {
+      if (entry?.variation?.id) {
+        map.set(String(entry.variation.id), entry.variation);
+      }
+    });
+
     return map;
-  }, [variationOptions, form?.variations, form?.itemVariations]);
+  }, [
+    variationOptions,
+    form?.variations,
+    form?.itemVariations,
+    form?.variationPriceOverrides,
+  ]);
 
   const modifierMap = useMemo(() => {
     const map = new Map<string, SelectableEntity>();
@@ -488,14 +526,32 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
       }
     });
 
-    normalizeArray(form?.modifierLinks).forEach((link: any) => {
-      if (link?.modifier?.id) {
-        map.set(String(link.modifier.id), link.modifier);
+    normalizeArray(form?.modifierPriceOverrides).forEach((entry: any) => {
+      if (entry?.modifier?.id) {
+        map.set(String(entry.modifier.id), entry.modifier);
       }
     });
 
+    normalizeArray(form?.variationPriceOverrides).forEach((variation: any) => {
+      normalizeArray(variation?.modifierPriceOverrides).forEach(
+        (modifierOverride: any) => {
+          if (modifierOverride?.modifier?.id) {
+            map.set(
+              String(modifierOverride.modifier.id),
+              modifierOverride.modifier
+            );
+          }
+        }
+      );
+    });
+
     return map;
-  }, [modifierOptions, form?.modifiers, form?.modifierLinks]);
+  }, [
+    modifierOptions,
+    form?.modifiers,
+    form?.modifierPriceOverrides,
+    form?.variationPriceOverrides,
+  ]);
 
   const selectedVariations = useMemo(
     () =>
@@ -721,7 +777,9 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
         override?.pickupPrice !== null &&
         !isValidNonNegativeNumber(override.pickupPrice)
       ) {
-        toast.error("Variation pickup prices must be valid non-negative numbers");
+        toast.error(
+          "Variation pickup prices must be valid non-negative numbers"
+        );
         return false;
       }
 
@@ -786,7 +844,8 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
 
           return {
             modifierId: String(modifierId),
-            priceDelta: nestedExisting?.priceDelta || topLevel?.priceDelta || "0",
+            priceDelta:
+              nestedExisting?.priceDelta || topLevel?.priceDelta || "0",
           };
         }),
       };
@@ -1030,8 +1089,8 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
             </h3>
 
             <p className="mt-1 text-sm text-gray-600">
-              Select reusable variations and modifiers, then configure item-level
-              variation prices and modifier prices.
+              Select reusable variations and modifiers, then configure
+              item-level variation prices and modifier prices.
             </p>
           </div>
         </div>
@@ -1093,26 +1152,19 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
         emptyDescription="Create master modifiers first, then attach them to this item."
         onToggle={(id) => toggleSelection("modifierIds", id)}
         onClear={() => clearSelection("modifierIds")}
-        renderMeta={(item) => {
-          const groups = getModifierGroupNames(item);
+        renderMeta={(item) => (
+          <>
+            {hasPositiveAmount(item?.priceDelta) ? (
+              <span>Base price: ${formatAmount(item?.priceDelta)}</span>
+            ) : null}
 
-          return (
-            <>
-              {hasPositiveAmount(item?.priceDelta) ? (
-                <span>Base delta: ${formatAmount(item?.priceDelta)}</span>
-              ) : null}
-
-              {groups.length ? (
-                <span title={groups.join(", ")}>
-                  Group: {groups[0]}
-                  {groups.length > 1 ? ` +${groups.length - 1}` : ""}
-                </span>
-              ) : (
-                <span>No group</span>
-              )}
-            </>
-          );
-        }}
+            {item?.isActive === false ? (
+              <span>Inactive</span>
+            ) : (
+              <span>Active</span>
+            )}
+          </>
+        )}
       />
 
       <ModifierBasePriceSection
@@ -1404,7 +1456,7 @@ function ModifierBasePriceSection({
 
               {hasPositiveAmount(modifier.priceDelta) ? (
                 <p className="mt-0.5 text-xs text-gray-500">
-                  Master delta: ${formatAmount(modifier.priceDelta)}
+                  Master base price: ${formatAmount(modifier.priceDelta)}
                 </p>
               ) : null}
             </div>
@@ -1648,7 +1700,8 @@ function VariationPricingMatrix({
 
                           {hasPositiveAmount(modifier.priceDelta) ? (
                             <p className="mt-0.5 text-xs text-gray-500">
-                              Master delta: ${formatAmount(modifier.priceDelta)}
+                              Master base price: $
+                              {formatAmount(modifier.priceDelta)}
                             </p>
                           ) : null}
                         </div>

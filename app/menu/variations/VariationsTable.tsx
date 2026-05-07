@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FaPen, FaTrash } from "react-icons/fa";
-import { PlusCircle, RefreshCcw, Search } from "lucide-react";
+import { PlusCircle, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import PaginationSection from "@/components/shared/pagination";
@@ -36,6 +36,10 @@ export default function VariationsTable() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  /**
+   * Debounced search:
+   * typing waits before API params update.
+   */
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search.trim());
@@ -153,6 +157,16 @@ export default function VariationsTable() {
     return String(sortOrderValue);
   };
 
+  const handleSortByChange = (value: SortBy) => {
+    setSortBy(value);
+    setPage(1);
+  };
+
+  const handleSortOrderChange = (value: SortOrder) => {
+    setSortOrder(value);
+    setPage(1);
+  };
+
   const SkeletonRow = () => (
     <tr>
       <td colSpan={7} className="px-4 py-5">
@@ -201,7 +215,7 @@ export default function VariationsTable() {
       </div>
 
       <div className="mb-6 rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_150px_auto] md:items-center">
+        <div className="grid gap-3 md:grid-cols-[1fr_190px_150px] md:items-center">
           <div className="relative">
             <Search
               className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
@@ -218,10 +232,7 @@ export default function VariationsTable() {
 
           <select
             value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value as SortBy);
-              setPage(1);
-            }}
+            onChange={(e) => handleSortByChange(e.target.value as SortBy)}
             className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           >
             <option value="createdAt">Sort: Latest</option>
@@ -232,28 +243,14 @@ export default function VariationsTable() {
 
           <select
             value={sortOrder}
-            onChange={(e) => {
-              setSortOrder(e.target.value as SortOrder);
-              setPage(1);
-            }}
+            onChange={(e) =>
+              handleSortOrderChange(e.target.value as SortOrder)
+            }
             className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           >
             <option value="DESC">DESC</option>
             <option value="ASC">ASC</option>
           </select>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => refetch()}
-            className="h-[44px] rounded-[14px] border-gray-200 px-4"
-          >
-            <RefreshCcw
-              size={16}
-              className={isFetching ? "animate-spin" : ""}
-            />
-            Refresh
-          </Button>
         </div>
       </div>
 
