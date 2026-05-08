@@ -1271,6 +1271,29 @@ function ModifierSelectionSection({
     return map;
   }, [selectedModifiers]);
 
+  const renderedItems = useMemo(() => {
+    const selectedIdSet = new Set(selectedIds.map((id) => String(id)));
+    const map = new Map<string, SelectableEntity>();
+
+    selectedIds.forEach((id) => {
+      const item = selectedMap.get(String(id));
+
+      if (item?.id) {
+        map.set(String(item.id), item);
+      }
+    });
+
+    items.forEach((item) => {
+      const id = String(item?.id || "");
+
+      if (!id || selectedIdSet.has(id)) return;
+
+      map.set(id, item);
+    });
+
+    return Array.from(map.values());
+  }, [items, selectedIds, selectedMap]);
+
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
 
@@ -1358,7 +1381,7 @@ function ModifierSelectionSection({
             <Loader2 className="mr-2 animate-spin" size={20} />
             Loading options...
           </div>
-        ) : items.length === 0 ? (
+        ) : renderedItems.length === 0 ? (
           <div className="flex min-h-[170px] flex-col items-center justify-center rounded-[14px] border border-dashed border-gray-200 bg-white p-6 text-center">
             <p className="text-sm font-semibold text-gray-900">{emptyTitle}</p>
             <p className="mt-1 max-w-[320px] text-sm text-gray-500">
@@ -1370,7 +1393,7 @@ function ModifierSelectionSection({
             className="grid max-h-[360px] gap-3 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
             onScroll={handleScroll}
           >
-            {items.map((item) => {
+            {renderedItems.map((item) => {
               const id = String(item?.id || "");
               const selected = selectedIds.includes(id);
 

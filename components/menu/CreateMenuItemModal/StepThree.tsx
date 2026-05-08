@@ -923,6 +923,44 @@ function VariationSelectionSection({
     return map;
   }, [selectedVariations]);
 
+  const renderItems = useMemo(() => {
+    const selectedIdSet = new Set(selectedIds.map((id) => String(id)));
+    const itemMap = new Map<string, SelectableEntity>();
+
+    items.forEach((item) => {
+      const id = String(item?.id || "");
+      if (!id) return;
+      itemMap.set(id, item);
+    });
+
+    const pinnedSelectedItems = selectedIds
+      .map((id) => {
+        const key = String(id);
+        const selectedSnapshot = selectedMap.get(key);
+        const liveItem = itemMap.get(key);
+
+        if (!selectedSnapshot && !liveItem) return null;
+
+        return {
+          ...selectedSnapshot,
+          ...liveItem,
+          id: key,
+          name:
+            liveItem?.name ||
+            selectedSnapshot?.name ||
+            `Selected ${key}`,
+        } as SelectableEntity;
+      })
+      .filter(Boolean) as SelectableEntity[];
+
+    const unselectedItems = items.filter((item) => {
+      const id = String(item?.id || "");
+      return id && !selectedIdSet.has(id);
+    });
+
+    return [...pinnedSelectedItems, ...unselectedItems];
+  }, [items, selectedIds, selectedMap]);
+
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
 
@@ -1010,7 +1048,7 @@ function VariationSelectionSection({
             <Loader2 className="mr-2 animate-spin" size={20} />
             Loading options...
           </div>
-        ) : items.length === 0 ? (
+        ) : renderItems.length === 0 ? (
           <div className="flex min-h-[170px] flex-col items-center justify-center rounded-[14px] border border-dashed border-gray-200 bg-white p-6 text-center">
             <p className="text-sm font-semibold text-gray-900">{emptyTitle}</p>
             <p className="mt-1 max-w-[320px] text-sm text-gray-500">
@@ -1022,7 +1060,7 @@ function VariationSelectionSection({
             className="grid max-h-[430px] gap-3 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
             onScroll={handleScroll}
           >
-            {items.map((item) => {
+            {renderItems.map((item) => {
               const id = String(item?.id || "");
               const selected = selectedIds.includes(id);
 
@@ -1076,8 +1114,6 @@ function VariationSelectionSection({
 
                     {selected ? (
                       <div className="w-full shrink-0 sm:ml-auto sm:w-[160px]">
-                      
-
                         <Input
                           type="number"
                           min={0}
