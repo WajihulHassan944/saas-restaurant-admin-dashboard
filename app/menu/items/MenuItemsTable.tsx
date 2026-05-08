@@ -150,7 +150,7 @@ export default function MenuItemsTable({ refetchKey }: any) {
       limit,
       search: debouncedSearch || undefined,
       restaurantId: restaurantId || undefined,
-      includeAll: statusFilter === "all" ? true : undefined,
+      all: statusFilter === "all" ? true : undefined,
       inactive: statusFilter === "inactive" ? true : undefined,
     }),
     [page, limit, debouncedSearch, restaurantId, statusFilter]
