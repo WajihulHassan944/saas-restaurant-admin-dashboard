@@ -23,7 +23,22 @@ import {
 const schema = z.object({
   name: z.string().trim().min(1, "Item name is required"),
   categoryId: z.string().trim().min(1, "Category is required"),
-  basePrice: z.string().trim().min(1, "Base price is required"),
+
+  basePrice: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (value) => {
+        if (!value) return true;
+
+        const numeric = Number(value);
+        return !Number.isNaN(numeric) && numeric >= 0;
+      },
+      {
+        message: "Base price must be a valid non-negative number",
+      }
+    ),
 });
 
 type Field = keyof z.infer<typeof schema>;
@@ -78,7 +93,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
     const result = schema.safeParse({
       name: form?.name || "",
       categoryId: form?.categoryId || "",
-      basePrice: form?.basePrice || "",
+      basePrice: form?.basePrice ?? "",
     });
 
     if (!result.success) {
@@ -93,15 +108,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
       return false;
     }
 
-    const basePrice = Number(form.basePrice);
-
-    if (Number.isNaN(basePrice) || basePrice < 0) {
-      setErrors((prev) => ({
-        ...prev,
-        basePrice: "Base price must be a valid non-negative number",
-      }));
-      return false;
-    }
+ 
 
     setErrors({});
     return true;
@@ -281,7 +288,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
           type="number"
           min={0}
           value={form.basePrice || ""}
-          placeholder="0"
+          placeholder=""
           onKeyDown={blockInvalidNumberKeys}
           onPaste={blockNegativeNumberPaste}
           onChange={(e) => {
@@ -302,16 +309,7 @@ const StepOne = forwardRef(({ form, setForm }: any, ref: any) => {
         ) : null}
       </div>
 
-      {/* <div className="space-y-2">
-        <Label>SKU</Label>
-
-        <Input
-          value={form.sku || ""}
-          placeholder="Optional item SKU"
-          onChange={(e) => updateForm("sku", e.target.value)}
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
-      </div> */}
+     
 
         <label className="flex items-center gap-2 rounded-[12px] border border-gray-200 bg-white p-3 text-sm">
           <input

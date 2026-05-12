@@ -118,7 +118,30 @@ export default function MenuItemsTable({ refetchKey }: any) {
       STATUS_FILTER_OPTIONS[0],
     [statusFilter]
   );
+const getItemDisplayPrice = (item: any) => {
+  const rawPrice = item?.price ?? item?.basePrice;
 
+  if (rawPrice === null || rawPrice === undefined || rawPrice === "") {
+    return {
+      hasPrice: false,
+      label: "Variation based",
+    };
+  }
+
+  const numericPrice = Number(rawPrice);
+
+  if (Number.isNaN(numericPrice)) {
+    return {
+      hasPrice: false,
+      label: "Variation based",
+    };
+  }
+
+  return {
+    hasPrice: true,
+    label: formatCurrency(numericPrice),
+  };
+};
   const hasActiveFilters = useMemo(() => {
     return Boolean(search.trim() || debouncedSearch || statusFilter !== "active");
   }, [search, debouncedSearch, statusFilter]);
@@ -645,9 +668,23 @@ export default function MenuItemsTable({ refetchKey }: any) {
                     {item.category?.name || item.categoryName || "-"}
                   </td>
 
-                  <td className="px-2 text-center font-medium">
-                    {formatCurrency(item.price ?? item.basePrice ?? 0)}
-                  </td>
+                <td className="px-2 text-center font-medium">
+  {(() => {
+    const price = getItemDisplayPrice(item);
+
+    return (
+      <span
+        className={
+          price.hasPrice
+            ? "text-gray-900"
+            : "rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500"
+        }
+      >
+        {price.label}
+      </span>
+    );
+  })()}
+</td>
 
                   <td className="px-2 text-center">
                     {item.prepTimeMinutes ?? "-"} min
@@ -763,7 +800,21 @@ export default function MenuItemsTable({ refetchKey }: any) {
 
                   <div className="mt-2 flex justify-between">
                     <span className="font-semibold text-primary">
-                      {formatCurrency(item.price ?? item.basePrice ?? 0)}
+                     {(() => {
+  const price = getItemDisplayPrice(item);
+
+  return (
+    <span
+      className={
+        price.hasPrice
+          ? "font-semibold text-primary"
+          : "rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500"
+      }
+    >
+      {price.label}
+    </span>
+  );
+})()}
                     </span>
 
                     <span className="text-xs text-gray-400">
