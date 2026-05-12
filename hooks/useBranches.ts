@@ -15,6 +15,9 @@ import {
   forceDeleteBranch,
   TemporaryClosurePayload,
   updateBranchTemporaryClosure,
+  getBranchHolidayOpeningHours,
+  UpdateBranchHolidayOpeningHoursPayload,
+  updateBranchHolidayOpeningHours,
 } from "@/services/branches";
 import { useRouter } from "next/navigation";
 
@@ -320,6 +323,58 @@ export const useUpdateBranchTemporaryClosure = () => {
     onError: (err: any) => {
       toast.error(
         err?.response?.data?.message || "Failed to update branch closure status"
+      );
+    },
+  });
+};
+
+
+
+
+export const useGetBranchHolidayOpeningHours = (branchId?: string) => {
+  return useQuery({
+    queryKey: ["branch-holiday-opening-hours", branchId],
+    queryFn: () => getBranchHolidayOpeningHours(branchId as string),
+    enabled: Boolean(branchId),
+  });
+};
+
+export const useUpdateBranchHolidayOpeningHours = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      branchId,
+      payload,
+    }: {
+      branchId: string;
+      payload: UpdateBranchHolidayOpeningHoursPayload;
+    }) =>
+      updateBranchHolidayOpeningHours({
+        branchId,
+        payload,
+      }),
+
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["branch-holiday-opening-hours", variables.branchId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["branch", variables.branchId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["branches"],
+      });
+
+      toast.success("Holiday opening hours updated successfully");
+    },
+
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to update holiday opening hours"
       );
     },
   });

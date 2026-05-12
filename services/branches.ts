@@ -155,3 +155,40 @@ export const updateBranchTemporaryClosure = async (
   const { data } = await api.patch(`/branches/${id}/temporary-closure`, payload);
   return data;
 };
+
+
+
+export type BranchHolidayOpeningHour = {
+  date: string;
+  isClosed: boolean;
+  openTime?: string | null;
+  closeTime?: string | null;
+  note?: string | null;
+};
+
+export type UpdateBranchHolidayOpeningHoursPayload = {
+  holidayOpeningHours: BranchHolidayOpeningHour[];
+};
+
+export const getBranchHolidayOpeningHours = async (branchId: string) => {
+  const { data } = await api.get(
+    `/branches/${branchId}/holiday-opening-hours`
+  );
+
+  return data;
+};
+
+export const updateBranchHolidayOpeningHours = async ({
+  branchId,
+  payload,
+}: {
+  branchId: string;
+  payload: UpdateBranchHolidayOpeningHoursPayload;
+}) => {
+  const { data } = await api.put(
+    `/branches/${branchId}/holiday-opening-hours`,
+    payload
+  );
+
+  return data;
+};

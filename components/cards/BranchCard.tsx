@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import type { ReactNode } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  CalendarDays,
   Eye,
   Image as ImageIcon,
   Store,
@@ -14,8 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { BranchProps } from "@/types/branch";
 import ActionDropdown from "../shared/ActionDropdown";
-import { useState } from "react";
 import OpeningHoursModal from "../branches/OpeningHoursModal";
+import AddHolidayHoursInfo from "../branches/AddHolidayHoursInfo";
 
 import {
   useDeleteBranch,
@@ -45,27 +48,24 @@ export default function BranchCard({
   logoUrl,
 }: BranchProps & { loading?: boolean }) {
   const [openingHoursOpen, setOpeningHoursOpen] = useState(false);
+  const [holidayHoursOpen, setHolidayHoursOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [coverModalOpen, setCoverModalOpen] = useState(false);
-const [isDeleting, setIsDeleting] = useState(false);
+  const [temporaryClosureOpen, setTemporaryClosureOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const deleteMutation = useDeleteBranch();
   const activateMutation = useActivateBranch();
   const suspendMutation = useSuspendBranch();
-const [temporaryClosureOpen, setTemporaryClosureOpen] = useState(false);
-const { token } = useAuth();
-const { del } = useApi(token);
-  const handleOpenChange = (value: boolean) => {
-    setOpeningHoursOpen(value);
-  };
-
   const temporaryClosureMutation = useUpdateBranchTemporaryClosure();
 
-  const isTemporarilyClosed = Boolean(
-  availability?.isTemporarilyClosed ||
-    availability?.temporaryClosure?.isClosed
-);
+  const { token } = useAuth();
+  const { del } = useApi(token);
 
-const temporaryClosure = availability?.temporaryClosure;
+  const isTemporarilyClosed = Boolean(
+    availability?.isTemporarilyClosed ||
+      availability?.temporaryClosure?.isClosed
+  );
 
   const iconMap = [
     { key: "menu", icon: List },
@@ -73,62 +73,53 @@ const temporaryClosure = availability?.temporaryClosure;
   ];
 
   const Icon =
-    iconMap.find(({ key }) =>
-      name?.toLowerCase().includes(key)
-    )?.icon || Store;
+    iconMap.find(({ key }) => name?.toLowerCase().includes(key))?.icon ||
+    Store;
 
-  /**
-   * ================= DELETE
-   */
- const handleDelete = async () => {
-  try {
-    setIsDeleting(true);
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
 
-    if (openDialog) {
-      // Branch delete
-      await deleteMutation.mutateAsync(id);
-    } else {
-      // Menu delete
-      const res = await del(`/v1/menus/${id}`);
+      if (openDialog) {
+        await deleteMutation.mutateAsync(id);
+      } else {
+        const res = await del(`/v1/menus/${id}`);
 
-      if (res?.error) return;
+        if (res?.error) return;
 
-      toast.success(res?.message || "Menu deleted successfully");
-      window.location.reload();
+        toast.success(res?.message || "Menu deleted successfully");
+        window.location.reload();
+      }
+
+      setDeleteDialogOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete");
+    } finally {
+      setIsDeleting(false);
     }
+  };
 
-    setDeleteDialogOpen(false);
-  } catch (err: any) {
-    console.error(err);
-    toast.error(err.message || "Failed to delete");
-  } finally {
-    setIsDeleting(false);
-  }
-}; 
+  const handleReopenTemporaryClosure = async () => {
+    if (!isTemporarilyClosed) return;
 
+    try {
+      await temporaryClosureMutation.mutateAsync({
+        id,
+        payload: {
+          isClosed: false,
+        },
+      });
 
-const handleReopenTemporaryClosure = async () => {
-  if (!isTemporarilyClosed) return;
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  try {
-    await temporaryClosureMutation.mutateAsync({
-      id,
-      payload: {
-        isClosed: false,
-      },
-    });
-
-    window.location.reload();
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-  /**
-   * ================= ACTIVATE
-   */
   const handleActivate = async () => {
     if (isActive) return;
+
     try {
       await activateMutation.mutateAsync(id);
     } catch (err: any) {
@@ -136,11 +127,9 @@ const handleReopenTemporaryClosure = async () => {
     }
   };
 
-  /**
-   * ================= SUSPEND
-   */
   const handleSuspend = async () => {
     if (!isActive) return;
+
     try {
       await suspendMutation.mutateAsync(id);
     } catch (err: any) {
@@ -148,9 +137,79 @@ const handleReopenTemporaryClosure = async () => {
     }
   };
 
-  /**
-   * ================= SKELETON STATE
-   */
+  const dropdownItems = [
+    openDialog
+      ? {
+          label: "Edit Branch",
+          href: `/branches/edit?branchId=${id}`,
+          icon: <Store size={16} />,
+        }
+      : {
+          label: "Edit Menu",
+          onClick: () => editMenu?.(id),
+          icon: <List size={16} />,
+        },
+
+    ...(openDialog
+      ? [
+          {
+            label: "Opening Hours",
+            onClick: () => setOpeningHoursOpen(true),
+            icon: <Store size={16} />,
+          },
+          {
+            label: "Holiday Hours",
+            onClick: () => setHolidayHoursOpen(true),
+            icon: <CalendarDays size={16} />,
+          },
+          {
+            label: isTemporarilyClosed
+              ? "Already Temporarily Closed"
+              : "Temporary Closure",
+            onClick: !isTemporarilyClosed
+              ? () => setTemporaryClosureOpen(true)
+              : undefined,
+            className: isTemporarilyClosed
+              ? "opacity-50 pointer-events-none"
+              : "",
+            icon: <PauseCircle size={16} />,
+          },
+          {
+            label: "Reopen Branch",
+            onClick: isTemporarilyClosed
+              ? handleReopenTemporaryClosure
+              : undefined,
+            className: !isTemporarilyClosed
+              ? "opacity-50 pointer-events-none"
+              : "",
+            icon: temporaryClosureMutation.isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Power size={16} />
+            ),
+          },
+          {
+            label: "Activate",
+            onClick: !isActive ? handleActivate : undefined,
+            className: isActive ? "opacity-50 pointer-events-none" : "",
+            icon: <Power size={16} />,
+          },
+          {
+            label: "Suspend",
+            onClick: isActive ? handleSuspend : undefined,
+            className: !isActive ? "opacity-50 pointer-events-none" : "",
+            icon: <PauseCircle size={16} />,
+          },
+        ]
+      : []),
+
+    {
+      label: "Delete",
+      onClick: () => setDeleteDialogOpen(true),
+      icon: <Trash size={16} className="text-red-500" />,
+    },
+  ];
+
   if (loading) {
     return (
       <div className="flex items-center justify-between bg-white rounded-[14px] border border-gray-200 px-4 py-4 animate-pulse">
@@ -172,323 +231,187 @@ const handleReopenTemporaryClosure = async () => {
     );
   }
 
-return (
-  <div
-    className={`
-      bg-white rounded-[14px] border border-gray-200
-      p-4 transition
-      ${typeof isActive === "boolean" && !isActive ? "opacity-60" : ""}
-    `}
-  >
-    {/* MOBILE CARD LAYOUT */}
-    <div className="flex flex-col gap-3 lg:hidden">
+  return (
+    <div
+      className={`
+        bg-white rounded-[14px] border border-gray-200
+        p-4 transition
+        ${typeof isActive === "boolean" && !isActive ? "opacity-60" : ""}
+      `}
+    >
+      <div className="flex flex-col gap-3 lg:hidden">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            defaultChecked
+            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+          />
 
-      {/* TOP */}
-      <div className="flex items-center gap-3">
-        <Checkbox
-          defaultChecked
-          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-        />
-
-        <div className="size-10 rounded-lg bg-[#F4F6FA] flex items-center justify-center shrink-0">
-          <Icon size={20} className="text-gray-500" />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-sm font-semibold truncate">{name}</h4>
-
-            {isDefault && (
-              <span className="text-[11px] font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full">
-                main
-              </span>
-            )}
-            {isTemporarilyClosed && (
-  <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-[2px] rounded-full">
-    temporarily closed
-  </span>
-)}
+          <div className="size-10 rounded-lg bg-[#F4F6FA] flex items-center justify-center shrink-0">
+            <Icon size={20} className="text-gray-500" />
           </div>
 
-          <p className="text-xs text-gray-400 mt-1">
-            ID: #{id} • {itemsCount} Items
-          </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-sm font-semibold truncate">{name}</h4>
+
+              {isDefault && (
+                <span className="text-[11px] font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full">
+                  main
+                </span>
+              )}
+
+              {isTemporarilyClosed && (
+                <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-[2px] rounded-full">
+                  temporarily closed
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-400 mt-1">
+              ID: #{id} • {itemsCount} Items
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t">
+          <div className="flex items-center gap-2">
+            {(openDialog || openMenuDetails) && (
+              <ActionButton
+                onClick={() =>
+                  openDialog ? openDialog(id) : openMenuDetails?.(id)
+                }
+              >
+                <Eye size={18} />
+              </ActionButton>
+            )}
+
+            {openDialog && (
+              <ActionButton onClick={() => setCoverModalOpen(true)}>
+                <ImageIcon size={18} />
+              </ActionButton>
+            )}
+          </div>
+
+          <ActionDropdown items={dropdownItems} />
         </div>
       </div>
 
-      {/* ACTION ROW */}
-      <div className="flex items-center justify-between pt-3 border-t">
+      <div className="hidden lg:flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <Checkbox
+            defaultChecked
+            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+          />
 
-        <div className="flex items-center gap-2">
-          {(openDialog || openMenuDetails) && (
-            <ActionButton
-              onClick={() =>
-                openDialog ? openDialog(id) : openMenuDetails?.(id)
-              }
-            >
-              <Eye size={18} />
-            </ActionButton>
+          <div className="size-10 rounded-lg bg-[#F4F6FA] flex items-center justify-center">
+            <Icon size={20} className="text-gray-500" />
+          </div>
+
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className="text-base font-semibold truncate">{name}</h4>
+
+              {isDefault && (
+                <div className="flex items-center">
+                  <span className="size-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full whitespace-nowrap">
+                    main
+                  </span>
+                </div>
+              )}
+
+              {isTemporarilyClosed && (
+                <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-[2px] rounded-full">
+                  temporarily closed
+                </span>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-400">
+              ID: #{id} | {itemsCount} Items
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center border border-gray-200 rounded-[10px] overflow-hidden">
+          {openDialog && (
+            <>
+              <ActionButton onClick={() => openDialog(id)}>
+                <Eye size={18} />
+              </ActionButton>
+              <Divider />
+            </>
+          )}
+
+          {openMenuDetails && (
+            <>
+              <ActionButton onClick={() => openMenuDetails(id)}>
+                <Eye size={18} />
+              </ActionButton>
+              <Divider />
+            </>
           )}
 
           {openDialog && (
-            <ActionButton onClick={() => setCoverModalOpen(true)}>
-              <ImageIcon size={18} />
-            </ActionButton>
+            <>
+              <ActionButton onClick={() => setCoverModalOpen(true)}>
+                <ImageIcon size={18} />
+              </ActionButton>
+              <Divider />
+            </>
           )}
+
+          <ActionDropdown items={dropdownItems} />
         </div>
-
-        <ActionDropdown
-       items={[
-  openDialog
-    ? {
-        label: "Edit Branch",
-        href: `/branches/edit?branchId=${id}`,
-        icon: <Store size={16} />,
-      }
-    : {
-        label: "Edit Menu",
-        onClick: () => editMenu?.(id),
-        icon: <List size={16} />,
-      },
-...(openDialog
-  ? [
-      {
-        label: "Opening Hours",
-        onClick: () => setOpeningHoursOpen(true),
-        icon: <Store size={16} />,
-      },
-      {
-        label: isTemporarilyClosed
-          ? "Already Temporarily Closed"
-          : "Temporary Closure",
-        onClick: !isTemporarilyClosed
-          ? () => setTemporaryClosureOpen(true)
-          : undefined,
-        className: isTemporarilyClosed
-          ? "opacity-50 pointer-events-none"
-          : "",
-        icon: <PauseCircle size={16} />,
-      },
-      {
-        label: "Reopen Branch",
-        onClick: isTemporarilyClosed
-          ? handleReopenTemporaryClosure
-          : undefined,
-        className: !isTemporarilyClosed
-          ? "opacity-50 pointer-events-none"
-          : "",
-        icon: temporaryClosureMutation.isPending ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Power size={16} />
-        ),
-      },
-      {
-        label: "Activate",
-        onClick: !isActive ? handleActivate : undefined,
-        className: isActive ? "opacity-50 pointer-events-none" : "",
-        icon: <Power size={16} />,
-      },
-      {
-        label: "Suspend",
-        onClick: isActive ? handleSuspend : undefined,
-        className: !isActive ? "opacity-50 pointer-events-none" : "",
-        icon: <PauseCircle size={16} />,
-      },
-    ]
-  : []),
-
-  {
-    label: "Delete",
-    onClick: () => setDeleteDialogOpen(true),
-    icon: <Trash size={16} className="text-red-500" />,
-  },
-]}
-        />
       </div>
+
+      <OpeningHoursModal
+        open={openingHoursOpen}
+        onOpenChange={setOpeningHoursOpen}
+        branchId={id}
+        branchName={name}
+      />
+
+      <AddHolidayHoursInfo
+        open={holidayHoursOpen}
+        onOpenChange={setHolidayHoursOpen}
+        branchId={id}
+        branchName={name}
+      />
+
+      <TemporaryBranchClosureModal
+        open={temporaryClosureOpen}
+        onOpenChange={setTemporaryClosureOpen}
+        branchId={id}
+        branchName={name}
+      />
+
+      <DeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        isLoading={isDeleting || deleteMutation.isPending}
+        title={openDialog ? "Delete Branch" : "Delete Menu"}
+        description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
+      />
+
+      <BranchCoverModal
+        open={coverModalOpen}
+        onOpenChange={setCoverModalOpen}
+        branchId={id}
+        branchName={name}
+        coverImage={coverImage}
+        logoUrl={logoUrl}
+      />
     </div>
-
-    {/* DESKTOP (UNCHANGED ORIGINAL STRUCTURE) */}
-    <div className="hidden lg:flex items-center justify-between gap-4">
-      {/* LEFT */}
-      <div className="flex items-center gap-4 min-w-0">
-        <Checkbox
-          defaultChecked
-          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-        />
-
-        <div className="size-10 rounded-lg bg-[#F4F6FA] flex items-center justify-center">
-          <Icon size={20} className="text-gray-500" />
-        </div>
-
-        <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="text-base font-semibold truncate">{name}</h4>
-
-            {isDefault && (
-              <div className="flex items-center">
-                <span className="size-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-[2px] rounded-full whitespace-nowrap">
-                  main
-                </span>
-              </div>
-            )}
-            {isTemporarilyClosed && (
-  <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-[2px] rounded-full">
-    temporarily closed
-  </span>
-)}
-          </div>
-
-          <p className="text-sm text-gray-400">
-            ID: #{id} | {itemsCount} Items
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT */}
-      <div className="flex items-center border border-gray-200 rounded-[10px] overflow-hidden">
-        {openDialog && (
-          <>
-            <ActionButton onClick={() => openDialog(id)}>
-              <Eye size={18} />
-            </ActionButton>
-            <Divider />
-          </>
-        )}
-
-        {openMenuDetails && (
-          <>
-            <ActionButton onClick={() => openMenuDetails(id)}>
-              <Eye size={18} />
-            </ActionButton>
-            <Divider />
-          </>
-        )}
-
-        {openDialog && (
-          <>
-            <ActionButton onClick={() => setCoverModalOpen(true)}>
-              <ImageIcon size={18} />
-            </ActionButton>
-            <Divider />
-          </>
-        )}
-
-        <ActionDropdown
-      items={[
-  openDialog
-    ? {
-        label: "Edit Branch",
-        href: `/branches/edit?branchId=${id}`,
-        icon: <Store size={16} />,
-      }
-    : {
-        label: "Edit Menu",
-        onClick: () => editMenu?.(id),
-        icon: <List size={16} />,
-      },
-
-   ...(openDialog
-  ? [
-      {
-        label: "Opening Hours",
-        onClick: () => setOpeningHoursOpen(true),
-        icon: <Store size={16} />,
-      },
-      {
-        label: isTemporarilyClosed
-          ? "Already Temporarily Closed"
-          : "Temporary Closure",
-        onClick: !isTemporarilyClosed
-          ? () => setTemporaryClosureOpen(true)
-          : undefined,
-        className: isTemporarilyClosed
-          ? "opacity-50 pointer-events-none"
-          : "",
-        icon: <PauseCircle size={16} />,
-      },
-      {
-        label: "Reopen Branch",
-        onClick: isTemporarilyClosed
-          ? handleReopenTemporaryClosure
-          : undefined,
-        className: !isTemporarilyClosed
-          ? "opacity-50 pointer-events-none"
-          : "",
-        icon: temporaryClosureMutation.isPending ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Power size={16} />
-        ),
-      },
-      {
-        label: "Activate",
-        onClick: !isActive ? handleActivate : undefined,
-        className: isActive ? "opacity-50 pointer-events-none" : "",
-        icon: <Power size={16} />,
-      },
-      {
-        label: "Suspend",
-        onClick: isActive ? handleSuspend : undefined,
-        className: !isActive ? "opacity-50 pointer-events-none" : "",
-        icon: <PauseCircle size={16} />,
-      },
-    ]
-  : []),
-
-  {
-    label: "Delete",
-    onClick: () => setDeleteDialogOpen(true),
-    icon: <Trash size={16} className="text-red-500" />,
-  },
-]}
-        />
-      </div>
-    </div>
-
-    {/* MODALS */}
-    <OpeningHoursModal
-      open={openingHoursOpen}
-      onOpenChange={handleOpenChange}
-      branchId={id}
-      branchName={name}
-    />
-<TemporaryBranchClosureModal
-  open={temporaryClosureOpen}
-  onOpenChange={setTemporaryClosureOpen}
-  branchId={id}
-  branchName={name}
-/>
-    <DeleteDialog
-      open={deleteDialogOpen}
-      onOpenChange={setDeleteDialogOpen}
-      onConfirm={handleDelete}
-      isLoading={isDeleting || deleteMutation.isPending}
-      title={openDialog ? "Delete Branch" : "Delete Menu"}
-      description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
-    />
-
-    <BranchCoverModal
-      open={coverModalOpen}
-      onOpenChange={setCoverModalOpen}
-      branchId={id}
-      branchName={name}
-       coverImage={coverImage}   // ✅ add this
-  logoUrl={logoUrl}
-    />
-  </div>
-);
+  );
 }
 
-/**
- * UI
- */
 function ActionButton({
   children,
   onClick,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick?: () => void;
 }) {
   return (
