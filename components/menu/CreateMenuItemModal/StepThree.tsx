@@ -194,7 +194,11 @@ const getVariationSnapshot = (entry: any): SelectableEntity | null => {
     entry?.variation?.id ||
     entry?.menuVariation?.id ||
     source?.id;
-  const name = source?.name || entry?.displayText || entry?.name;
+
+  const name =
+    source?.name ||
+    entry?.displayText ||
+    entry?.name;
 
   if (!id || !hasUsableName(name)) return null;
 
@@ -273,16 +277,48 @@ const resolveVariationDisplayText = ({
   return variationName || existing || "";
 };
 
+const isEmptyValue = (value: any) => {
+  return value === "" || value === null || value === undefined;
+};
+
 const isValidNonNegativeNumber = (value: any) => {
-  if (value === "" || value === null || value === undefined) return false;
+  if (isEmptyValue(value)) return false;
 
   const numeric = Number(value);
 
   return !Number.isNaN(numeric) && numeric >= 0;
 };
 
+const isValidOptionalNonNegativeNumber = (value: any) => {
+  if (isEmptyValue(value)) return true;
+
+  return isValidNonNegativeNumber(value);
+};
+
 const getItemBasePrice = (form: any) => {
-  return sanitizeNonNegativeNumber(String(form?.basePrice ?? "0")) || "0";
+  if (isEmptyValue(form?.basePrice)) return "";
+
+  return sanitizeNonNegativeNumber(String(form?.basePrice));
+};
+
+const getFallbackVariationPrice = ({
+  form,
+  variation,
+}: {
+  form: any;
+  variation?: SelectableEntity;
+}) => {
+  if (!isEmptyValue(variation?.price)) {
+    const variationPrice = sanitizeNonNegativeNumber(String(variation?.price));
+
+    if (variationPrice !== "") return variationPrice;
+  }
+
+  const basePrice = getItemBasePrice(form);
+
+  if (basePrice !== "") return basePrice;
+
+  return "0";
 };
 
 const normalizeTopLevelModifierOverrides = (
@@ -543,7 +579,6 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
 
   useEffect(() => {
     setForm((prev: any) => {
-      const basePrice = getItemBasePrice(prev);
       const modifierIds = resolveModifierIdsFromForm(prev);
       const topLevelModifierOverrides = normalizeTopLevelModifierOverrides(
         prev?.modifierPriceOverrides
@@ -559,6 +594,10 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
           );
 
           const variation = variationMap.get(String(variationId));
+          const fallbackPrice = getFallbackVariationPrice({
+            form: prev,
+            variation,
+          });
 
           const nestedModifierOverrides = modifierIds.map((modifierId) => {
             const existingNested = existing?.modifierPriceOverrides?.find(
@@ -587,7 +626,7 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
               existing?.price !== null &&
               existing.price !== ""
                 ? existing.price
-                : basePrice,
+                : fallbackPrice,
             pickupPrice:
               existing?.pickupPrice !== undefined &&
               existing?.pickupPrice !== null
@@ -625,9 +664,7 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
       return false;
     }
 
-    const basePrice = getItemBasePrice(form);
-
-    if (!isValidNonNegativeNumber(basePrice)) {
+    if (!isValidOptionalNonNegativeNumber(form?.basePrice)) {
       toast.error("Base price must be a valid non-negative number");
       return false;
     }
@@ -645,12 +682,18 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
         (entry) => String(entry.variationId) === String(variationId)
       );
 
+      const variation = variationMap.get(String(variationId));
+      const fallbackPrice = getFallbackVariationPrice({
+        form,
+        variation,
+      });
+
       const variationPrice =
         override?.price !== undefined &&
         override?.price !== null &&
         override.price !== ""
           ? override.price
-          : basePrice;
+          : fallbackPrice;
 
       if (!isValidNonNegativeNumber(variationPrice)) {
         toast.error("Variation prices must be valid non-negative numbers");
@@ -663,9 +706,7 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
         override?.pickupPrice !== null &&
         !isValidNonNegativeNumber(override.pickupPrice)
       ) {
-        toast.error(
-          "Variation pickup prices must be valid non-negative numbers"
-        );
+        toast.error("Variation pickup prices must be valid non-negative numbers");
         return false;
       }
     }
@@ -676,10 +717,19 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
       );
 
       const variation = variationMap.get(String(variationId));
+      const fallbackPrice = getFallbackVariationPrice({
+        form,
+        variation,
+      });
 
       return {
         variationId: String(variationId),
-        price: existing?.price || basePrice,
+        price:
+          existing?.price !== undefined &&
+          existing?.price !== null &&
+          existing.price !== ""
+            ? existing.price
+            : fallbackPrice,
         pickupPrice: existing?.pickupPrice || "",
         displayText: resolveVariationDisplayText({
           existingDisplayText: existing?.displayText,
@@ -717,10 +767,14 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
     validateStep,
   }));
 
-  const getVariationPrice = (variationId: string) => {
-    const override = variationPriceOverrides.find(
+  const getVariationOverride = (variationId: string) => {
+    return variationPriceOverrides.find(
       (entry) => String(entry.variationId) === String(variationId)
     );
+  };
+
+  const getVariationPrice = (variationId: string) => {
+    const override = getVariationOverride(variationId);
 
     if (
       override?.price !== undefined &&
@@ -730,7 +784,85 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
       return override.price;
     }
 
-    return getItemBasePrice(form);
+    return getFallbackVariationPrice({
+      form,
+      variation: variationMap.get(String(variationId)),
+    });
+  };
+
+  const getVariationPickupPrice = (variationId: string) => {
+    const override = getVariationOverride(variationId);
+
+    return override?.pickupPrice || "";
+  };
+
+  const getVariationDisplayText = (variationId: string) => {
+    const override = getVariationOverride(variationId);
+    const variation = variationMap.get(String(variationId));
+
+    return resolveVariationDisplayText({
+      existingDisplayText: override?.displayText,
+      variationName: variation?.name,
+      variationId,
+    });
+  };
+
+  const upsertVariationOverride = ({
+    variationId,
+    patch,
+  }: {
+    variationId: string;
+    patch: Partial<VariationPriceOverride>;
+  }) => {
+    setForm((prev: any) => {
+      const current = normalizeVariationPriceOverrides(
+        prev?.variationPriceOverrides
+      );
+
+      const variation = variationMap.get(String(variationId));
+      const fallbackPrice = getFallbackVariationPrice({
+        form: prev,
+        variation,
+      });
+
+      const existing = current.find(
+        (entry) => String(entry.variationId) === String(variationId)
+      );
+
+      const defaultOverride: VariationPriceOverride = {
+        variationId,
+        price: fallbackPrice,
+        pickupPrice: "",
+        displayText: resolveVariationDisplayText({
+          existingDisplayText: "",
+          variationName: variation?.name,
+          variationId,
+        }),
+        modifierPriceOverrides: [],
+      };
+
+      const next = existing
+        ? current.map((entry) =>
+            String(entry.variationId) === String(variationId)
+              ? {
+                  ...entry,
+                  ...patch,
+                }
+              : entry
+          )
+        : [
+            ...current,
+            {
+              ...defaultOverride,
+              ...patch,
+            },
+          ];
+
+      return {
+        ...prev,
+        variationPriceOverrides: next,
+      };
+    });
   };
 
   const toggleVariation = (id: string) => {
@@ -773,42 +905,41 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
     variationId: string;
     value: string;
   }) => {
-    const sanitized = sanitizeNonNegativeNumber(value);
+    upsertVariationOverride({
+      variationId,
+      patch: {
+        price: sanitizeNonNegativeNumber(value),
+      },
+    });
+  };
 
-    setForm((prev: any) => {
-      const current = normalizeVariationPriceOverrides(
-        prev?.variationPriceOverrides
-      );
-      const basePrice = getItemBasePrice(prev);
+  const handleVariationPickupPriceChange = ({
+    variationId,
+    value,
+  }: {
+    variationId: string;
+    value: string;
+  }) => {
+    upsertVariationOverride({
+      variationId,
+      patch: {
+        pickupPrice: sanitizeNonNegativeNumber(value),
+      },
+    });
+  };
 
-      const exists = current.some(
-        (entry) => String(entry.variationId) === String(variationId)
-      );
-
-      const next = exists
-        ? current.map((entry) =>
-            String(entry.variationId) === String(variationId)
-              ? {
-                  ...entry,
-                  price: sanitized,
-                }
-              : entry
-          )
-        : [
-            ...current,
-            {
-              variationId,
-              price: sanitized || basePrice,
-              pickupPrice: "",
-              displayText: variationMap.get(String(variationId))?.name || "",
-              modifierPriceOverrides: [],
-            },
-          ];
-
-      return {
-        ...prev,
-        variationPriceOverrides: next,
-      };
+  const handleVariationDisplayTextChange = ({
+    variationId,
+    value,
+  }: {
+    variationId: string;
+    value: string;
+  }) => {
+    upsertVariationOverride({
+      variationId,
+      patch: {
+        displayText: value,
+      },
     });
   };
 
@@ -831,8 +962,9 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
             </h3>
 
             <p className="mt-1 text-sm text-gray-600">
-              Select reusable variations for this item. Once selected, the item
-              base price is prefilled inline and can be overridden immediately.
+              Select reusable variations for this item. For each selected
+              variation, define customer-facing display text, standard price,
+              pickup price, and modifier-level overrides.
             </p>
           </div>
         </div>
@@ -840,7 +972,7 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
 
       <VariationSelectionSection
         title="Assign Variations"
-        description="Choose one or more size, portion, or serving options for this item."
+        description="Choose one or more size, portion, or serving options and configure pricing per variation."
         icon={<SlidersHorizontal size={18} />}
         searchValue={variationSearch}
         onSearchChange={setVariationSearch}
@@ -860,7 +992,11 @@ const StepThree = forwardRef(({ form, setForm }: StepThreeProps, ref: any) => {
         onToggle={toggleVariation}
         onClear={clearVariations}
         getPriceValue={getVariationPrice}
+        getPickupPriceValue={getVariationPickupPrice}
+        getDisplayTextValue={getVariationDisplayText}
         onPriceChange={handleVariationPriceChange}
+        onPickupPriceChange={handleVariationPickupPriceChange}
+        onDisplayTextChange={handleVariationDisplayTextChange}
       />
     </div>
   );
@@ -889,7 +1025,11 @@ type VariationSelectionSectionProps = {
   onToggle: (id: string) => void;
   onClear: () => void;
   getPriceValue: (variationId: string) => string;
+  getPickupPriceValue: (variationId: string) => string;
+  getDisplayTextValue: (variationId: string) => string;
   onPriceChange: (payload: { variationId: string; value: string }) => void;
+  onPickupPriceChange: (payload: { variationId: string; value: string }) => void;
+  onDisplayTextChange: (payload: { variationId: string; value: string }) => void;
 };
 
 function VariationSelectionSection({
@@ -911,7 +1051,11 @@ function VariationSelectionSection({
   onToggle,
   onClear,
   getPriceValue,
+  getPickupPriceValue,
+  getDisplayTextValue,
   onPriceChange,
+  onPickupPriceChange,
+  onDisplayTextChange,
 }: VariationSelectionSectionProps) {
   const selectedMap = useMemo(() => {
     const map = new Map<string, SelectableEntity>();
@@ -945,10 +1089,7 @@ function VariationSelectionSection({
           ...selectedSnapshot,
           ...liveItem,
           id: key,
-          name:
-            liveItem?.name ||
-            selectedSnapshot?.name ||
-            `Selected ${key}`,
+          name: liveItem?.name || selectedSnapshot?.name || `Selected ${key}`,
         } as SelectableEntity;
       })
       .filter(Boolean) as SelectableEntity[];
@@ -1010,6 +1151,7 @@ function VariationSelectionSection({
         <div className="mb-4 flex max-h-[92px] flex-wrap gap-2 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]">
           {selectedIds.map((id) => {
             const item = selectedMap.get(String(id));
+            const displayText = getDisplayTextValue(String(id));
 
             return (
               <button
@@ -1018,8 +1160,8 @@ function VariationSelectionSection({
                 onClick={() => onToggle(String(id))}
                 className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/10"
               >
-                <span className="max-w-[180px] truncate">
-                  {item?.name || `Selected ${id}`}
+                <span className="max-w-[220px] truncate">
+                  {displayText || item?.name || `Selected ${id}`}
                 </span>
                 <X size={14} className="shrink-0" />
               </button>
@@ -1057,7 +1199,7 @@ function VariationSelectionSection({
           </div>
         ) : (
           <div
-            className="grid max-h-[430px] gap-3 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
+            className="grid max-h-[520px] gap-3 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
             onScroll={handleScroll}
           >
             {renderItems.map((item) => {
@@ -1069,69 +1211,145 @@ function VariationSelectionSection({
               return (
                 <div
                   key={id}
-                  className={`w-full min-w-0 rounded-[14px] border bg-white p-4 transition ${
+                  className={`w-full min-w-0 rounded-[16px] border bg-white p-4 transition ${
                     selected
                       ? "border-primary shadow-sm ring-2 ring-primary/10"
                       : "border-gray-100 hover:border-primary/30 hover:shadow-sm"
                   }`}
                 >
-                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
-                    <button
-                      type="button"
-                      onClick={() => onToggle(id)}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    >
-                      <div
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border ${
-                          selected
-                            ? "border-primary bg-primary text-white"
-                            : "border-gray-300 bg-white text-transparent"
-                        }`}
+                  <div className="flex min-w-0 flex-col gap-4">
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+                      <button
+                        type="button"
+                        onClick={() => onToggle(id)}
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left"
                       >
-                        <Check size={14} />
-                      </div>
+                        <div
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border ${
+                            selected
+                              ? "border-primary bg-primary text-white"
+                              : "border-gray-300 bg-white text-transparent"
+                          }`}
+                        >
+                          <Check size={14} />
+                        </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="max-w-full truncate text-sm font-semibold text-gray-900">
-                            {item?.name || "Unnamed"}
-                          </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="max-w-full truncate text-sm font-semibold text-gray-900">
+                              {item?.name || "Unnamed"}
+                            </p>
 
-                          {!selected ? (
-                            item?.isActive === false ? (
-                              <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-                                Inactive
-                              </span>
+                            {!selected ? (
+                              item?.isActive === false ? (
+                                <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                                  Inactive
+                                </span>
+                              ) : (
+                                <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                  Active
+                                </span>
+                              )
                             ) : (
-                              <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                                Active
+                              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                Configured
                               </span>
-                            )
+                            )}
+                          </div>
+
+                          {item?.description ? (
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
+                              {item.description}
+                            </p>
                           ) : null}
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                    </div>
 
-                    {selected ? (
-                      <div className="w-full shrink-0 sm:ml-auto sm:w-[160px]">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={getPriceValue(id)}
-                          onKeyDown={blockInvalidNumberKeys}
-                          onPaste={blockNegativeNumberPaste}
-                          onChange={(event) =>
-                            onPriceChange({
-                              variationId: id,
-                              value: event.target.value,
-                            })
-                          }
-                          onClick={(event) => event.stopPropagation()}
-                          placeholder="0"
-                          className="h-[40px] min-w-0 rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
-                        />
-                      </div>
-                    ) : null}
+               {selected ? (
+  <div className="mt-4 rounded-[16px] border border-gray-100 bg-[#FAFAFA] p-4">
+    <div className="mb-4">
+      <p className="text-sm font-semibold text-gray-900">
+        Pricing & Display
+      </p>
+
+      <p className="mt-1 text-xs leading-5 text-gray-500">
+        Customize customer-facing text and prices for delivery and pickup.
+      </p>
+    </div>
+
+    <div className="space-y-4">
+      {/* DISPLAY TEXT FULL WIDTH */}
+      <div className="min-w-0 space-y-1.5">
+        <label className="block text-xs font-medium text-gray-600">
+          Display Text
+        </label>
+
+        <Input
+          value={getDisplayTextValue(id)}
+          onChange={(event) =>
+            onDisplayTextChange({
+              variationId: id,
+              value: event.target.value,
+            })
+          }
+          onClick={(event) => event.stopPropagation()}
+          placeholder="e.g. Medium size option"
+          className="h-[42px] w-full rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+        />
+      </div>
+
+      {/* PRICE FIELDS RESPONSIVE */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0 space-y-1.5">
+          <label className="block text-xs font-medium text-gray-600">
+            Price
+          </label>
+
+          <Input
+            type="number"
+            min={0}
+            value={getPriceValue(id)}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(event) =>
+              onPriceChange({
+                variationId: id,
+                value: event.target.value,
+              })
+            }
+            onClick={(event) => event.stopPropagation()}
+            placeholder="0"
+            className="h-[42px] w-full rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+          />
+        </div>
+
+        <div className="min-w-0 space-y-1.5">
+          <label className="block text-xs font-medium text-gray-600">
+            Pickup Price
+          </label>
+
+          <Input
+            type="number"
+            min={0}
+            value={getPickupPriceValue(id)}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(event) =>
+              onPickupPriceChange({
+                variationId: id,
+                value: event.target.value,
+              })
+            }
+            onClick={(event) => event.stopPropagation()}
+            placeholder="Optional"
+            className="h-[42px] w-full rounded-[12px] border-gray-200 bg-white text-sm focus:border-primary focus:ring-primary/15"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+) : null}
                   </div>
                 </div>
               );
