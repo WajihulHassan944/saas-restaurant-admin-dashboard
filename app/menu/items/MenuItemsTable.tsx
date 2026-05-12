@@ -118,23 +118,57 @@ export default function MenuItemsTable({ refetchKey }: any) {
       STATUS_FILTER_OPTIONS[0],
     [statusFilter]
   );
+  
+const hasItemVariations = (item: any) => {
+  const variationSources = [
+    item?.variations,
+    item?.category?.variations,
+    item?.menuCategory?.variations,
+  ];
+
+  const hasArrayVariations = variationSources.some(
+    (source) => Array.isArray(source) && source.length > 0
+  );
+
+  const hasCountVariations =
+    Number(item?.variationsCount ?? item?.variationCount ?? 0) > 0;
+
+  return hasArrayVariations || hasCountVariations;
+};
+
 const getItemDisplayPrice = (item: any) => {
   const rawPrice = item?.price ?? item?.basePrice;
+  const itemHasVariations = hasItemVariations(item);
 
+  /**
+   * If price/basePrice is missing:
+   * - has variations => show "Variation based"
+   * - no variations => show "$0.00"
+   */
   if (rawPrice === null || rawPrice === undefined || rawPrice === "") {
-    return {
-      hasPrice: false,
-      label: "Variation based",
-    };
+    return itemHasVariations
+      ? {
+          hasPrice: false,
+          label: "Variation based",
+        }
+      : {
+          hasPrice: true,
+          label: formatCurrency(0),
+        };
   }
 
   const numericPrice = Number(rawPrice);
 
   if (Number.isNaN(numericPrice)) {
-    return {
-      hasPrice: false,
-      label: "Variation based",
-    };
+    return itemHasVariations
+      ? {
+          hasPrice: false,
+          label: "Variation based",
+        }
+      : {
+          hasPrice: true,
+          label: formatCurrency(0),
+        };
   }
 
   return {
@@ -142,6 +176,7 @@ const getItemDisplayPrice = (item: any) => {
     label: formatCurrency(numericPrice),
   };
 };
+
   const hasActiveFilters = useMemo(() => {
     return Boolean(search.trim() || debouncedSearch || statusFilter !== "active");
   }, [search, debouncedSearch, statusFilter]);
