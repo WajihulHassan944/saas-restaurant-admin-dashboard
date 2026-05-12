@@ -429,7 +429,6 @@ const { mutate: updateCategoryStatus } = useUpdateMenuCategory();
       }}
       className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm focus:outline-none"
     >
-      <option value="all">Status</option>
       <option value="all">Active</option>
       <option value="active">Inactive</option>
     </select>

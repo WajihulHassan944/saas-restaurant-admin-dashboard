@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FaPen, FaTrash } from "react-icons/fa";
-import { PlusCircle, Search } from "lucide-react";
+import {
+  Filter,
+  Loader2,
+  PlusCircle,
+  RefreshCcw,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import PaginationSection from "@/components/shared/pagination";
@@ -16,50 +23,194 @@ import {
 import VariationModal from "@/components/menu/listing/VariationModal";
 import { useAuth } from "@/hooks/useAuth";
 
+const PAGE_LIMIT = 10;
+
 type SortOrder = "ASC" | "DESC";
 type SortBy = "createdAt" | "name" | "price" | "sortOrder";
+type VariationStatusFilter = "active" | "inactive" | "all";
+
+const STATUS_FILTER_OPTIONS: Array<{
+  label: string;
+  value: VariationStatusFilter;
+  helper: string;
+}> = [
+  {
+    label: "Active",
+    value: "active",
+    helper: "Only active variations",
+  },
+  {
+    label: "Inactive",
+    value: "inactive",
+    helper: "Only inactive variations",
+  },
+  {
+    label: "All",
+    value: "all",
+    helper: "Active and inactive variations",
+  },
+];
+
+const SORT_OPTIONS: Array<{
+  label: string;
+  value: SortBy;
+}> = [
+  {
+    label: "Latest",
+    value: "createdAt",
+  },
+  {
+    label: "Name",
+    value: "name",
+  },
+  {
+    label: "Price",
+    value: "price",
+  },
+  {
+    label: "Priority",
+    value: "sortOrder",
+  },
+];
+
+const extractResponseItems = (response: any) => {
+  if (!response) return [];
+
+  const candidates = [
+    response?.data?.items,
+    response?.data?.variations,
+    response?.data?.data?.items,
+    response?.data?.data?.variations,
+    response?.data?.data,
+    response?.items,
+    response?.variations,
+    response?.data,
+    response,
+  ];
+
+  const raw = candidates.find((candidate) => Array.isArray(candidate));
+
+  return Array.isArray(raw) ? raw : [];
+};
+
+const extractResponseMeta = (response: any) => {
+  return (
+    response?.data?.pagination ||
+    response?.data?.meta ||
+    response?.data?.data?.pagination ||
+    response?.data?.data?.meta ||
+    response?.pagination ||
+    response?.meta ||
+    {}
+  );
+};
+
+const formatPrice = (value: any) => {
+  const numeric = Number(value ?? 0);
+
+  if (Number.isNaN(numeric)) return "0.00";
+
+  return numeric.toFixed(2);
+};
+
+const formatCurrency = (value: any) => {
+  return `$${formatPrice(value)}`;
+};
+
+const getPriorityLabel = (value: any) => {
+  const sortOrderValue = Number(value ?? 0);
+
+  if (sortOrderValue === 0) return "Top";
+  if (sortOrderValue === 10) return "High";
+  if (sortOrderValue === 50) return "Medium";
+  if (sortOrderValue === 100) return "Low";
+
+  return String(sortOrderValue || "-");
+};
 
 export default function VariationsTable() {
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const { user, restaurantId: authRestaurantId } = useAuth();
 
-  const { restaurantId } = useAuth();
+  const restaurantId =
+    authRestaurantId ?? user?.restaurantId ?? user?.tenantId ?? "";
+
+  const [page, setPage] = useState(1);
+  const [limit] = useState(PAGE_LIMIT);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [sortBy, setSortBy] = useState<SortBy>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("DESC");
+  const [statusFilter, setStatusFilter] =
+    useState<VariationStatusFilter>("active");
 
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<any>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  /**
-   * Debounced search:
-   * typing waits before API params update.
-   */
+  const canFetchVariations = Boolean(restaurantId);
+
+  const activeStatusOption = useMemo(() => {
+    return (
+      STATUS_FILTER_OPTIONS.find((option) => option.value === statusFilter) ||
+      STATUS_FILTER_OPTIONS[0]
+    );
+  }, [statusFilter]);
+
+  const hasActiveFilters = useMemo(() => {
+    return Boolean(
+      search.trim() ||
+        debouncedSearch ||
+        statusFilter !== "active" ||
+        sortBy !== "createdAt" ||
+        sortOrder !== "DESC"
+    );
+  }, [search, debouncedSearch, statusFilter, sortBy, sortOrder]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search.trim());
       setPage(1);
-    }, 450);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [search]);
 
-  const queryParams = useMemo(
-    () => ({
+  const queryParams = useMemo(() => {
+    const params: any = {
       page,
       limit,
       restaurantId: restaurantId || undefined,
       search: debouncedSearch || undefined,
       sortBy,
       sortOrder,
-    }),
-    [page, limit, restaurantId, debouncedSearch, sortBy, sortOrder]
-  );
+    };
+
+    if (statusFilter === "active") {
+      params.isActive = true;
+    }
+
+    if (statusFilter === "inactive") {
+      params.inactive = true;
+    }
+
+    if (statusFilter === "all") {
+      params.all = true;
+      params.includeInactive = true;
+    }
+
+    return params;
+  }, [
+    page,
+    limit,
+    restaurantId,
+    debouncedSearch,
+    sortBy,
+    sortOrder,
+    statusFilter,
+  ]);
 
   const {
     data: response,
@@ -72,36 +223,22 @@ export default function VariationsTable() {
     useDeleteMenuVariation();
 
   const items = useMemo(() => {
-    if (!response) return [];
+    return extractResponseItems(response);
+  }, [response]);
 
-    const raw =
-      response?.data?.items ||
-      response?.data?.variations ||
-      response?.data?.data ||
-      response?.items ||
-      response?.variations ||
-      response?.data ||
-      [];
-
-    return Array.isArray(raw) ? raw : [];
+  const meta = useMemo(() => {
+    return extractResponseMeta(response);
   }, [response]);
 
   const pagination = useMemo(() => {
-    const source =
-      response?.data?.pagination ||
-      response?.data?.meta ||
-      response?.pagination ||
-      response?.meta ||
-      {};
-
-    const total = Number(source?.total ?? items.length ?? 0);
-    const currentPage = Number(source?.page ?? page);
-    const pageSize = Number(source?.limit ?? limit);
+    const total = Number(meta?.total ?? items.length ?? 0);
+    const currentPage = Number(meta?.page ?? page);
+    const pageSize = Number(meta?.limit ?? limit);
 
     const totalPages = Number(
-      source?.totalPages ??
-        source?.pages ??
-        (pageSize > 0 ? Math.ceil(total / pageSize) : 1)
+      meta?.totalPages ??
+        meta?.pages ??
+        (total > 0 && pageSize > 0 ? Math.ceil(total / pageSize) : 1)
     );
 
     return {
@@ -109,13 +246,22 @@ export default function VariationsTable() {
       totalPages: totalPages || 1,
       total,
       limit: pageSize || limit,
-      hasNext: source?.hasNext ?? currentPage < (totalPages || 1),
+      hasNext:
+        typeof meta?.hasNext === "boolean"
+          ? meta.hasNext
+          : currentPage < (totalPages || 1),
       hasPrevious:
-        source?.hasPrevious ?? source?.hasPrev ?? currentPage > 1,
+        typeof meta?.hasPrevious === "boolean"
+          ? meta.hasPrevious
+          : typeof meta?.hasPrev === "boolean"
+          ? meta.hasPrev
+          : currentPage > 1,
     };
-  }, [response, items.length, page, limit]);
+  }, [meta, items.length, page, limit]);
 
-  const isTableLoading = isLoading || isFetching;
+  const shouldShowInitialLoader = isLoading && items.length === 0;
+  const shouldShowRefreshing = isFetching && !shouldShowInitialLoader;
+  const shouldShowEmpty = !isLoading && !isFetching && items.length === 0;
 
   const handleDelete = () => {
     if (!deleteId) return;
@@ -138,23 +284,22 @@ export default function VariationsTable() {
     setOpen(true);
   };
 
-  const formatPrice = (value: any) => {
-    const numeric = Number(value ?? 0);
+  const handleManualSearch = () => {
+    if (!canFetchVariations) return;
 
-    if (Number.isNaN(numeric)) return "0.00";
+    const nextSearch = search.trim();
 
-    return numeric.toFixed(2);
+    setPage(1);
+    setDebouncedSearch(nextSearch);
+
+    if (page === 1 && debouncedSearch === nextSearch) {
+      refetch();
+    }
   };
 
-  const getPriorityLabel = (value: any) => {
-    const sortOrderValue = Number(value ?? 0);
-
-    if (sortOrderValue === 0) return "Top";
-    if (sortOrderValue === 10) return "High";
-    if (sortOrderValue === 50) return "Medium";
-    if (sortOrderValue === 100) return "Low";
-
-    return String(sortOrderValue);
+  const handleStatusChange = (value: VariationStatusFilter) => {
+    setStatusFilter(value);
+    setPage(1);
   };
 
   const handleSortByChange = (value: SortBy) => {
@@ -167,15 +312,30 @@ export default function VariationsTable() {
     setPage(1);
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setDebouncedSearch("");
+    setStatusFilter("active");
+    setSortBy("createdAt");
+    setSortOrder("DESC");
+    setPage(1);
+
+    if (!hasActiveFilters) {
+      refetch();
+    }
+  };
+
   const SkeletonRow = () => (
     <tr>
       <td colSpan={7} className="px-4 py-5">
-        <div className="flex animate-pulse items-center gap-4">
-          <div className="h-4 w-[160px] rounded bg-gray-200" />
-          <div className="h-4 w-[220px] rounded bg-gray-200" />
-          <div className="h-4 w-[80px] rounded bg-gray-200" />
-          <div className="h-4 w-[70px] rounded bg-gray-200" />
-          <div className="h-4 w-[70px] rounded bg-gray-200" />
+        <div className="grid animate-pulse grid-cols-[1.2fr_1.6fr_0.7fr_0.7fr_0.7fr_0.7fr_0.6fr] gap-4">
+          <div className="h-4 rounded bg-gray-200" />
+          <div className="h-4 rounded bg-gray-200" />
+          <div className="h-4 rounded bg-gray-200" />
+          <div className="h-4 rounded bg-gray-200" />
+          <div className="h-4 rounded bg-gray-200" />
+          <div className="h-4 rounded bg-gray-200" />
+          <div className="h-4 rounded bg-gray-200" />
         </div>
       </td>
     </tr>
@@ -184,248 +344,386 @@ export default function VariationsTable() {
   const SkeletonCard = () => (
     <div className="animate-pulse rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm">
       <div className="space-y-3">
-        <div className="h-4 w-[160px] rounded bg-gray-200" />
+        <div className="h-4 w-[160px] max-w-full rounded bg-gray-200" />
         <div className="h-3 w-full rounded bg-gray-200" />
-        <div className="h-3 w-[120px] rounded bg-gray-200" />
+        <div className="h-3 w-[120px] max-w-full rounded bg-gray-200" />
       </div>
     </div>
   );
 
+  const EmptyState = () => (
+    <div className="mx-auto max-w-[360px] px-4 py-10 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-500">
+        <SlidersHorizontal size={22} />
+      </div>
+
+      <p className="text-base font-semibold text-gray-900">
+        No variations found
+      </p>
+
+      <p className="mt-1 text-sm leading-6 text-gray-500">
+        {hasActiveFilters
+          ? "No variations match the selected filters. Try changing your search, status, or sorting options."
+          : "Add your first variation like Small, Medium, Large, Regular, or Family."}
+      </p>
+
+      {hasActiveFilters ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleResetFilters}
+          className="mt-4 rounded-[12px]"
+        >
+          <RefreshCcw size={16} className="mr-2" />
+          Reset Filters
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          onClick={openCreateModal}
+          className="mt-4 rounded-[12px] bg-primary text-white hover:bg-primary/90"
+        >
+          <PlusCircle size={18} className="mr-2" />
+          Add Variation
+        </Button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="w-full">
-      <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
+    <div className="w-full max-w-full overflow-hidden">
+      {/* PAGE HEADER */}
+      <div className="mb-5 flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
           <h2 className="text-[20px] font-semibold text-gray-900">
             Menu Variations
           </h2>
 
           <p className="mt-1 text-sm text-gray-500">
-            Create and manage variations that can be reused across menu setup.
+            Create and manage reusable variations for menu setup.
           </p>
         </div>
 
         <Button
           type="button"
           onClick={openCreateModal}
-          className="h-[42px] rounded-[12px] bg-primary px-4 text-white hover:bg-primary/90"
+          className="h-[42px] shrink-0 rounded-[12px] bg-primary px-4 text-white hover:bg-primary/90"
         >
-          <PlusCircle size={18} />
+          <PlusCircle size={18} className="mr-2" />
           Add Variation
         </Button>
       </div>
 
-      <div className="mb-6 rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_190px_150px] md:items-center">
-          <div className="relative">
-            <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
-            />
+      {/* FILTERS */}
+      <div className="mb-6 w-full max-w-full overflow-hidden rounded-[20px] border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+              <Filter size={18} />
+            </div>
 
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search variations by name..."
-              className="h-[44px] w-full rounded-[14px] border border-gray-200 bg-[#FAFAFA] pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-            />
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Variation Filters
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Search by name, email, or identifier. Current view:{" "}
+                <span className="font-medium text-gray-700">
+                  {activeStatusOption.helper}
+                </span>
+              </p>
+            </div>
           </div>
 
-          <select
-            value={sortBy}
-            onChange={(e) => handleSortByChange(e.target.value as SortBy)}
-            className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-          >
-            <option value="createdAt">Sort: Latest</option>
-            <option value="name">Sort: Name</option>
-            <option value="price">Sort: Price</option>
-            <option value="sortOrder">Sort: Priority</option>
-          </select>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-600">
+              Showing {items.length}
+              {pagination.total > 0 ? ` of ${pagination.total}` : ""}
+            </span>
 
-          <select
-            value={sortOrder}
-            onChange={(e) =>
-              handleSortOrderChange(e.target.value as SortOrder)
-            }
-            className="h-[44px] rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+            {shouldShowRefreshing ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">
+                <Loader2 size={12} className="animate-spin" />
+                Refreshing
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12 xl:items-end">
+          {/* SEARCH */}
+          <div className="min-w-0 xl:col-span-4">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              Search
+            </label>
+
+            <div className="relative min-w-0">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+
+              <input
+                placeholder="Search by name, email, or identifier..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleManualSearch();
+                  }
+                }}
+                className="h-[44px] w-full min-w-0 rounded-[14px] border border-gray-200 bg-[#FAFAFA] pl-11 pr-4 text-sm text-gray-800 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
+              />
+            </div>
+          </div>
+
+          {/* STATUS */}
+          <div className="min-w-0 xl:col-span-3">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              Status
+            </label>
+
+            <div className="grid min-w-0 grid-cols-3 gap-2 rounded-[14px] bg-[#F7F7F7] p-1">
+              {STATUS_FILTER_OPTIONS.map((option) => {
+                const isActive = statusFilter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleStatusChange(option.value)}
+                    disabled={!canFetchVariations}
+                    className={`h-[38px] min-w-0 rounded-[11px] px-2 text-xs font-semibold transition ${
+                      isActive
+                        ? "bg-white text-primary shadow-sm ring-1 ring-primary/10"
+                        : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <span className="block truncate">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SORT BY */}
+          <div className="min-w-0 xl:col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              Sort By
+            </label>
+
+            <select
+              value={sortBy}
+              onChange={(event) =>
+                handleSortByChange(event.target.value as SortBy)
+              }
+              disabled={!canFetchVariations}
+              className="h-[44px] w-full min-w-0 rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-4 text-sm text-gray-700 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* SORT ORDER */}
+          <div className="min-w-0 xl:col-span-1">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              Order
+            </label>
+
+            <select
+              value={sortOrder}
+              onChange={(event) =>
+                handleSortOrderChange(event.target.value as SortOrder)
+              }
+              disabled={!canFetchVariations}
+              className="h-[44px] w-full min-w-0 rounded-[14px] border border-gray-200 bg-[#FAFAFA] px-3 text-sm text-gray-700 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="DESC">DESC</option>
+              <option value="ASC">ASC</option>
+            </select>
+          </div>
+
+          <Button
+            disabled={!canFetchVariations}
+            onClick={handleManualSearch}
+            className="h-[44px] rounded-[14px] bg-primary px-5 text-white shadow-sm hover:bg-primary/90 md:w-full xl:col-span-1"
           >
-            <option value="DESC">DESC</option>
-            <option value="ASC">ASC</option>
-          </select>
+            Search
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canFetchVariations || (!hasActiveFilters && !isFetching)}
+            onClick={handleResetFilters}
+            className="h-[44px] rounded-[14px] border-gray-200 px-4 text-gray-700 md:w-full xl:col-span-1"
+          >
+            <RefreshCcw size={15} className="mr-2" />
+            Reset
+          </Button>
         </div>
       </div>
 
-      <div className="hidden overflow-hidden rounded-[18px] border border-gray-100 bg-white shadow-sm md:block">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="px-4 py-4">Name</th>
-                <th className="px-4 py-4">Description</th>
-                <th className="px-4 py-4 text-center">Price</th>
-                <th className="px-4 py-4 text-center">Priority</th>
-                <th className="px-4 py-4 text-center">Default</th>
-                <th className="px-4 py-4 text-center">Status</th>
-                <th className="px-4 py-4 text-center">Actions</th>
+      {!canFetchVariations ? (
+        <div className="rounded-[18px] border border-amber-100 bg-amber-50 p-4 text-sm text-amber-700">
+          Restaurant context is missing. Please select or assign a restaurant
+          before loading variations.
+        </div>
+      ) : null}
+
+      {/* DESKTOP TABLE */}
+      <div className="hidden w-full max-w-full overflow-hidden rounded-[18px] border border-gray-100 bg-white shadow-sm md:block">
+        <table className="w-full table-fixed text-sm">
+          <thead>
+            <tr className="border-b bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="w-[22%] px-4 py-4">Variation</th>
+              <th className="w-[30%] px-4 py-4">Description</th>
+              <th className="w-[11%] px-4 py-4 text-center">Price</th>
+              <th className="w-[11%] px-4 py-4 text-center">Priority</th>
+              <th className="w-[10%] px-4 py-4 text-center">Default</th>
+              <th className="w-[10%] px-4 py-4 text-center">Status</th>
+              <th className="w-[6%] px-4 py-4 text-center">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {shouldShowInitialLoader ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <SkeletonRow key={index} />
+              ))
+            ) : shouldShowEmpty ? (
+              <tr>
+                <td colSpan={7}>
+                  <EmptyState />
+                </td>
               </tr>
-            </thead>
-
-            <tbody>
-              {isTableLoading ? (
-                Array.from({ length: 6 }).map((_, index) => (
-                  <SkeletonRow key={index} />
-                ))
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <div className="mx-auto max-w-[320px]">
-                      <p className="text-base font-semibold text-gray-900">
-                        No variations found
+            ) : (
+              items.map((item: any) => (
+                <tr
+                  key={item.id}
+                  className="border-b border-gray-100 transition hover:bg-[#FAFAFA]"
+                >
+                  <td className="px-4 py-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900">
+                        {item?.name || "-"}
                       </p>
 
-                      <p className="mt-1 text-sm text-gray-500">
-                        Add your first variation like Small, Medium, Large,
-                        Regular, or Family.
+                      <p className="mt-0.5 truncate text-xs text-gray-400">
+                        ID: {item?.id || "-"}
                       </p>
+                    </div>
+                  </td>
 
-                      <Button
+                  <td className="px-4 py-4">
+                    <p className="line-clamp-2 break-words text-gray-600">
+                      {item?.description || "No description"}
+                    </p>
+                  </td>
+
+                  <td className="px-4 py-4 text-center font-semibold text-gray-900">
+                    <span className="block truncate">
+                      {formatCurrency(item?.price)}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-4 text-center">
+                    <span className="inline-flex max-w-full rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                      <span className="truncate">
+                        {getPriorityLabel(item?.sortOrder)}
+                      </span>
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-4 text-center">
+                    <span
+                      className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-medium ${
+                        item?.isDefault
+                          ? "bg-primary/10 text-primary"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      <span className="truncate">
+                        {item?.isDefault ? "Default" : "No"}
+                      </span>
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-4 text-center">
+                    <span
+                      className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-medium ${
+                        item?.isActive
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <span className="truncate">
+                        {item?.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
                         type="button"
-                        onClick={openCreateModal}
-                        className="mt-4 rounded-[12px] bg-primary text-white hover:bg-primary/90"
+                        title="Edit"
+                        onClick={() => openEditModal(item)}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:-translate-y-[1px] hover:border-primary/20 hover:text-primary"
+                        aria-label="Edit variation"
                       >
-                        <PlusCircle size={18} />
-                        Add Variation
-                      </Button>
+                        <FaPen size={13} />
+                      </button>
+
+                      <button
+                        type="button"
+                        title="Delete"
+                        onClick={() => setDeleteId(item.id)}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:-translate-y-[1px] hover:border-red-200 hover:text-red-500"
+                        aria-label="Delete variation"
+                      >
+                        <FaTrash size={13} />
+                      </button>
                     </div>
                   </td>
                 </tr>
-              ) : (
-                items.map((item: any) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-gray-100 transition hover:bg-[#FAFAFA]"
-                  >
-                    <td className="px-4 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-gray-900">
-                          {item?.name || "-"}
-                        </span>
-
-                        <span className="mt-0.5 text-xs text-gray-400">
-                          ID: {item?.id || "-"}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="max-w-[320px] px-4 py-4">
-                      <p className="line-clamp-2 text-gray-600">
-                        {item?.description || "No description"}
-                      </p>
-                    </td>
-
-                    <td className="px-4 py-4 text-center font-semibold text-gray-900">
-                      ${formatPrice(item?.price)}
-                    </td>
-
-                    <td className="px-4 py-4 text-center">
-                      <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                        {getPriorityLabel(item?.sortOrder)}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4 text-center">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                          item?.isDefault
-                            ? "bg-primary/10 text-primary"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {item?.isDefault ? "Default" : "No"}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4 text-center">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                          item?.isActive
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {item?.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(item)}
-                          className="text-gray-500 transition hover:text-primary"
-                          aria-label="Edit variation"
-                        >
-                          <FaPen size={14} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setDeleteId(item.id)}
-                          className="text-gray-500 transition hover:text-red-500"
-                          aria-label="Delete variation"
-                        >
-                          <FaTrash size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
 
         <div className="border-t border-gray-100 px-4 py-4">
           <PaginationSection {...pagination} onPageChange={setPage} />
         </div>
       </div>
 
-      <div className="space-y-4 md:hidden">
-        {isTableLoading ? (
+      {/* MOBILE CARDS */}
+      <div className="w-full max-w-full space-y-4 md:hidden">
+        {shouldShowInitialLoader ? (
           Array.from({ length: 5 }).map((_, index) => (
             <SkeletonCard key={index} />
           ))
-        ) : items.length === 0 ? (
-          <div className="rounded-[18px] border border-dashed border-gray-200 bg-white p-6 text-center">
-            <p className="text-base font-semibold text-gray-900">
-              No variations found
-            </p>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Add variations to reuse them during menu setup.
-            </p>
-
-            <Button
-              type="button"
-              onClick={openCreateModal}
-              className="mt-4 rounded-[12px] bg-primary text-white hover:bg-primary/90"
-            >
-              <PlusCircle size={18} />
-              Add Variation
-            </Button>
+        ) : shouldShowEmpty ? (
+          <div className="rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm">
+            <EmptyState />
           </div>
         ) : (
           items.map((item: any) => (
             <div
               key={item.id}
-              className="rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm"
+              className="w-full max-w-full overflow-hidden rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <h3 className="truncate text-[16px] font-semibold text-gray-900">
                     {item?.name || "-"}
                   </h3>
 
-                  <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+                  <p className="mt-1 line-clamp-2 break-words text-sm text-gray-500">
                     {item?.description || "No description"}
                   </p>
                 </div>
@@ -441,30 +739,37 @@ export default function VariationsTable() {
                 </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <div className="rounded-[12px] bg-[#FAFAFA] p-3">
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
                   <p className="text-xs text-gray-400">Price</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    ${formatPrice(item?.price)}
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {formatCurrency(item?.price)}
                   </p>
                 </div>
 
-                <div className="rounded-[12px] bg-[#FAFAFA] p-3">
+                <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
                   <p className="text-xs text-gray-400">Priority</p>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="truncate text-sm font-semibold text-gray-900">
                     {getPriorityLabel(item?.sortOrder)}
                   </p>
                 </div>
 
-                <div className="rounded-[12px] bg-[#FAFAFA] p-3">
+                <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
                   <p className="text-xs text-gray-400">Default</p>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="truncate text-sm font-semibold text-gray-900">
                     {item?.isDefault ? "Yes" : "No"}
+                  </p>
+                </div>
+
+                <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
+                  <p className="text-xs text-gray-400">ID</p>
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {item?.id || "-"}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-end gap-3">
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => openEditModal(item)}
@@ -487,7 +792,9 @@ export default function VariationsTable() {
           ))
         )}
 
-        <PaginationSection {...pagination} onPageChange={setPage} />
+        <div className="w-full max-w-full overflow-hidden">
+          <PaginationSection {...pagination} onPageChange={setPage} />
+        </div>
       </div>
 
       <VariationModal
@@ -500,7 +807,10 @@ export default function VariationsTable() {
           }
         }}
         initialData={selected}
-        onSuccess={() => refetch()}
+        onSuccess={() => {
+          setPage(1);
+          refetch();
+        }}
       />
 
       <DeleteDialog

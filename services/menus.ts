@@ -70,9 +70,20 @@ export const createMenuVariation = async (payload: MenuVariationValues) => {
   return data;
 };
 
-export const getMenuVariations = async (params?: GetMenuVariationsParams) => {
-  const { data } = await api.get("/menu/variations", { params });
-  return data;
+export const getMenuVariations = async (
+  params?: GetMenuVariationsParams
+) => {
+  const cleanParams = Object.fromEntries(
+    Object.entries(params || {}).filter(([, value]) => {
+      return value !== undefined && value !== null && value !== "";
+    })
+  );
+
+  const response = await api.get("/menu/variations", {
+    params: cleanParams,
+  });
+
+  return response.data;
 };
 
 export const updateMenuVariation = async (

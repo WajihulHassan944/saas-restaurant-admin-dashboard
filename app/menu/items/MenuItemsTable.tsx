@@ -23,7 +23,7 @@ import InfiniteScrollFooter from "@/components/shared/infinite-scroll-footer";
 
 const PAGE_LIMIT = 10;
 
-type MenuItemStatusFilter = "active" | "all" | "inactive";
+type MenuItemStatusFilter = "active" | "inactive";
 
 const STATUS_FILTER_OPTIONS: Array<{
   label: string;
@@ -35,11 +35,7 @@ const STATUS_FILTER_OPTIONS: Array<{
     value: "active",
     helper: "Only active items",
   },
-  {
-    label: "All",
-    value: "all",
-    helper: "Active + inactive",
-  },
+ 
   {
     label: "Inactive",
     value: "inactive",
@@ -150,7 +146,6 @@ export default function MenuItemsTable({ refetchKey }: any) {
       limit,
       search: debouncedSearch || undefined,
       restaurantId: restaurantId || undefined,
-      all: statusFilter === "all" ? true : undefined,
       inactive: statusFilter === "inactive" ? true : undefined,
     }),
     [page, limit, debouncedSearch, restaurantId, statusFilter]
@@ -528,7 +523,7 @@ export default function MenuItemsTable({ refetchKey }: any) {
               Status
             </label>
 
-            <div className="grid grid-cols-3 gap-2 rounded-[14px] bg-[#F7F7F7] p-1">
+            <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-[#F7F7F7] p-1">
               {STATUS_FILTER_OPTIONS.map((option) => {
                 const isActive = statusFilter === option.value;
 

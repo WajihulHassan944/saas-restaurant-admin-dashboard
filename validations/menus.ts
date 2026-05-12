@@ -274,19 +274,36 @@ export type MenuVariationValues = z.infer<typeof menuVariationSchema>;
 export type UpdateMenuVariationValues = z.infer<
   typeof updateMenuVariationSchema
 >;
+export type SortOrder = "ASC" | "DESC";
+
 export type GetMenuVariationsParams = {
   page?: number;
   limit?: number;
+
   search?: string;
-  itemId?: string;
+  sortBy?: string;
+  sortOrder?: SortOrder | string;
+
   restaurantId?: string;
-  isActive?: boolean;
+  categoryId?: string;
+  itemId?: string;
 
   /**
-   * Keep this only if some old screens still pass categoryId.
-   * Remove it after all old category-based variation screens are migrated.
+   * Backend-supported status filters.
+   *
+   * active list:
+   * isActive=true
+   *
+   * inactive list:
+   * inactive=true
+   *
+   * all list:
+   * all=true or includeInactive=true
    */
-  categoryId?: string;
+  isActive?: boolean;
+  inactive?: boolean;
+  includeInactive?: boolean;
+  all?: boolean;
 };
 /**
  * ==============================

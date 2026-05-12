@@ -168,27 +168,22 @@ export const useCreateMenuVariation = () => {
   });
 };
 
-export const useGetMenuVariations = (params?: {
-  page?: number;
-  limit?: number;
-  restaurantId?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: string;
-}) => {
+export const useGetMenuVariations = (
+  params?: GetMenuVariationsParams
+) => {
+  const cleanParams = Object.fromEntries(
+    Object.entries(params || {}).filter(([, value]) => {
+      return value !== undefined && value !== null && value !== "";
+    })
+  );
+
   return useQuery({
-    queryKey: [
-      "menu-variations",
-      params?.page,
-      params?.limit,
-      params?.restaurantId,
-      params?.search,
-      params?.sortBy,
-      params?.sortOrder,
-    ],
+    queryKey: ["menu-variations", cleanParams],
     queryFn: () => getMenuVariations(params),
+    enabled: Boolean(params?.restaurantId),
   });
 };
+
 export const useUpdateMenuVariation = () => {
   const queryClient = useQueryClient();
 
