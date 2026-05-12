@@ -6,24 +6,46 @@ import { FaPen, FaTrash } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useDeleteMenuItem,
+  useDuplicateMenuItem,
   useGetMenuItems,
   useReorderMenuItems,
 } from "@/hooks/useMenus";
 import DeleteDialog from "@/components/dialogs/delete-dialog";
 import {
+  Copy,
   Filter,
   GripVertical,
   Loader2,
+  MoreVertical,
   RefreshCcw,
   Search,
 } from "lucide-react";
 import CreateMenuItemModal from "@/components/menu/CreateMenuItemModal/CreateMenuItemModal";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import InfiniteScrollFooter from "@/components/shared/infinite-scroll-footer";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 const PAGE_LIMIT = 10;
 
 type MenuItemStatusFilter = "active" | "inactive";
+
+const STATUS_FILTER_OPTIONS: Array<{
+  label: string;
+  value: MenuItemStatusFilter;
+  helper: string;
+}> = [
+  {
+    label: "Active",
+    value: "active",
+    helper: "Only active items",
+  },
+  {
+    label: "Inactive",
+    value: "inactive",
+    helper: "Only inactive items",
+  },
+];
+
 const getItemDisplayPrice = (item: any) => {
   const rawPrice = item?.price ?? item?.basePrice;
 
@@ -48,23 +70,6 @@ const getItemDisplayPrice = (item: any) => {
     label: formatCurrency(numericPrice),
   };
 };
-const STATUS_FILTER_OPTIONS: Array<{
-  label: string;
-  value: MenuItemStatusFilter;
-  helper: string;
-}> = [
-  {
-    label: "Active",
-    value: "active",
-    helper: "Only active items",
-  },
- 
-  {
-    label: "Inactive",
-    value: "inactive",
-    helper: "Only inactive items",
-  },
-];
 
 const extractResponseItems = (response: any) => {
   if (!response) return null;
@@ -132,6 +137,7 @@ export default function MenuItemsTable({ refetchKey }: any) {
   const [open, setOpen] = useState(false);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
 
   const canFetchItems = Boolean(restaurantId);
 
@@ -146,12 +152,6 @@ export default function MenuItemsTable({ refetchKey }: any) {
     return Boolean(search.trim() || debouncedSearch || statusFilter !== "active");
   }, [search, debouncedSearch, statusFilter]);
 
-  /**
-   * Important:
-   * Do not clear allItems inside debounce.
-   * On initial mount, the empty search debounce can fire after the first
-   * successful API response and wipe the list.
-   */
   useEffect(() => {
     const timer = setTimeout(() => {
       const nextSearch = search.trim();
@@ -203,6 +203,9 @@ export default function MenuItemsTable({ refetchKey }: any) {
 
   const { mutate: deleteMenuItem, isPending: isDeleting } =
     useDeleteMenuItem();
+
+  const { mutate: duplicateMenuItem, isPending: isDuplicating } =
+    useDuplicateMenuItem();
 
   const { mutate: reorderItems, isPending: isReordering } =
     useReorderMenuItems();
@@ -345,9 +348,30 @@ export default function MenuItemsTable({ refetchKey }: any) {
         );
 
         setDeleteId(null);
+        setOpenActionId(null);
         refetch();
       },
     });
+  };
+
+  const handleDuplicate = (menuItemId: string) => {
+    duplicateMenuItem(menuItemId, {
+      onSuccess: () => {
+        setOpenActionId(null);
+        resetAndFetchFirstPage();
+      },
+    });
+  };
+
+  const handleEdit = (item: any) => {
+    setSelected(item);
+    setOpen(true);
+    setOpenActionId(null);
+  };
+
+  const handleDeleteOpen = (itemId: string) => {
+    setDeleteId(itemId);
+    setOpenActionId(null);
   };
 
   const buildReorderPayload = (items: any[]) => ({
@@ -492,7 +516,7 @@ export default function MenuItemsTable({ refetchKey }: any) {
                 Menu Item Filters
               </h3>
               <p className="mt-1 text-xs text-gray-500">
-                Filter menu items by keyword and active status. Current view: {" "}
+                Filter menu items by keyword and active status. Current view:{" "}
                 <span className="font-medium text-gray-700">
                   {activeStatusOption.helper}
                 </span>
@@ -668,23 +692,23 @@ export default function MenuItemsTable({ refetchKey }: any) {
                     {item.category?.name || item.categoryName || "-"}
                   </td>
 
-                <td className="px-2 text-center font-medium">
-  {(() => {
-    const price = getItemDisplayPrice(item);
+                  <td className="px-2 text-center font-medium">
+                    {(() => {
+                      const price = getItemDisplayPrice(item);
 
-    return (
-      <span
-        className={
-          price.hasPrice
-            ? "text-gray-900"
-            : "rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500"
-        }
-      >
-        {price.label}
-      </span>
-    );
-  })()}
-</td>
+                      return (
+                        <span
+                          className={
+                            price.hasPrice
+                              ? "text-gray-900"
+                              : "rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500"
+                          }
+                        >
+                          {price.label}
+                        </span>
+                      );
+                    })()}
+                  </td>
 
                   <td className="px-2 text-center">
                     {item.prepTimeMinutes ?? "-"} min
@@ -703,28 +727,20 @@ export default function MenuItemsTable({ refetchKey }: any) {
                   </td>
 
                   <td className="px-2 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        title="Edit"
-                        onClick={() => {
-                          setSelected(item);
-                          setOpen(true);
-                        }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:-translate-y-[1px] hover:border-primary/20 hover:text-primary"
-                      >
-                        <FaPen size={13} />
-                      </button>
-
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => setDeleteId(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:-translate-y-[1px] hover:border-red-200 hover:text-red-500"
-                      >
-                        <FaTrash size={13} />
-                      </button>
-                    </div>
+                    <ActionDropdown
+                      item={item}
+                      isOpen={openActionId === item.id}
+                      isDuplicating={isDuplicating}
+                      onToggle={() =>
+                        setOpenActionId((prev) =>
+                          prev === item.id ? null : item.id
+                        )
+                      }
+                      onClose={() => setOpenActionId(null)}
+                      onDuplicate={handleDuplicate}
+                      onEdit={handleEdit}
+                      onDelete={handleDeleteOpen}
+                    />
                   </td>
                 </tr>
               ))
@@ -751,7 +767,8 @@ export default function MenuItemsTable({ refetchKey }: any) {
           ))
         ) : shouldShowEmpty ? (
           <div className="py-10 text-center text-gray-400">
-            No menu items found{hasActiveFilters ? " for the selected filters" : ""}
+            No menu items found
+            {hasActiveFilters ? " for the selected filters" : ""}
           </div>
         ) : (
           allItems.map((item: any) => (
@@ -766,11 +783,26 @@ export default function MenuItemsTable({ refetchKey }: any) {
                 draggedId === item.id ? "bg-primary/5 opacity-60" : ""
               }`}
             >
-              <div className="mb-3 flex justify-end">
+              <div className="mb-3 flex items-center justify-between">
                 <div className="flex cursor-grab items-center gap-1 text-xs text-gray-400 active:cursor-grabbing">
                   <GripVertical size={16} />
                   Drag
                 </div>
+
+                <ActionDropdown
+                  item={item}
+                  isOpen={openActionId === item.id}
+                  isDuplicating={isDuplicating}
+                  onToggle={() =>
+                    setOpenActionId((prev) =>
+                      prev === item.id ? null : item.id
+                    )
+                  }
+                  onClose={() => setOpenActionId(null)}
+                  onDuplicate={handleDuplicate}
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteOpen}
+                />
               </div>
 
               <div className="flex gap-4">
@@ -799,23 +831,21 @@ export default function MenuItemsTable({ refetchKey }: any) {
                   </div>
 
                   <div className="mt-2 flex justify-between">
-                    <span className="font-semibold text-primary">
-                     {(() => {
-  const price = getItemDisplayPrice(item);
+                    {(() => {
+                      const price = getItemDisplayPrice(item);
 
-  return (
-    <span
-      className={
-        price.hasPrice
-          ? "font-semibold text-primary"
-          : "rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500"
-      }
-    >
-      {price.label}
-    </span>
-  );
-})()}
-                    </span>
+                      return (
+                        <span
+                          className={
+                            price.hasPrice
+                              ? "font-semibold text-primary"
+                              : "rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500"
+                          }
+                        >
+                          {price.label}
+                        </span>
+                      );
+                    })()}
 
                     <span className="text-xs text-gray-400">
                       {item.prepTimeMinutes ?? "-"} min
@@ -832,29 +862,6 @@ export default function MenuItemsTable({ refetchKey }: any) {
                     >
                       {item.isActive ? "Active" : "Inactive"}
                     </span>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        title="Edit"
-                        onClick={() => {
-                          setSelected(item);
-                          setOpen(true);
-                        }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:border-primary/20 hover:text-primary"
-                      >
-                        <FaPen size={13} />
-                      </button>
-
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => setDeleteId(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:border-red-200 hover:text-red-500"
-                      >
-                        <FaTrash size={13} />
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -899,6 +906,163 @@ export default function MenuItemsTable({ refetchKey }: any) {
         title="Delete Menu Item"
         description="Are you sure you want to delete this menu item? This action cannot be undone."
       />
+    </div>
+  );
+}
+
+function ActionDropdown({
+  item,
+  isOpen,
+  isDuplicating,
+  onToggle,
+  onClose,
+  onDuplicate,
+  onEdit,
+  onDelete,
+}: {
+  item: any;
+  isOpen: boolean;
+  isDuplicating: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onDuplicate: (menuItemId: string) => void;
+  onEdit: (item: any) => void;
+  onDelete: (menuItemId: string) => void;
+}) {
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const dropdownRef = useClickOutside<HTMLDivElement>(() => {
+    if (isOpen) {
+      onClose();
+    }
+  });
+
+  const updateDropdownPosition = useCallback(() => {
+    if (!buttonRef.current) return;
+
+    const dropdownWidth = 170;
+    const dropdownHeight = 122;
+    const gap = 8;
+    const viewportPadding = 8;
+
+    const buttonRect = buttonRef.current.getBoundingClientRect();
+
+    const spaceBelow = window.innerHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top;
+
+    const shouldOpenUpward =
+      spaceBelow < dropdownHeight + gap && spaceAbove > dropdownHeight + gap;
+
+    const top = shouldOpenUpward
+      ? buttonRect.top - dropdownHeight - gap
+      : buttonRect.bottom + gap;
+
+    const left = Math.min(
+      Math.max(viewportPadding, buttonRect.right - dropdownWidth),
+      window.innerWidth - dropdownWidth - viewportPadding
+    );
+
+    setDropdownPosition({
+      top: Math.max(viewportPadding, top),
+      left,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDropdownPosition(null);
+      return;
+    }
+
+    updateDropdownPosition();
+
+    window.addEventListener("resize", updateDropdownPosition);
+    window.addEventListener("scroll", updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateDropdownPosition);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+    };
+  }, [isOpen, updateDropdownPosition]);
+
+  return (
+    <div ref={dropdownRef} className="relative flex justify-center">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-expanded={isOpen}
+        aria-label="Menu item actions"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onToggle();
+        }}
+        onMouseDown={(event) => {
+          event.stopPropagation();
+        }}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+      >
+        <MoreVertical size={17} />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="fixed z-[9999] w-[170px] overflow-hidden rounded-[12px] border border-gray-100 bg-white py-1 text-left shadow-lg"
+          style={{
+            top: dropdownPosition?.top ?? 0,
+            left: dropdownPosition?.left ?? 0,
+            visibility: dropdownPosition ? "visible" : "hidden",
+          }}
+        >
+          <button
+            type="button"
+            disabled={isDuplicating}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+
+              if (isDuplicating) return;
+
+              onDuplicate(item.id);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Copy size={15} />
+            {isDuplicating ? "Duplicating..." : "Duplicate"}
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onEdit(item);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+          >
+            <FaPen size={13} />
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onDelete(item.id);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+          >
+            <FaTrash size={13} />
+            Delete
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

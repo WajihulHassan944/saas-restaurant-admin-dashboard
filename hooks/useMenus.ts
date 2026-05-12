@@ -18,6 +18,7 @@ import {
   deleteModifier,
   deleteModifierGroup,
   deleteRestaurantMenu,
+  duplicateMenuItem,
   duplicateModifier,
   getCategoryModifierGroups,
   getMenuById,
@@ -725,6 +726,28 @@ export const useDuplicateModifier = () => {
     onError: (error: any) => {
       toast.error(
         error?.response?.data?.message || "Failed to duplicate modifier"
+      );
+    },
+  });
+};
+
+
+export const useDuplicateMenuItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: duplicateMenuItem,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["menu-item"] });
+
+      toast.success("Menu item duplicated successfully");
+    },
+
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message || "Failed to duplicate menu item"
       );
     },
   });

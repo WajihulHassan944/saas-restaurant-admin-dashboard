@@ -334,6 +334,10 @@ export const duplicateModifier = async (modifierId: string) => {
   return data;
 };
 
+export const duplicateMenuItem = async (menuItemId: string) => {
+  const { data } = await api.post(`/menu/items/${menuItemId}/duplicate`);
+  return data;
+};
 
 export const reorderMenuItems = async (payload: {
   items: {
