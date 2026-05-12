@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import FormInput from "@/components/register/form/FormInput";
 import PageWrapper from "@/components/forms/Promotions/PageWrapper";
 import Section from "@/components/forms/Promotions/Section";
-import AdvanceSettings from "@/components/forms/Promotions/AdvanceSettings";
 import {
   Select,
   SelectContent,
@@ -18,13 +17,35 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
+const isApiError = (res: any) => {
+  return !res || Boolean(res?.error) || res?.success === false;
+};
+
+const getApiErrorMessage = (res: any, fallback: string) => {
+  if (!res) return fallback;
+
+  if (typeof res?.error === "string") return res.error;
+  if (typeof res?.error?.message === "string") return res.error.message;
+  if (typeof res?.message === "string") return res.message;
+  if (typeof res?.data?.message === "string") return res.data.message;
+
+  return fallback;
+};
+
+const normalizeApiArray = (res: any) => {
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (Array.isArray(res?.items)) return res.items;
+  return [];
+};
+
 export default function AddNewCoupon() {
-  const { token } = useAuth();
+  const { token, restaurantId: authRestaurantId, user } = useAuth();
   const { get, post, patch } = useApi(token);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const couponCode = searchParams.get("coupon"); // ✅ detect edit mode
+  const couponCode = searchParams.get("coupon");
 
   const [saving, setSaving] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
@@ -51,81 +72,134 @@ export default function AddNewCoupon() {
   });
 
   const getStoredAuth = () => {
-    const stored = localStorage.getItem("auth");
-    return stored ? JSON.parse(stored) : null;
+    if (typeof window === "undefined") return null;
+
+    try {
+      const stored = localStorage.getItem("auth");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
   };
 
-  // ✅ format ISO → datetime-local
+  const restaurantId = useMemo(() => {
+    const stored = getStoredAuth();
+
+    return (
+      authRestaurantId ||
+      user?.restaurantId ||
+      stored?.user?.restaurantId ||
+      ""
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authRestaurantId, user?.restaurantId]);
+
   const formatDate = (date: string) => {
     if (!date) return "";
-    return new Date(date).toISOString().slice(0, 16);
+
+    const parsed = new Date(date);
+
+    if (Number.isNaN(parsed.getTime())) return "";
+
+    return parsed.toISOString().slice(0, 16);
+  };
+
+  const toOptionalNumber = (value: any) => {
+    if (value === "" || value === null || value === undefined) return undefined;
+
+    const numeric = Number(value);
+
+    return Number.isFinite(numeric) ? numeric : undefined;
+  };
+
+  const cleanPayload = (payload: Record<string, any>) => {
+    return Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => {
+        return value !== undefined && value !== null && value !== "";
+      })
+    );
   };
 
   /* ================= FETCH BASE DATA ================= */
+
   useEffect(() => {
     const fetchData = async () => {
-      const stored = getStoredAuth();
-      const restaurantId = stored?.user?.restaurantId;
-
       if (!restaurantId || !token) return;
 
-      try {
-        const [branchRes, itemRes] = await Promise.all([
-          get(`/v1/branches?restaurantId=${restaurantId}`),
-          get(`/v1/menu/items?restaurantId=${restaurantId}`),
-        ]);
+      const [branchRes, itemRes] = await Promise.all([
+        get(`/v1/branches?restaurantId=${restaurantId}`),
+        get(`/v1/menu/items?restaurantId=${restaurantId}`),
+      ]);
 
-        setBranches(branchRes.data || []);
-        setItems(itemRes.data || []);
-      } catch (err) {
-        console.error(err);
+      if (!isApiError(branchRes)) {
+        setBranches(normalizeApiArray(branchRes));
+      }
+
+      if (!isApiError(itemRes)) {
+        setItems(normalizeApiArray(itemRes));
       }
     };
 
     fetchData();
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, restaurantId]);
 
   /* ================= FETCH EDIT DATA ================= */
+
   useEffect(() => {
     const fetchCoupon = async () => {
       if (!couponCode || !token) return;
 
-      try {
-        setIsEdit(true);
+      setIsEdit(true);
 
-        const res = await get(`/v1/coupons?search=${couponCode}`);
+      const params = new URLSearchParams({
+        search: couponCode,
+      });
 
-       const coupon = res?.data?.[0];
-        if (!coupon) return;
-console.log("coupon is", coupon);
-        setCouponId(coupon.id);
-
-        setForm({
-          code: coupon.code || "",
-          title: coupon.title || "",
-          discountType: coupon.discountType || "FLAT",
-          discountValue: coupon.discountValue || "",
-          startsAt: formatDate(coupon.startsAt),
-          expiresAt: formatDate(coupon.expiresAt),
-          description: coupon.description || "",
-          branchId: coupon.branchId || "",
-          maxDiscountAmount: coupon.maxDiscountAmount || "",
-          minOrderAmount: coupon.minOrderAmount || "",
-          maxUses: coupon.maxUses || "",
-          maxUsesPerCustomer: coupon.maxUsesPerCustomer || "",
-          scopeMenuItemId: coupon.scopeMenuItemId || "",
-          scopeCategoryId: coupon.scopeCategoryId || "",
-        });
-
-      } catch (err) {
-        toast.error("Failed to fetch coupon");
+      if (restaurantId) {
+        params.set("restaurantId", restaurantId);
       }
+
+      const res = await get(`/v1/coupons?${params.toString()}`);
+
+      if (isApiError(res)) {
+        return;
+      }
+
+      const coupons = normalizeApiArray(res);
+      const coupon = coupons?.[0];
+
+      if (!coupon) {
+        toast.error("Coupon not found");
+        return;
+      }
+
+      setCouponId(coupon.id);
+
+      setForm({
+        code: coupon.code || "",
+        title: coupon.title || "",
+        discountType: coupon.discountType || "FLAT",
+        discountValue: coupon.discountValue ?? "",
+        startsAt: formatDate(coupon.startsAt),
+        expiresAt: formatDate(coupon.expiresAt),
+        description: coupon.description || "",
+        branchId: coupon.branchId || "",
+        maxDiscountAmount: coupon.maxDiscountAmount ?? "",
+        minOrderAmount: coupon.minOrderAmount ?? "",
+        maxUses: coupon.maxUses ?? "",
+        maxUsesPerCustomer: coupon.maxUsesPerCustomer ?? "",
+        scopeMenuItemId: coupon.scopeMenuItemId || "",
+        scopeCategoryId: coupon.scopeCategoryId || "",
+      });
     };
 
     fetchCoupon();
-  }, [couponCode, token]);
-console.log("coupon id is", couponId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponCode, token, restaurantId]);
+
   /* ================= HELPERS ================= */
+
   const updateField = (key: string, value: any) => {
     setForm((prev: any) => ({ ...prev, [key]: value }));
   };
@@ -141,44 +215,72 @@ console.log("coupon id is", couponId)
   };
 
   /* ================= SAVE ================= */
+
   const handleSave = async () => {
     if (saving) return;
 
-    if (!form.code || !form.title) {
-      toast.error("Required fields missing");
+    if (!restaurantId) {
+      toast.error("Restaurant id is missing");
+      return;
+    }
+
+    if (!form.code?.trim() || !form.title?.trim()) {
+      toast.error("Coupon title and code are required");
+      return;
+    }
+
+    if (isEdit && !couponId) {
+      toast.error("Coupon id is missing");
       return;
     }
 
     setSaving(true);
 
-    const payload = {
+    const payload = cleanPayload({
       ...form,
-      discountValue: Number(form.discountValue) || 0,
-      maxDiscountAmount: Number(form.maxDiscountAmount) || 0,
-      minOrderAmount: Number(form.minOrderAmount) || 0,
-      maxUses: Number(form.maxUses) || 0,
-      maxUsesPerCustomer: Number(form.maxUsesPerCustomer) || 0,
-    };
+
+      // Required by backend for create/update context
+      restaurantId,
+
+      code: form.code?.trim(),
+      title: form.title?.trim(),
+      description: form.description?.trim() || undefined,
+
+      discountValue: toOptionalNumber(form.discountValue) ?? 0,
+      maxDiscountAmount: toOptionalNumber(form.maxDiscountAmount),
+      minOrderAmount: toOptionalNumber(form.minOrderAmount),
+      maxUses: toOptionalNumber(form.maxUses),
+      maxUsesPerCustomer: toOptionalNumber(form.maxUsesPerCustomer),
+    });
 
     try {
-      let res;
+      let res: any;
 
       if (isEdit) {
-        // ✅ UPDATE
         res = await patch(`/v1/coupons/${couponId}`, payload);
-        toast.success("Coupon updated");
+
+        if (isApiError(res)) {
+          if (res?.success === false) {
+            toast.error(getApiErrorMessage(res, "Failed to update coupon"));
+          }
+          return;
+        }
+
+        toast.success("Coupon updated successfully");
       } else {
-        // ✅ CREATE
         res = await post("/v1/coupons", payload);
-        toast.success("Coupon created");
+
+        if (isApiError(res)) {
+          if (res?.success === false) {
+            toast.error(getApiErrorMessage(res, "Failed to create coupon"));
+          }
+          return;
+        }
+
+        toast.success("Coupon created successfully");
       }
 
-      if (res) {
-        router.push("/promotion-management");
-      }
-
-    } catch (err) {
-      toast.error(isEdit ? "Failed to update coupon" : "Failed to create coupon");
+      router.push("/promotion-management");
     } finally {
       setSaving(false);
     }
@@ -210,7 +312,6 @@ console.log("coupon id is", couponId)
       saving={saving}
       onReset={handleReset}
     >
-
       {/* BASIC */}
       <Section label="Setup Basic Info">
         <FormInput
@@ -330,8 +431,6 @@ console.log("coupon id is", couponId)
           value={form.maxUsesPerCustomer}
           onChange={(val) => updateField("maxUsesPerCustomer", val)}
         />
-
-        <AdvanceSettings branches={branches} />
       </Section>
     </PageWrapper>
   );
