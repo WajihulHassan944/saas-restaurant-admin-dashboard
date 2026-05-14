@@ -525,13 +525,6 @@ const getRawVariationOverrideSource = (initialData?: any) => {
     (link) => link?.variation || link
   );
 
-  /**
-   * Order matters:
-   * - generic/fallback variation objects first
-   * - item-specific variationPriceOverrides last
-   *
-   * This allows item-specific edit values to win.
-   */
   return [
     ...variationLinks,
     ...normalizeArray(initialData?.itemVariations),
@@ -645,6 +638,18 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
       initialData?.maxSelect !== undefined && initialData?.maxSelect !== null
         ? String(initialData.maxSelect)
         : "",
+
+    minQuantity:
+      initialData?.minQuantity !== undefined &&
+      initialData?.minQuantity !== null
+        ? String(initialData.minQuantity)
+        : "1",
+
+    maxQuantity:
+      initialData?.maxQuantity !== undefined &&
+      initialData?.maxQuantity !== null
+        ? String(initialData.maxQuantity)
+        : "5",
 
     variationIds: normalizeIds(
       [
@@ -828,6 +833,12 @@ export default function CreateMenuItemModal({
     const minSelect = Math.max(0, toNumberOrZero(form.minSelect));
     const maxSelect = toOptionalNumber(form.maxSelect);
 
+    const minQuantity = Math.max(1, toNumberOrZero(form.minQuantity || 1));
+    const maxQuantity = Math.max(
+      minQuantity,
+      toNumberOrZero(form.maxQuantity || minQuantity)
+    );
+
     const modifierPriceOverrideMap = new Map<string, ModifierPriceOverride>();
 
     selectedModifierPriceOverrides.forEach((item) => {
@@ -940,6 +951,9 @@ export default function CreateMenuItemModal({
       minSelect,
       maxSelect,
 
+      minQuantity,
+      maxQuantity,
+
       supportsSplitPizza:
         typeof form.supportsSplitPizza === "boolean"
           ? form.supportsSplitPizza
@@ -1007,6 +1021,19 @@ export default function CreateMenuItemModal({
 
     if (form.isRequired && minSelect < 1) {
       toast.error("Required items must have minimum selection of at least 1");
+      return false;
+    }
+
+    const minQuantity = Math.max(1, toNumberOrZero(form.minQuantity || 1));
+    const maxQuantity = Math.max(0, toNumberOrZero(form.maxQuantity || 0));
+
+    if (minQuantity < 1) {
+      toast.error("Minimum quantity must be at least 1");
+      return false;
+    }
+
+    if (maxQuantity < minQuantity) {
+      toast.error("Maximum quantity cannot be less than minimum quantity");
       return false;
     }
 

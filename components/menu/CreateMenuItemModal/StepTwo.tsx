@@ -12,6 +12,7 @@ import {
   Info,
   ListChecks,
   Loader2,
+  PackageCheck,
   Tags,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -48,8 +49,12 @@ const schema = z.object({
   takeawayPriceAdjustment: z.string().optional(),
   depositAmount: z.string().optional(),
   sortOrder: z.string().optional(),
+
   minSelect: z.string().optional(),
   maxSelect: z.string().optional(),
+
+  minQuantity: z.string().optional(),
+  maxQuantity: z.string().optional(),
 });
 
 const PAGE_SIZE = 20;
@@ -179,6 +184,14 @@ const parseOptionalNumber = (value: any): number | null => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
+const parseNumber = (value: any, fallback = 0) => {
+  if (value === "" || value === undefined || value === null) return fallback;
+
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
 const getSelectionSummary = ({
   isRequired,
   minSelect,
@@ -192,22 +205,35 @@ const getSelectionSummary = ({
   const max = parseOptionalNumber(maxSelect);
 
   if (!isRequired && min === 0 && max === null) {
-    return "Optional selection with no maximum limit.";
+    return "Add-ons are optional with no maximum selection limit.";
   }
 
   if (!isRequired && min === 0 && max !== null) {
-    return `Optional selection. Customer can select up to ${max}.`;
+    return `Add-ons are optional. Customer can select up to ${max}.`;
   }
 
   if (isRequired && max !== null) {
-    return `Required selection. Customer must select at least ${min} and up to ${max}.`;
+    return `Add-ons are required. Customer must select at least ${min} and up to ${max}.`;
   }
 
   if (isRequired && max === null) {
-    return `Required selection. Customer must select at least ${min}. No maximum limit.`;
+    return `Add-ons are required. Customer must select at least ${min}. No maximum limit.`;
   }
 
-  return `Customer must select at least ${min}.`;
+  return `Customer must select at least ${min} add-on option(s).`;
+};
+
+const getQuantitySummary = ({
+  minQuantity,
+  maxQuantity,
+}: {
+  minQuantity: string;
+  maxQuantity: string;
+}) => {
+  const min = Math.max(1, parseNumber(minQuantity, 1));
+  const max = Math.max(min, parseNumber(maxQuantity, min));
+
+  return `Customer can order minimum ${min} and maximum ${max} quantity for this item.`;
 };
 
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
@@ -337,6 +363,8 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           "sortOrder",
           "minSelect",
           "maxSelect",
+          "minQuantity",
+          "maxQuantity",
         ].includes(field) &&
         (value === "" || value === null || value === undefined)
       ) {
@@ -370,36 +398,39 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
     if (Number.isNaN(minSelect) || minSelect < 0) {
       setErrors((prev: any) => ({
         ...prev,
-        minSelect: "Minimum selection cannot be negative",
+        minSelect: "Minimum add-on selection cannot be negative",
       }));
-      toast.error("Minimum selection cannot be negative");
+      toast.error("Minimum add-on selection cannot be negative");
       return false;
     }
 
     if (maxSelect !== null && maxSelect < 0) {
       setErrors((prev: any) => ({
         ...prev,
-        maxSelect: "Maximum selection cannot be negative",
+        maxSelect: "Maximum add-on selection cannot be negative",
       }));
-      toast.error("Maximum selection cannot be negative");
+      toast.error("Maximum add-on selection cannot be negative");
       return false;
     }
 
     if (maxSelect !== null && maxSelect < minSelect) {
       setErrors((prev: any) => ({
         ...prev,
-        maxSelect: "Maximum selection cannot be less than minimum selection",
+        maxSelect:
+          "Maximum add-on selection cannot be less than minimum selection",
       }));
-      toast.error("Maximum selection cannot be less than minimum selection");
+      toast.error(
+        "Maximum add-on selection cannot be less than minimum selection"
+      );
       return false;
     }
 
     if (form.isRequired && minSelect < 1) {
       setErrors((prev: any) => ({
         ...prev,
-        minSelect: "Required selection must have minimum value of at least 1",
+        minSelect: "Required add-ons must have minimum value of at least 1",
       }));
-      toast.error("Required selection must have minimum value of at least 1");
+      toast.error("Required add-ons must have minimum value of at least 1");
       return false;
     }
 
@@ -407,6 +438,48 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       const copy = { ...prev };
       delete copy.minSelect;
       delete copy.maxSelect;
+      return copy;
+    });
+
+    return true;
+  };
+
+  const validateQuantityRules = () => {
+    const minQuantity = Number(form.minQuantity || 1);
+    const maxQuantity = Number(form.maxQuantity || 0);
+
+    if (Number.isNaN(minQuantity) || minQuantity < 1) {
+      setErrors((prev: any) => ({
+        ...prev,
+        minQuantity: "Minimum item quantity must be at least 1",
+      }));
+      toast.error("Minimum item quantity must be at least 1");
+      return false;
+    }
+
+    if (Number.isNaN(maxQuantity) || maxQuantity < 1) {
+      setErrors((prev: any) => ({
+        ...prev,
+        maxQuantity: "Maximum item quantity must be at least 1",
+      }));
+      toast.error("Maximum item quantity must be at least 1");
+      return false;
+    }
+
+    if (maxQuantity < minQuantity) {
+      setErrors((prev: any) => ({
+        ...prev,
+        maxQuantity:
+          "Maximum item quantity cannot be less than minimum quantity",
+      }));
+      toast.error("Maximum item quantity cannot be less than minimum quantity");
+      return false;
+    }
+
+    setErrors((prev: any) => {
+      const copy = { ...prev };
+      delete copy.minQuantity;
+      delete copy.maxQuantity;
       return copy;
     });
 
@@ -436,6 +509,10 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       return false;
     }
 
+    if (!validateQuantityRules()) {
+      return false;
+    }
+
     setErrors({});
     return true;
   };
@@ -450,6 +527,11 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
     isRequired: Boolean(form.isRequired),
     minSelect: form.minSelect || "0",
     maxSelect: form.maxSelect || "",
+  });
+
+  const quantitySummary = getQuantitySummary({
+    minQuantity: form.minQuantity || "1",
+    maxQuantity: form.maxQuantity || "5",
   });
 
   return (
@@ -473,11 +555,11 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
 
           <div>
             <h3 className="text-sm font-semibold text-gray-950">
-              Selection Rules
+              Add-on Selection Rules
             </h3>
             <p className="mt-1 text-sm leading-6 text-gray-500">
-              Configure whether selection is required and how many choices a
-              customer can make.
+              Configure whether add-ons are required and how many add-on options
+              a customer can select.
             </p>
           </div>
         </div>
@@ -491,7 +573,8 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
                 {selectionSummary}
               </p>
               <p className="mt-1 text-xs leading-5 text-gray-600">
-                Leave maximum empty when there is no maximum selection limit.
+                These limits are for add-on selections only. Leave maximum empty
+                when there is no maximum add-on limit.
               </p>
             </div>
           </div>
@@ -501,10 +584,10 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           <label className="flex cursor-pointer flex-col gap-3 rounded-[14px] border border-gray-200 bg-[#FAFAFA] p-4 transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-gray-900">
-                Required Selection
+                Required Add-ons
               </p>
               <p className="mt-1 text-xs leading-5 text-gray-500">
-                Enable this when the customer must select at least one option.
+                Enable this when the customer must select at least one add-on.
               </p>
             </div>
 
@@ -526,7 +609,7 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
 
           <div className="space-y-2">
             <Label className="text-sm font-semibold text-gray-900">
-              Min Select
+              Min Add-on Select
             </Label>
 
             <Input
@@ -552,7 +635,7 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
             />
 
             <p className="text-xs leading-5 text-gray-400">
-              Minimum number of options the customer must select.
+              Minimum number of add-on options the customer must select.
             </p>
 
             {errors.minSelect && (
@@ -563,7 +646,7 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           <div className="space-y-2">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Label className="text-sm font-semibold text-gray-900">
-                Max Select
+                Max Add-on Select
               </Label>
 
               <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700">
@@ -608,12 +691,117 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
             />
 
             <p className="text-xs leading-5 text-gray-400">
-              Maximum number of options the customer can select. Enable “No
-              maximum limit” for unlimited selection.
+              Maximum number of add-on options the customer can select.
             </p>
 
             {errors.maxSelect && (
               <p className="text-xs text-red-500">{errors.maxSelect}</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[18px] border border-primary/10 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+            <PackageCheck size={18} />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-950">
+              Item Quantity Limits
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-gray-500">
+              Configure how many units of this item can be ordered.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-[16px] border border-primary/15 bg-primary/[0.04] p-4">
+          <div className="flex items-start gap-3">
+            <Info size={18} className="mt-0.5 shrink-0 text-primary" />
+
+            <div>
+              <p className="text-sm font-semibold text-gray-950">
+                {quantitySummary}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-600">
+                These limits control item quantity, not add-on selection.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-gray-900">
+              Min Item Quantity
+            </Label>
+
+            <Input
+              type="number"
+              min={1}
+              value={form.minQuantity ?? "1"}
+              onKeyDown={blockInvalidNumberKeys}
+              onPaste={blockNegativeNumberPaste}
+              onChange={(event) =>
+                update(
+                  "minQuantity",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              onBlur={(event) =>
+                validateField(
+                  "minQuantity",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              placeholder="1"
+              className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+            />
+
+            <p className="text-xs leading-5 text-gray-400">
+              Minimum quantity allowed per order for this item.
+            </p>
+
+            {errors.minQuantity && (
+              <p className="text-xs text-red-500">{errors.minQuantity}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-gray-900">
+              Max Item Quantity
+            </Label>
+
+            <Input
+              type="number"
+              min={1}
+              value={form.maxQuantity ?? "5"}
+              onKeyDown={blockInvalidNumberKeys}
+              onPaste={blockNegativeNumberPaste}
+              onChange={(event) =>
+                update(
+                  "maxQuantity",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              onBlur={(event) =>
+                validateField(
+                  "maxQuantity",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              placeholder="5"
+              className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+            />
+
+            <p className="text-xs leading-5 text-gray-400">
+              Maximum quantity allowed per order for this item.
+            </p>
+
+            {errors.maxQuantity && (
+              <p className="text-xs text-red-500">{errors.maxQuantity}</p>
             )}
           </div>
         </div>
