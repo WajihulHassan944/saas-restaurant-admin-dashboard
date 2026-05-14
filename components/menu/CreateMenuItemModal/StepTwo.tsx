@@ -1,19 +1,44 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle, useState } from "react";
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { z } from "zod";
+import {
+  AlertCircle,
+  Info,
+  ListChecks,
+  Loader2,
+  Tags,
+} from "lucide-react";
+import { toast } from "sonner";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
+import ImageDropzoneUpload from "@/components/ui/ImageDropzoneUpload";
+import AsyncMultiSelect from "@/components/ui/AsyncMultiSelect";
+
+import { useAuth } from "@/hooks/useAuth";
+import { useGetAllergenAdditiveTemplates } from "@/hooks/useAllergen";
+import { useGetMenuItemLabels } from "@/hooks/useProductLabel";
+
 import {
   blockInvalidNumberKeys,
   blockNegativeNumberPaste,
   sanitizeNonNegativeNumber,
 } from "@/utils/numberInput";
-import ImageDropzoneUpload from "@/components/ui/ImageDropzoneUpload";
 
 type Field = keyof z.infer<typeof schema>;
+
+type OptionItem = {
+  value?: string;
+  code?: string;
+  label: string;
+};
 
 const schema = z.object({
   prepTimeMinutes: z.string().optional(),
@@ -22,13 +47,242 @@ const schema = z.object({
   deliveryPriceAdjustment: z.string().optional(),
   takeawayPriceAdjustment: z.string().optional(),
   depositAmount: z.string().optional(),
+  sortOrder: z.string().optional(),
+  minSelect: z.string().optional(),
+  maxSelect: z.string().optional(),
 });
 
+const PAGE_SIZE = 20;
+
+const normalizeArray = (value: any): string[] => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const normalizeLabelOptions = (response: any): OptionItem[] => {
+  const candidates = [
+    response?.data?.labels,
+    response?.data?.items,
+    response?.data?.data?.labels,
+    response?.data?.data?.items,
+    response?.data?.data,
+    response?.labels,
+    response?.items,
+    response?.data,
+    response,
+  ];
+
+  const raw = candidates.find((candidate) => Array.isArray(candidate));
+
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => ({
+      value: String(item?.value || "").trim(),
+      label: String(item?.label || item?.value || "").trim(),
+    }))
+    .filter((item) => item.value && item.label);
+};
+
+const normalizeAllergenOptions = (response: any): OptionItem[] => {
+  const candidates = [
+    response?.data?.allergens,
+    response?.data?.data?.allergens,
+    response?.allergens,
+    response?.data?.templates?.allergens,
+    response?.templates?.allergens,
+  ];
+
+  const raw = candidates.find((candidate) => Array.isArray(candidate));
+
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => ({
+      code: String(item?.code || "").trim(),
+      label: String(item?.label || item?.code || "").trim(),
+    }))
+    .filter((item) => item.code && item.label);
+};
+
+const createLocalFetchOptions =
+  ({
+    items,
+    keys,
+  }: {
+    items: OptionItem[];
+    keys: Array<keyof OptionItem>;
+  }) =>
+  async ({ search, page }: { search: string; page: number }) => {
+    const keyword = search.trim().toLowerCase();
+
+    const filtered = keyword
+      ? items.filter((item) =>
+          keys.some((key) =>
+            String(item?.[key] || "")
+              .toLowerCase()
+              .includes(keyword)
+          )
+        )
+      : items;
+
+    const start = (page - 1) * PAGE_SIZE;
+    const data = filtered.slice(start, start + PAGE_SIZE);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit: PAGE_SIZE,
+        total: filtered.length,
+        hasNext: start + PAGE_SIZE < filtered.length,
+      },
+    };
+  };
+
+const createSelectedOptions = ({
+  selectedValues,
+  options,
+  valueKey,
+}: {
+  selectedValues: string[];
+  options: OptionItem[];
+  valueKey: "value" | "code";
+}) => {
+  return selectedValues.map((selectedValue) => {
+    const existing = options.find(
+      (option) => String(option?.[valueKey]) === String(selectedValue)
+    );
+
+    if (existing) return existing;
+
+    return {
+      [valueKey]: selectedValue,
+      label: selectedValue,
+    };
+  });
+};
+
+const parseOptionalNumber = (value: any): number | null => {
+  if (value === "" || value === undefined || value === null) return null;
+
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const getSelectionSummary = ({
+  isRequired,
+  minSelect,
+  maxSelect,
+}: {
+  isRequired: boolean;
+  minSelect: string;
+  maxSelect: string;
+}) => {
+  const min = Number(minSelect || 0);
+  const max = parseOptionalNumber(maxSelect);
+
+  if (!isRequired && min === 0 && max === null) {
+    return "Optional selection with no maximum limit.";
+  }
+
+  if (!isRequired && min === 0 && max !== null) {
+    return `Optional selection. Customer can select up to ${max}.`;
+  }
+
+  if (isRequired && max !== null) {
+    return `Required selection. Customer must select at least ${min} and up to ${max}.`;
+  }
+
+  if (isRequired && max === null) {
+    return `Required selection. Customer must select at least ${min}. No maximum limit.`;
+  }
+
+  return `Customer must select at least ${min}.`;
+};
+
 const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
+  const { restaurantId: authRestaurantId, user } = useAuth();
+
+  const restaurantId =
+    authRestaurantId ??
+    user?.restaurantId ??
+    user?.tenantId ??
+    form?.restaurantId;
+
   const [errors, setErrors] = useState<any>({});
   const [imageUploading, setImageUploading] = useState(false);
 
-  const update = (key: string, value: string | boolean) => {
+  const { data: labelsResponse, isLoading: labelsLoading } =
+    useGetMenuItemLabels(
+      restaurantId
+        ? {
+            restaurantId,
+          }
+        : undefined
+    );
+
+  const { data: allergenTemplatesResponse, isLoading: allergensLoading } =
+    useGetAllergenAdditiveTemplates({
+      restaurantId: restaurantId || undefined,
+    });
+
+  const labelOptions = useMemo(() => {
+    return normalizeLabelOptions(labelsResponse);
+  }, [labelsResponse]);
+
+  const allergenOptions = useMemo(() => {
+    return normalizeAllergenOptions(allergenTemplatesResponse);
+  }, [allergenTemplatesResponse]);
+
+  const selectedLabelValues = useMemo(() => {
+    return normalizeArray(form.labels);
+  }, [form.labels]);
+
+  const selectedAllergenCodeValues = useMemo(() => {
+    return normalizeArray(form.allergenCodes);
+  }, [form.allergenCodes]);
+
+  const selectedLabelOptions = useMemo(() => {
+    return createSelectedOptions({
+      selectedValues: selectedLabelValues,
+      options: labelOptions,
+      valueKey: "value",
+    });
+  }, [selectedLabelValues, labelOptions]);
+
+  const selectedAllergenOptions = useMemo(() => {
+    return createSelectedOptions({
+      selectedValues: selectedAllergenCodeValues,
+      options: allergenOptions,
+      valueKey: "code",
+    });
+  }, [selectedAllergenCodeValues, allergenOptions]);
+
+  const fetchLabelOptions = useMemo(() => {
+    return createLocalFetchOptions({
+      items: labelOptions,
+      keys: ["value", "label"],
+    });
+  }, [labelOptions]);
+
+  const fetchAllergenOptions = useMemo(() => {
+    return createLocalFetchOptions({
+      items: allergenOptions,
+      keys: ["code", "label"],
+    });
+  }, [allergenOptions]);
+
+  const update = (key: string, value: any) => {
     setForm((prev: any) => ({
       ...prev,
       [key]: value,
@@ -80,6 +334,9 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
           "deliveryPriceAdjustment",
           "takeawayPriceAdjustment",
           "depositAmount",
+          "sortOrder",
+          "minSelect",
+          "maxSelect",
         ].includes(field) &&
         (value === "" || value === null || value === undefined)
       ) {
@@ -106,6 +363,56 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
     }
   };
 
+  const validateSelectionRules = () => {
+    const minSelect = Number(form.minSelect || 0);
+    const maxSelect = parseOptionalNumber(form.maxSelect);
+
+    if (Number.isNaN(minSelect) || minSelect < 0) {
+      setErrors((prev: any) => ({
+        ...prev,
+        minSelect: "Minimum selection cannot be negative",
+      }));
+      toast.error("Minimum selection cannot be negative");
+      return false;
+    }
+
+    if (maxSelect !== null && maxSelect < 0) {
+      setErrors((prev: any) => ({
+        ...prev,
+        maxSelect: "Maximum selection cannot be negative",
+      }));
+      toast.error("Maximum selection cannot be negative");
+      return false;
+    }
+
+    if (maxSelect !== null && maxSelect < minSelect) {
+      setErrors((prev: any) => ({
+        ...prev,
+        maxSelect: "Maximum selection cannot be less than minimum selection",
+      }));
+      toast.error("Maximum selection cannot be less than minimum selection");
+      return false;
+    }
+
+    if (form.isRequired && minSelect < 1) {
+      setErrors((prev: any) => ({
+        ...prev,
+        minSelect: "Required selection must have minimum value of at least 1",
+      }));
+      toast.error("Required selection must have minimum value of at least 1");
+      return false;
+    }
+
+    setErrors((prev: any) => {
+      const copy = { ...prev };
+      delete copy.minSelect;
+      delete copy.maxSelect;
+      return copy;
+    });
+
+    return true;
+  };
+
   const validateStep = () => {
     if (imageUploading) {
       toast.error("Please wait until image upload is complete");
@@ -125,6 +432,10 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
       return false;
     }
 
+    if (!validateSelectionRules()) {
+      return false;
+    }
+
     setErrors({});
     return true;
   };
@@ -133,8 +444,16 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
     validateStep,
   }));
 
+  const noMaximumLimit = form.maxSelect === "" || form.maxSelect === null;
+
+  const selectionSummary = getSelectionSummary({
+    isRequired: Boolean(form.isRequired),
+    minSelect: form.minSelect || "0",
+    maxSelect: form.maxSelect || "",
+  });
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <ImageDropzoneUpload
         label="Image"
         value={form.imageUrl}
@@ -146,202 +465,530 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
         previewAlt="Item image preview"
       />
 
-      <div className="space-y-2">
-        <Label>Preparation Time (minutes) - Optional</Label>
+      <section className="rounded-[18px] border border-primary/10 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+            <ListChecks size={18} />
+          </div>
 
-        <Input
-          type="number"
-          min={0}
-          value={form.prepTimeMinutes || ""}
-          onKeyDown={blockInvalidNumberKeys}
-          onPaste={blockNegativeNumberPaste}
-          onChange={(e) =>
-            update("prepTimeMinutes", sanitizeNonNegativeNumber(e.target.value))
-          }
-          onBlur={(e) =>
-            validateField(
-              "prepTimeMinutes",
-              sanitizeNonNegativeNumber(e.target.value)
-            )
-          }
-          placeholder="Enter preparation time if applicable"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+          <div>
+            <h3 className="text-sm font-semibold text-gray-950">
+              Selection Rules
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-gray-500">
+              Configure whether selection is required and how many choices a
+              customer can make.
+            </p>
+          </div>
+        </div>
 
-        {errors.prepTimeMinutes && (
-          <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
-        )}
-      </div>
+        <div className="rounded-[16px] border border-primary/15 bg-primary/[0.04] p-4">
+          <div className="flex items-start gap-3">
+            <Info size={18} className="mt-0.5 shrink-0 text-primary" />
 
-      <div className="space-y-2">
-        <Label>Delivery Price Adjustment</Label>
+            <div>
+              <p className="text-sm font-semibold text-gray-950">
+                {selectionSummary}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-600">
+                Leave maximum empty when there is no maximum selection limit.
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <Input
-          type="number"
-          min={0}
-          value={form.deliveryPriceAdjustment || ""}
-          onKeyDown={blockInvalidNumberKeys}
-          onPaste={blockNegativeNumberPaste}
-          onChange={(e) =>
-            update(
-              "deliveryPriceAdjustment",
-              sanitizeNonNegativeNumber(e.target.value)
-            )
-          }
-          onBlur={(e) =>
-            validateField(
-              "deliveryPriceAdjustment",
-              sanitizeNonNegativeNumber(e.target.value)
-            )
-          }
-          placeholder="0"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+        <div className="mt-4 space-y-4">
+          <label className="flex cursor-pointer flex-col gap-3 rounded-[14px] border border-gray-200 bg-[#FAFAFA] p-4 transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">
+                Required Selection
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Enable this when the customer must select at least one option.
+              </p>
+            </div>
 
-        {errors.deliveryPriceAdjustment && (
-          <p className="text-xs text-red-500">
-            {errors.deliveryPriceAdjustment}
-          </p>
-        )}
-      </div>
+            <input
+              type="checkbox"
+              checked={Boolean(form.isRequired)}
+              onChange={(event) => {
+                const checked = event.target.checked;
 
-      <div className="space-y-2">
-        <Label>Takeaway Price Adjustment</Label>
+                update("isRequired", checked);
 
-        <Input
-          type="number"
-          min={0}
-          value={form.takeawayPriceAdjustment || ""}
-          onKeyDown={blockInvalidNumberKeys}
-          onPaste={blockNegativeNumberPaste}
-          onChange={(e) =>
-            update(
-              "takeawayPriceAdjustment",
-              sanitizeNonNegativeNumber(e.target.value)
-            )
-          }
-          onBlur={(e) =>
-            validateField(
-              "takeawayPriceAdjustment",
-              sanitizeNonNegativeNumber(e.target.value)
-            )
-          }
-          placeholder="0"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+                if (checked && Number(form.minSelect || 0) < 1) {
+                  update("minSelect", "1");
+                }
+              }}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
 
-        {errors.takeawayPriceAdjustment && (
-          <p className="text-xs text-red-500">
-            {errors.takeawayPriceAdjustment}
-          </p>
-        )}
-      </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-gray-900">
+              Min Select
+            </Label>
 
-      <div className="space-y-2">
-        <Label>Deposit Amount</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.minSelect ?? "0"}
+              onKeyDown={blockInvalidNumberKeys}
+              onPaste={blockNegativeNumberPaste}
+              onChange={(event) =>
+                update(
+                  "minSelect",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              onBlur={(event) =>
+                validateField(
+                  "minSelect",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              placeholder="0"
+              className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+            />
 
-        <Input
-          type="number"
-          min={0}
-          value={form.depositAmount || ""}
-          onKeyDown={blockInvalidNumberKeys}
-          onPaste={blockNegativeNumberPaste}
-          onChange={(e) =>
-            update("depositAmount", sanitizeNonNegativeNumber(e.target.value))
-          }
-          onBlur={(e) =>
-            validateField(
-              "depositAmount",
-              sanitizeNonNegativeNumber(e.target.value)
-            )
-          }
-          placeholder="0"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+            <p className="text-xs leading-5 text-gray-400">
+              Minimum number of options the customer must select.
+            </p>
 
-        {errors.depositAmount && (
-          <p className="text-xs text-red-500">{errors.depositAmount}</p>
-        )}
-      </div>
+            {errors.minSelect && (
+              <p className="text-xs text-red-500">{errors.minSelect}</p>
+            )}
+          </div>
 
-      <div className="space-y-2">
-        <Label>Ingredients</Label>
+          <div className="space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Label className="text-sm font-semibold text-gray-900">
+                Max Select
+              </Label>
 
-        <Textarea
-          value={form.ingredients || ""}
-          placeholder="e.g. Chicken patty, lettuce, cheese, mayo"
-          onChange={(e) =>
-            setForm((prev: any) => ({
-              ...prev,
-              ingredients: e.target.value,
-            }))
-          }
-          onBlur={(e) => validateField("ingredients", e.target.value)}
-          className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+              <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={noMaximumLimit}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      update("maxSelect", "");
+                      return;
+                    }
 
-        {errors.ingredients && (
-          <p className="text-xs text-red-500">{errors.ingredients}</p>
-        )}
-      </div>
+                    update("maxSelect", form.minSelect || "1");
+                  }}
+                  className="accent-primary"
+                />
+                No maximum limit
+              </label>
+            </div>
 
-      <div className="space-y-2">
-        <Label>Nutritional Information</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.maxSelect ?? ""}
+              disabled={noMaximumLimit}
+              onKeyDown={blockInvalidNumberKeys}
+              onPaste={blockNegativeNumberPaste}
+              onChange={(event) =>
+                update(
+                  "maxSelect",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              onBlur={(event) =>
+                validateField(
+                  "maxSelect",
+                  sanitizeNonNegativeNumber(event.target.value)
+                )
+              }
+              placeholder="No maximum"
+              className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+            />
 
-        <Textarea
-          value={form.nutritionalInformation || ""}
-          placeholder="e.g. 450 kcal, 20g protein, 15g fat"
-          onChange={(e) =>
-            setForm((prev: any) => ({
-              ...prev,
-              nutritionalInformation: e.target.value,
-            }))
-          }
-          onBlur={(e) =>
-            validateField("nutritionalInformation", e.target.value)
-          }
-          className="h-[90px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
+            <p className="text-xs leading-5 text-gray-400">
+              Maximum number of options the customer can select. Enable “No
+              maximum limit” for unlimited selection.
+            </p>
 
-        {errors.nutritionalInformation && (
-          <p className="text-xs text-red-500">
-            {errors.nutritionalInformation}
-          </p>
-        )}
-      </div>
+            {errors.maxSelect && (
+              <p className="text-xs text-red-500">{errors.maxSelect}</p>
+            )}
+          </div>
+        </div>
+      </section>
 
-      <div className="space-y-2">
-        <Label>Dietary Flags</Label>
+      <section className="rounded-[18px] border border-primary/10 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+            <Tags size={18} />
+          </div>
 
-        <Input
-          value={form.dietaryFlags || ""}
-          onChange={(e) => update("dietaryFlags", e.target.value)}
-          placeholder="e.g. halal, vegan, gluten-free"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
-      </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-950">
+              Labels & Allergens
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-gray-500">
+              Attach reusable menu labels and allergen codes from configured
+              templates.
+            </p>
+          </div>
+        </div>
 
-      <div className="space-y-2">
-        <Label>Allergen Flags</Label>
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Labels</Label>
 
-        <Input
-          value={form.allergenFlags || ""}
-          onChange={(e) => update("allergenFlags", e.target.value)}
-          placeholder="e.g. nuts, dairy, soy"
-          className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
-        />
-      </div>
+              {labelsLoading ? (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  Loading
+                </span>
+              ) : null}
+            </div>
 
-      <div className="flex items-center gap-6 pt-2 text-sm text-gray-600">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={form.isActive !== false}
-            onChange={(e) => update("isActive", e.target.checked)}
-            className="accent-primary"
+            <AsyncMultiSelect
+              value={selectedLabelOptions}
+              onChange={(selected) =>
+                update(
+                  "labels",
+                  selected
+                    .map((item: any) => String(item?.value || "").trim())
+                    .filter(Boolean)
+                )
+              }
+              placeholder="Select item labels"
+              fetchOptions={fetchLabelOptions}
+              labelKey="label"
+              valueKey="value"
+              maxSelectedLabelCount={3}
+            />
+
+            <p className="text-xs leading-5 text-gray-400">
+              Example: Vegan, Spicy, Popular, Recommended, New.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Allergen Codes</Label>
+
+              {allergensLoading ? (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  Loading
+                </span>
+              ) : null}
+            </div>
+
+            <AsyncMultiSelect
+              value={selectedAllergenOptions}
+              onChange={(selected) =>
+                update(
+                  "allergenCodes",
+                  selected
+                    .map((item: any) => String(item?.code || "").trim())
+                    .filter(Boolean)
+                )
+              }
+              placeholder="Select allergen codes"
+              fetchOptions={fetchAllergenOptions}
+              labelKey="label"
+              valueKey="code"
+              maxSelectedLabelCount={3}
+            />
+
+            <p className="text-xs leading-5 text-gray-400">
+              Codes are sent to backend in{" "}
+              <span className="font-medium">allergenCodes</span>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <div className="space-y-2">
+          <Label>Preparation Time (minutes)</Label>
+
+          <Input
+            type="number"
+            min={0}
+            value={form.prepTimeMinutes || ""}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(e) =>
+              update(
+                "prepTimeMinutes",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            onBlur={(e) =>
+              validateField(
+                "prepTimeMinutes",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            placeholder="Enter preparation time if applicable"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
           />
-          Active
-        </label>
+
+          {errors.prepTimeMinutes && (
+            <p className="text-xs text-red-500">{errors.prepTimeMinutes}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Sort Order</Label>
+
+          <Input
+            type="number"
+            min={0}
+            value={form.sortOrder || "0"}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(e) =>
+              update("sortOrder", sanitizeNonNegativeNumber(e.target.value))
+            }
+            onBlur={(e) =>
+              validateField(
+                "sortOrder",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            placeholder="0"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.sortOrder && (
+            <p className="text-xs text-red-500">{errors.sortOrder}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Delivery Price Adjustment</Label>
+
+          <Input
+            type="number"
+            min={0}
+            value={form.deliveryPriceAdjustment || ""}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(e) =>
+              update(
+                "deliveryPriceAdjustment",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            onBlur={(e) =>
+              validateField(
+                "deliveryPriceAdjustment",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            placeholder="0"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.deliveryPriceAdjustment && (
+            <p className="text-xs text-red-500">
+              {errors.deliveryPriceAdjustment}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Takeaway Price Adjustment</Label>
+
+          <Input
+            type="number"
+            min={0}
+            value={form.takeawayPriceAdjustment || ""}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(e) =>
+              update(
+                "takeawayPriceAdjustment",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            onBlur={(e) =>
+              validateField(
+                "takeawayPriceAdjustment",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            placeholder="0"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.takeawayPriceAdjustment && (
+            <p className="text-xs text-red-500">
+              {errors.takeawayPriceAdjustment}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Deposit Amount</Label>
+
+          <Input
+            type="number"
+            min={0}
+            value={form.depositAmount || ""}
+            onKeyDown={blockInvalidNumberKeys}
+            onPaste={blockNegativeNumberPaste}
+            onChange={(e) =>
+              update("depositAmount", sanitizeNonNegativeNumber(e.target.value))
+            }
+            onBlur={(e) =>
+              validateField(
+                "depositAmount",
+                sanitizeNonNegativeNumber(e.target.value)
+              )
+            }
+            placeholder="0"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.depositAmount && (
+            <p className="text-xs text-red-500">{errors.depositAmount}</p>
+          )}
+        </div>
+
+        {/* Removed for now as requested.
+        <div className="space-y-2">
+          <Label>Allergen PDF URL</Label>
+
+          <Input
+            value={form.allergenPdfUrl || ""}
+            onChange={(e) => update("allergenPdfUrl", e.target.value)}
+            onBlur={(e) => validateField("allergenPdfUrl", e.target.value)}
+            placeholder="https://example.com/allergen-info.pdf"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.allergenPdfUrl && (
+            <p className="text-xs text-red-500">{errors.allergenPdfUrl}</p>
+          )}
+        </div>
+        */}
+      </section>
+
+      <section className="space-y-5">
+        <div className="space-y-2">
+          <Label>Ingredients</Label>
+
+          <Textarea
+            value={form.ingredients || ""}
+            placeholder="e.g. Chicken patty, lettuce, cheese, mayo"
+            onChange={(e) =>
+              setForm((prev: any) => ({
+                ...prev,
+                ingredients: e.target.value,
+              }))
+            }
+            onBlur={(e) => validateField("ingredients", e.target.value)}
+            className="h-[100px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.ingredients && (
+            <p className="text-xs text-red-500">{errors.ingredients}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Nutritional Information</Label>
+
+          <Textarea
+            value={form.nutritionalInformation || ""}
+            placeholder="e.g. 450 kcal, 20g protein, 15g fat"
+            onChange={(e) =>
+              setForm((prev: any) => ({
+                ...prev,
+                nutritionalInformation: e.target.value,
+              }))
+            }
+            onBlur={(e) =>
+              validateField("nutritionalInformation", e.target.value)
+            }
+            className="h-[100px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          {errors.nutritionalInformation && (
+            <p className="text-xs text-red-500">
+              {errors.nutritionalInformation}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <div className="space-y-2">
+          <Label>Dietary Flags</Label>
+
+          <Input
+            value={form.dietaryFlags || ""}
+            onChange={(e) => update("dietaryFlags", e.target.value)}
+            placeholder="e.g. halal, vegan, gluten-free"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          <p className="text-xs text-gray-400">
+            Comma-separated fallback flags. Labels above are preferred where
+            possible.
+          </p>
+        </div>
+
+        {/* Removed for now as requested.
+        <div className="space-y-2">
+          <Label>Allergen Flags</Label>
+
+          <Input
+            value={form.allergenFlags || ""}
+            onChange={(e) => update("allergenFlags", e.target.value)}
+            placeholder="e.g. nuts, dairy, soy"
+            className="h-[44px] rounded-[12px] border-gray-300 focus:border-gray-400"
+          />
+
+          <p className="text-xs text-gray-400">
+            Comma-separated fallback flags. Allergen Codes above are preferred.
+          </p>
+        </div>
+        */}
+      </section>
+
+      <section className="rounded-[18px] border border-gray-100 bg-[#FAFAFA] p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Item Status</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Control whether this item is visible and available.
+            </p>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100">
+            <input
+              type="checkbox"
+              checked={form.isActive !== false}
+              onChange={(e) => update("isActive", e.target.checked)}
+              className="accent-primary"
+            />
+            Active
+          </label>
+        </div>
+      </section>
+
+      <div className="rounded-[16px] border border-primary/15 bg-primary/[0.04] p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle size={18} className="mt-0.5 shrink-0 text-primary" />
+          <p className="text-sm leading-6 text-gray-700">
+            For add-on style selection, use <strong>Required Selection</strong>,{" "}
+            <strong>Min Select</strong>, and <strong>Max Select</strong>. Leave
+            Max Select empty for unlimited selection.
+          </p>
+        </div>
       </div>
     </div>
   );

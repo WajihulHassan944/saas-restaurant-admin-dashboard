@@ -15,8 +15,9 @@ import {
   FileText,
   Tags,
   PackagePlus,
-  Layers,
   ClipboardList,
+  AlertTriangle,
+  BadgeCheck,
 } from "lucide-react";
 import { PiUsersThree } from "react-icons/pi";
 
@@ -49,32 +50,25 @@ export const menuItems: MenuItem[] = [
     icon: List,
     section: "main",
     children: [
-       {
+      {
         title: "Menu",
         href: "/menu",
         icon: List,
         section: "main",
       },
-        {
+      {
         title: "Categories",
         href: "/menu/categories",
         icon: ClipboardList,
         section: "main",
       },
-
-      // {
-      //   title: "Modifier Groups",
-      //   href: "/menu/modifier-groups",
-      //   icon: Layers,
-      //   section: "main",
-      // },
       {
         title: "Modifiers",
         href: "/menu/modifier",
         icon: Tags,
         section: "main",
       },
-        {
+      {
         title: "Variations",
         href: "/menu/variations",
         icon: ClipboardList,
@@ -84,6 +78,18 @@ export const menuItems: MenuItem[] = [
         title: "Items",
         href: "/menu/items",
         icon: PackagePlus,
+        section: "main",
+      },
+      {
+        title: "Allergen",
+        href: "/menu/allergen",
+        icon: AlertTriangle,
+        section: "main",
+      },
+      {
+        title: "Labels",
+        href: "/menu/labels",
+        icon: BadgeCheck,
         section: "main",
       },
     ],
@@ -144,7 +150,6 @@ export const menuItems: MenuItem[] = [
       },
     ],
   },
-
   {
     title: "Profile",
     href: "/profile",

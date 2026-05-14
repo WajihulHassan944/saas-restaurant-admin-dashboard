@@ -62,6 +62,21 @@ const normalizeArray = (value: any): any[] => {
   return Array.isArray(value) ? value : [];
 };
 
+const normalizeTextArray = (value: any): string[] => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  }
+
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
 const normalizeIds = (sources: any[], type: EntityType): string[] => {
   const ids = new Set<string>();
 
@@ -235,6 +250,14 @@ const toNumberOrZero = (value: any) => {
   const numeric = Number(value);
 
   return Number.isNaN(numeric) ? 0 : numeric;
+};
+
+const toOptionalNumber = (value: any): number | null => {
+  if (value === "" || value === undefined || value === null) return null;
+
+  const numeric = Number(value);
+
+  return Number.isNaN(numeric) ? null : numeric;
 };
 
 const normalizeModifierPriceOverrides = (
@@ -418,28 +441,25 @@ const normalizeVariationPriceOverrides = ({
 
     const isVariationOverrideEntry = Boolean(entry?.variationId);
 
-    const price =
-      isVariationOverrideEntry
-        ? entry?.price ?? itemSpecificOverride?.price ?? variationSource?.price
-        : itemSpecificOverride?.price ?? entry?.price ?? variationSource?.price;
+    const price = isVariationOverrideEntry
+      ? entry?.price ?? itemSpecificOverride?.price ?? variationSource?.price
+      : itemSpecificOverride?.price ?? entry?.price ?? variationSource?.price;
 
-    const pickupPrice =
-      isVariationOverrideEntry
-        ? entry?.pickupPrice ??
-          itemSpecificOverride?.pickupPrice ??
-          variationSource?.pickupPrice
-        : itemSpecificOverride?.pickupPrice ??
-          entry?.pickupPrice ??
-          variationSource?.pickupPrice;
+    const pickupPrice = isVariationOverrideEntry
+      ? entry?.pickupPrice ??
+        itemSpecificOverride?.pickupPrice ??
+        variationSource?.pickupPrice
+      : itemSpecificOverride?.pickupPrice ??
+        entry?.pickupPrice ??
+        variationSource?.pickupPrice;
 
-    const displayText =
-      isVariationOverrideEntry
-        ? entry?.displayText ??
-          itemSpecificOverride?.displayText ??
-          variationSource?.displayText
-        : itemSpecificOverride?.displayText ??
-          entry?.displayText ??
-          variationSource?.displayText;
+    const displayText = isVariationOverrideEntry
+      ? entry?.displayText ??
+        itemSpecificOverride?.displayText ??
+        variationSource?.displayText
+      : itemSpecificOverride?.displayText ??
+        entry?.displayText ??
+        variationSource?.displayText;
 
     map.set(id, {
       variationId: id,
@@ -500,7 +520,6 @@ const normalizeVariationPriceOverrides = ({
   return Array.from(map.values());
 };
 
-
 const getRawVariationOverrideSource = (initialData?: any) => {
   const variationLinks = normalizeArray(initialData?.variationLinks).map(
     (link) => link?.variation || link
@@ -550,11 +569,18 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
     ingredients: initialData?.ingredients || "",
     nutritionalInformation: initialData?.nutritionalInformation || "",
 
+    allergenPdfUrl: initialData?.allergenPdfUrl || "",
+
     imageUrl: initialData?.imageUrl || "",
     imagePreview: initialData?.imageUrl || "",
 
     slug: initialData?.slug || "",
     sku: initialData?.sku || "",
+
+    sortOrder:
+      initialData?.sortOrder !== undefined && initialData?.sortOrder !== null
+        ? String(initialData.sortOrder)
+        : "0",
 
     pricingMode: initialData?.pricingMode || "SINGLE",
 
@@ -587,14 +613,37 @@ const getInitialForm = (restaurantId?: string, initialData?: any) => {
       ? initialData.dietaryFlags.join(", ")
       : initialData?.dietaryFlags || "",
 
+    labels: Array.isArray(initialData?.labels)
+      ? initialData.labels.join(", ")
+      : initialData?.labels || "",
+
     allergenFlags: Array.isArray(initialData?.allergenFlags)
       ? initialData.allergenFlags.join(", ")
       : initialData?.allergenFlags || "",
+
+    allergenCodes: Array.isArray(initialData?.allergenCodes)
+      ? initialData.allergenCodes.join(", ")
+      : initialData?.allergenCodes || "",
 
     depositAmount:
       initialData?.depositAmount !== undefined &&
       initialData?.depositAmount !== null
         ? String(initialData.depositAmount)
+        : "",
+
+    isRequired:
+      typeof initialData?.isRequired === "boolean"
+        ? initialData.isRequired
+        : false,
+
+    minSelect:
+      initialData?.minSelect !== undefined && initialData?.minSelect !== null
+        ? String(initialData.minSelect)
+        : "0",
+
+    maxSelect:
+      initialData?.maxSelect !== undefined && initialData?.maxSelect !== null
+        ? String(initialData.maxSelect)
         : "",
 
     variationIds: normalizeIds(
@@ -691,25 +740,25 @@ export default function CreateMenuItemModal({
     setForm(getInitialForm(restaurantId, initialData));
   }, [open, restaurantId, initialData]);
 
-  const parsedDietaryFlags = useMemo(() => {
-    if (!form.dietaryFlags) return [];
-    if (Array.isArray(form.dietaryFlags)) return form.dietaryFlags;
+  const parsedDietaryFlags = useMemo(
+    () => normalizeTextArray(form.dietaryFlags),
+    [form.dietaryFlags]
+  );
 
-    return String(form.dietaryFlags)
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }, [form.dietaryFlags]);
+  const parsedLabels = useMemo(
+    () => normalizeTextArray(form.labels),
+    [form.labels]
+  );
 
-  const parsedAllergenFlags = useMemo(() => {
-    if (!form.allergenFlags) return [];
-    if (Array.isArray(form.allergenFlags)) return form.allergenFlags;
+  const parsedAllergenFlags = useMemo(
+    () => normalizeTextArray(form.allergenFlags),
+    [form.allergenFlags]
+  );
 
-    return String(form.allergenFlags)
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }, [form.allergenFlags]);
+  const parsedAllergenCodes = useMemo(
+    () => normalizeTextArray(form.allergenCodes),
+    [form.allergenCodes]
+  );
 
   const selectedVariationIds = useMemo(
     () =>
@@ -774,8 +823,10 @@ export default function CreateMenuItemModal({
 
   const buildPayload = () => {
     const generatedSlug = form.slug?.trim() || buildSlug(form.name);
-
     const basePrice = toNumberOrZero(form.basePrice);
+
+    const minSelect = Math.max(0, toNumberOrZero(form.minSelect));
+    const maxSelect = toOptionalNumber(form.maxSelect);
 
     const modifierPriceOverrideMap = new Map<string, ModifierPriceOverride>();
 
@@ -791,6 +842,11 @@ export default function CreateMenuItemModal({
         priceDelta: toNumberOrZero(existing?.priceDelta),
       };
     });
+
+    const finalModifiers = finalModifierPriceOverrides.map((item) => ({
+      modifierId: item.modifierId,
+      priceDelta: item.priceDelta,
+    }));
 
     const topLevelModifierMap = new Map<string, number>();
 
@@ -856,9 +912,11 @@ export default function CreateMenuItemModal({
 
       ingredients: form.ingredients || "",
       nutritionalInformation: form.nutritionalInformation || "",
+      allergenPdfUrl: form.allergenPdfUrl || "",
 
       imageUrl: form.imageUrl || "",
       sku: form.sku || "",
+      sortOrder: toNumberOrZero(form.sortOrder),
 
       pricingMode: form.pricingMode || "SINGLE",
 
@@ -868,19 +926,27 @@ export default function CreateMenuItemModal({
       prepTimeMinutes: toNumberOrZero(form.prepTimeMinutes),
 
       dietaryFlags: parsedDietaryFlags,
+      labels: parsedLabels,
       allergenFlags: parsedAllergenFlags,
+      allergenCodes: parsedAllergenCodes,
 
       depositAmount: toNumberOrZero(form.depositAmount),
 
       isActive: typeof form.isActive === "boolean" ? form.isActive : true,
+
+      isRequired:
+        typeof form.isRequired === "boolean" ? form.isRequired : false,
+
+      minSelect,
+      maxSelect,
 
       supportsSplitPizza:
         typeof form.supportsSplitPizza === "boolean"
           ? form.supportsSplitPizza
           : false,
 
+      modifiers: finalModifiers,
       modifierPriceOverrides: finalModifierPriceOverrides,
-
       variationPriceOverrides: finalVariationPriceOverrides,
     };
   };
@@ -907,6 +973,7 @@ export default function CreateMenuItemModal({
     setForm(getInitialForm(restaurantId, initialData));
     setCurrentStep(1);
   };
+
   const closeOnly = () => {
     setForm(getInitialForm(restaurantId));
     setCurrentStep(1);
@@ -927,6 +994,19 @@ export default function CreateMenuItemModal({
 
     if (!restaurantId && !isEditMode) {
       toast.error("Restaurant id is missing");
+      return false;
+    }
+
+    const minSelect = Math.max(0, toNumberOrZero(form.minSelect));
+    const maxSelect = toOptionalNumber(form.maxSelect);
+
+    if (maxSelect !== null && maxSelect < minSelect) {
+      toast.error("Maximum selection cannot be less than minimum selection");
+      return false;
+    }
+
+    if (form.isRequired && minSelect < 1) {
+      toast.error("Required items must have minimum selection of at least 1");
       return false;
     }
 
