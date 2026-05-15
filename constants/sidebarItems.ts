@@ -18,6 +18,7 @@ import {
   ClipboardList,
   AlertTriangle,
   BadgeCheck,
+  Coins,
 } from "lucide-react";
 import { PiUsersThree } from "react-icons/pi";
 
@@ -110,6 +111,12 @@ export const menuItems: MenuItem[] = [
     title: "Customer Management",
     href: "/customer-settings",
     icon: PiUsersThree,
+    section: "main",
+  },
+  {
+    title: "Loyalty Program",
+    href: "/loyalty",
+    icon: Coins,
     section: "main",
   },
   {
