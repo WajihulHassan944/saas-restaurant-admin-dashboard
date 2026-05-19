@@ -1019,7 +1019,7 @@ const StepTwo = forwardRef(({ form, setForm }: any, ref: any) => {
         </div>
 
         <div className="space-y-2">
-          <Label>Deposit Amount</Label>
+          <Label>Deposit Amount (Pfand)</Label>
 
           <Input
             type="number"
