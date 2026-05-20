@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import PageWrapper from "@/components/forms/Promotions/PageWrapper";
 import Section from "@/components/forms/Promotions/Section";
 import AsyncSelect from "@/components/ui/AsyncSelect";
+import AsyncMultiSelect from "@/components/ui/AsyncMultiSelect";
 
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -20,10 +21,12 @@ import {
   useUpdateAdminPromotionCampaign,
 } from "@/hooks/usePromotions";
 
+import { getBranches } from "@/services/branches";
 import { getMenuItems } from "@/services/menus";
 import { getMenuCategories } from "@/services/categories";
 
 type DiscountType = "FLAT" | "PERCENTAGE";
+type ApplyMode = "ORDER_TOTAL" | "SCOPED_ITEMS";
 
 type FormState = {
   code: string;
@@ -37,6 +40,8 @@ type FormState = {
   maxUsesPerCustomer: string;
   startsAt: string;
   expiresAt: string;
+  applyMode: ApplyMode;
+  autoApply: boolean;
   isActive: boolean;
   assignPermanently: boolean;
 };
@@ -53,6 +58,8 @@ const initialForm: FormState = {
   maxUsesPerCustomer: "",
   startsAt: "",
   expiresAt: "",
+  applyMode: "ORDER_TOTAL",
+  autoApply: true,
   isActive: true,
   assignPermanently: false,
 };
@@ -87,6 +94,72 @@ const normalizeDetail = (response: any) => {
   return response?.data?.data ?? response?.data ?? response ?? null;
 };
 
+const getOptionId = (option: any) => {
+  return String(option?.id ?? option?.value ?? option?._id ?? "").trim();
+};
+
+const getIds = (options: any[]) => {
+  return Array.from(
+    new Set(
+      (Array.isArray(options) ? options : [])
+        .map((option) => getOptionId(option))
+        .filter(Boolean)
+    )
+  );
+};
+
+const normalizeSelectedOptions = ({
+  records,
+  ids,
+  singleRecord,
+  singleId,
+  fallbackLabel,
+}: {
+  records?: any[];
+  ids?: string[];
+  singleRecord?: any;
+  singleId?: string | null;
+  fallbackLabel: string;
+}) => {
+  const map = new Map<string, any>();
+
+  const pushOption = (option: any, fallbackId?: string) => {
+    const id = String(
+      option?.id ?? option?.value ?? option?._id ?? fallbackId ?? ""
+    ).trim();
+
+    if (!id) return;
+
+    map.set(id, {
+      ...option,
+      id,
+      name:
+        option?.name ||
+        option?.title ||
+        option?.label ||
+        `${fallbackLabel} ${map.size + 1}`,
+    });
+  };
+
+  if (Array.isArray(records)) {
+    records.forEach((record) => pushOption(record));
+  }
+
+  if (Array.isArray(ids)) {
+    ids.forEach((id) =>
+      pushOption({ id, name: `${fallbackLabel} ${map.size + 1}` })
+    );
+  }
+
+  if (singleRecord) {
+    pushOption(singleRecord, singleId || undefined);
+  } else if (singleId) {
+    pushOption({ id: singleId, name: `Selected ${fallbackLabel}` });
+  }
+
+  return Array.from(map.values());
+};
+
 export default function AddNewPromotion() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -96,19 +169,18 @@ export default function AddNewPromotion() {
 
   const { user, restaurantId } = useAuth();
 
-  const branchId = user?.branchId ?? "";
+  const authBranchId = user?.branchId ?? "";
 
   const [form, setForm] = useState<FormState>(initialForm);
-  const [selectedMenuItem, setSelectedMenuItem] = useState<any>(null);
-  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [selectedBranch, setSelectedBranch] = useState<any>(null);
+  const [selectedMenuItems, setSelectedMenuItems] = useState<any[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<any[]>([]);
 
-const {
-  data: detailResponse,
-  isLoading: detailLoading,
-} = useGetAdminPromotionCampaignDetail(id ?? undefined, {
-  restaurantId,
-  branchId,
-});
+  const { data: detailResponse, isLoading: detailLoading } =
+    useGetAdminPromotionCampaignDetail(id ?? undefined, {
+      restaurantId,
+      branchId: authBranchId,
+    });
 
   const createMutation = useCreateAdminPromotionCampaign();
   const updateMutation = useUpdateAdminPromotionCampaign();
@@ -118,11 +190,25 @@ const {
   const pageTitle = isEditMode ? "Update Promotion" : "Add New Promotion";
 
   useEffect(() => {
+    if (isEditMode) return;
+    if (!authBranchId || selectedBranch) return;
+
+    setSelectedBranch({
+      id: authBranchId,
+      name: user?.branch?.name || user?.branchName || "Current Branch",
+    });
+  }, [authBranchId, isEditMode, selectedBranch, user]);
+
+  useEffect(() => {
     if (!isEditMode || !detailResponse) return;
 
     const detail = normalizeDetail(detailResponse);
 
     if (!detail) return;
+
+    const detailAutoApply = Boolean(detail.autoApply ?? !detail.code);
+    const detailApplyMode: ApplyMode =
+      detail.applyMode === "SCOPED_ITEMS" ? "SCOPED_ITEMS" : "ORDER_TOTAL";
 
     setForm({
       code: detail.code ?? "",
@@ -136,27 +222,40 @@ const {
       maxUsesPerCustomer: String(detail.maxUsesPerCustomer ?? ""),
       startsAt: toDatetimeLocal(detail.startsAt),
       expiresAt: toDatetimeLocal(detail.expiresAt),
+      applyMode: detailApplyMode,
+      autoApply: detailAutoApply,
       isActive: Boolean(detail.isActive),
       assignPermanently: !detail.expiresAt,
     });
 
-    if (detail.scopeMenuItem) {
-      setSelectedMenuItem(detail.scopeMenuItem);
-    } else if (detail.scopeMenuItemId) {
-      setSelectedMenuItem({
-        id: detail.scopeMenuItemId,
-        name: detail.scopeMenuItem?.name ?? "Selected Menu Item",
+    if (detail.branch) {
+      setSelectedBranch(detail.branch);
+    } else if (detail.branchId) {
+      setSelectedBranch({
+        id: detail.branchId,
+        name: "Selected Branch",
       });
     }
 
-    if (detail.scopeCategory) {
-      setSelectedCategory(detail.scopeCategory);
-    } else if (detail.scopeCategoryId) {
-      setSelectedCategory({
-        id: detail.scopeCategoryId,
-        name: detail.scopeCategory?.name ?? "Selected Category",
-      });
-    }
+    setSelectedMenuItems(
+      normalizeSelectedOptions({
+        records: detail.scopeMenuItems,
+        ids: detail.scopeMenuItemIds,
+        singleRecord: detail.scopeMenuItem,
+        singleId: detail.scopeMenuItemId,
+        fallbackLabel: "Menu Item",
+      })
+    );
+
+    setSelectedCategories(
+      normalizeSelectedOptions({
+        records: detail.scopeCategories,
+        ids: detail.scopeCategoryIds,
+        singleRecord: detail.scopeCategory,
+        singleId: detail.scopeCategoryId,
+        fallbackLabel: "Category",
+      })
+    );
   }, [detailResponse, isEditMode]);
 
   const updateField = <K extends keyof FormState>(
@@ -169,20 +268,32 @@ const {
     }));
   };
 
-const fetchMenuItemOptions = async ({
-  search,
-  page,
-}: {
-  search: string;
-  page: number;
-}) => {
-  return getMenuItems({
-    page,
-    limit: 10,
+  const selectedBranchId = getOptionId(selectedBranch) || authBranchId || "";
+
+  const fetchBranchOptions = async ({ search }: { search: string; page: number }) => {
+    return getBranches({
+      search,
+      sortOrder: "ASC",
+      includeInactive: true,
+      restaurantId: restaurantId ?? undefined,
+    });
+  };
+
+  const fetchMenuItemOptions = async ({
     search,
-    restaurantId: restaurantId ?? undefined,
-  });
-};
+    page,
+  }: {
+    search: string;
+    page: number;
+  }) => {
+    return getMenuItems({
+      page,
+      limit: 10,
+      search,
+      restaurantId: restaurantId ?? undefined,
+    });
+  };
+
   const fetchCategoryOptions = async ({
     search,
     page,
@@ -199,12 +310,20 @@ const fetchMenuItemOptions = async ({
   };
 
   const payload = useMemo(() => {
+    const scopeMenuItemIds =
+      form.applyMode === "SCOPED_ITEMS" ? getIds(selectedMenuItems) : [];
+
+    const scopeCategoryIds =
+      form.applyMode === "SCOPED_ITEMS" ? getIds(selectedCategories) : [];
+
+    const trimmedCode = form.code.trim();
+
     return {
-      code: form.code.trim(),
+      ...(form.autoApply || !trimmedCode ? {} : { code: trimmedCode }),
       title: form.title.trim(),
       description: form.description.trim(),
       restaurantId,
-      branchId: branchId || null,
+      branchId: selectedBranchId,
       discountType: form.discountType,
       discountValue: toNumber(form.discountValue),
       maxDiscountAmount: toNumber(form.maxDiscountAmount),
@@ -215,11 +334,21 @@ const fetchMenuItemOptions = async ({
       expiresAt: form.assignPermanently
         ? null
         : toISOStringOrNull(form.expiresAt),
-      scopeMenuItemId: selectedMenuItem?.id ?? null,
-      scopeCategoryId: selectedCategory?.id ?? null,
+      scopeMenuItemId: scopeMenuItemIds[0] ?? null,
+      scopeCategoryId: scopeCategoryIds[0] ?? null,
+      scopeMenuItemIds,
+      scopeCategoryIds,
+      applyMode: form.applyMode,
+      autoApply: form.autoApply,
       isActive: form.isActive,
     };
-  }, [form, restaurantId, branchId, selectedMenuItem, selectedCategory]);
+  }, [
+    form,
+    restaurantId,
+    selectedBranchId,
+    selectedMenuItems,
+    selectedCategories,
+  ]);
 
   const validateForm = () => {
     if (!restaurantId) {
@@ -227,11 +356,7 @@ const fetchMenuItemOptions = async ({
       return false;
     }
 
-    if (!form.code.trim()) {
-      toast.error("Promotion code is required.");
-      return false;
-    }
-
+  
     if (!form.title.trim()) {
       toast.error("Offer title is required.");
       return false;
@@ -239,6 +364,14 @@ const fetchMenuItemOptions = async ({
 
     if (!form.discountValue || Number(form.discountValue) <= 0) {
       toast.error("Discount value must be greater than 0.");
+      return false;
+    }
+
+    if (
+      form.discountType === "PERCENTAGE" &&
+      Number(form.discountValue) > 100
+    ) {
+      toast.error("Percentage discount cannot be greater than 100.");
       return false;
     }
 
@@ -257,6 +390,15 @@ const fetchMenuItemOptions = async ({
       new Date(form.expiresAt).getTime() <= new Date(form.startsAt).getTime()
     ) {
       toast.error("Expiry date must be after start date.");
+      return false;
+    }
+
+    if (
+      form.applyMode === "SCOPED_ITEMS" &&
+      selectedMenuItems.length === 0 &&
+      selectedCategories.length === 0
+    ) {
+      toast.error("Select at least one item or category for scoped promotion.");
       return false;
     }
 
@@ -306,18 +448,27 @@ const fetchMenuItemOptions = async ({
     <PageWrapper title={pageTitle}>
       <form onSubmit={handleSubmit} className="space-y-8">
         <Section label="Setup Basic Info">
-        <FormInput
-  label="Promotion Code *"
-  placeholder="eg. SUMMER20"
-  value={form.code}
-  onChange={(val) => updateField("code", val)}
-/>
+          <div className="space-y-2">
+            <Label className="text-[16px]">Branch *</Label>
+            <p className="text-sm text-gray-500">
+              Select the branch where this promotion should be available.
+            </p>
+
+            <AsyncSelect
+              value={selectedBranch}
+              onChange={setSelectedBranch}
+              placeholder="Search branch"
+              fetchOptions={fetchBranchOptions}
+              labelKey="name"
+              valueKey="id"
+            />
+          </div>
 
           <FormInput
             label="Offer Title *"
             placeholder="eg. 20% Off On Orders"
             value={form.title}
-             onChange={(val) => updateField("title", val)}
+            onChange={(val) => updateField("title", val)}
           />
 
           <div className="space-y-2">
@@ -330,7 +481,37 @@ const fetchMenuItemOptions = async ({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <Checkbox
+                checked={form.autoApply}
+                onCheckedChange={(checked) =>
+                  updateField("autoApply", Boolean(checked))
+                }
+              />
+
+              <span>
+                <span className="block font-medium text-gray-900">
+                  Auto-apply promotion
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-gray-500">
+                  When enabled, customers do not need a coupon code. The
+                  frontend will not send a code for this promotion.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          {!form.autoApply ? (
+            <FormInput
+              label="Promotion Code (optional)"
+              placeholder="eg. SUMMER20"
+              value={form.code}
+              onChange={(val) => updateField("code", val)}
+            />
+          ) : null}
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Discount Type *</Label>
               <select
@@ -354,7 +535,7 @@ const fetchMenuItemOptions = async ({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <FormInput
               label="Minimum Order Amount"
               type="number"
@@ -372,13 +553,13 @@ const fetchMenuItemOptions = async ({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <FormInput
               label="Maximum Uses"
               type="number"
               placeholder="eg. 100"
               value={form.maxUses}
-             onChange={(val) => updateField("maxUses", val)}
+              onChange={(val) => updateField("maxUses", val)}
             />
 
             <FormInput
@@ -390,7 +571,7 @@ const fetchMenuItemOptions = async ({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Starts At *</Label>
               <Input
@@ -436,69 +617,90 @@ const fetchMenuItemOptions = async ({
 
         <Section label="Promotion Scope">
           <div className="space-y-2">
-            <Label className="text-[16px]">Select Food Item</Label>
+            <Label>Apply Mode *</Label>
+            <select
+              value={form.applyMode}
+              onChange={(e) =>
+                updateField("applyMode", e.target.value as ApplyMode)
+              }
+              className="h-[44px] w-full rounded-md border border-[#BBBBBB] bg-white px-4 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              <option value="ORDER_TOTAL">
+                Order Total - apply discount on full order
+              </option>
+              <option value="SCOPED_ITEMS">
+                Scoped Items - apply only on selected items/categories
+              </option>
+            </select>
+
             <p className="text-sm text-gray-500">
-              Select a specific food item if this promotion should only apply to
-              one item.
+              ORDER_TOTAL discounts the full order total. SCOPED_ITEMS discounts
+              only matching items and/or categories.
             </p>
-
-            <AsyncSelect
-              value={selectedMenuItem}
-              onChange={(value) => {
-                setSelectedMenuItem(value);
-                setSelectedCategory(null);
-              }}
-              placeholder="Search food item"
-              fetchOptions={fetchMenuItemOptions}
-              labelKey="name"
-              valueKey="id"
-            />
-
-            {selectedMenuItem && (
-              <button
-                type="button"
-                onClick={() => setSelectedMenuItem(null)}
-                className="text-sm text-primary"
-              >
-                Clear selected food item
-              </button>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-[16px]">Select Food Category</Label>
-            <p className="text-sm text-gray-500">
-              Select a category if this promotion should apply to all food items
-              inside a category.
-            </p>
+          {form.applyMode === "SCOPED_ITEMS" ? (
+            <>
+              <div className="space-y-2">
+                <Label className="text-[16px]">Select Food Items</Label>
+                <p className="text-sm text-gray-500">
+                  Select one or more food items. The promotion can be scoped to
+                  only items, only categories, or both.
+                </p>
 
-            <AsyncSelect
-              value={selectedCategory}
-              onChange={(value) => {
-                setSelectedCategory(value);
-                setSelectedMenuItem(null);
-              }}
-              placeholder="Search category"
-              fetchOptions={fetchCategoryOptions}
-              labelKey="name"
-              valueKey="id"
-            />
+                <AsyncMultiSelect
+                  value={selectedMenuItems}
+                  onChange={setSelectedMenuItems}
+                  placeholder="Search and select food items"
+                  fetchOptions={fetchMenuItemOptions}
+                  labelKey="name"
+                  valueKey="id"
+                />
 
-            {selectedCategory && (
-              <button
-                type="button"
-                onClick={() => setSelectedCategory(null)}
-                className="text-sm text-primary"
-              >
-                Clear selected category
-              </button>
-            )}
-          </div>
+                {selectedMenuItems.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMenuItems([])}
+                    className="text-sm text-primary"
+                  >
+                    Clear selected food items
+                  </button>
+                ) : null}
+              </div>
 
-          <p className="text-sm text-gray-500">
-            Leave both fields empty if the promotion applies to the whole
-            restaurant.
-          </p>
+              <div className="space-y-2">
+                <Label className="text-[16px]">Select Food Categories</Label>
+                <p className="text-sm text-gray-500">
+                  Select one or more categories. All matching items inside these
+                  categories can receive the discount.
+                </p>
+
+                <AsyncMultiSelect
+                  value={selectedCategories}
+                  onChange={setSelectedCategories}
+                  placeholder="Search and select categories"
+                  fetchOptions={fetchCategoryOptions}
+                  labelKey="name"
+                  valueKey="id"
+                />
+
+                {selectedCategories.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategories([])}
+                    className="text-sm text-primary"
+                  >
+                    Clear selected categories
+                  </button>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
+              This promotion applies to the full eligible order total. No item
+              or category scope is needed.
+            </div>
+          )}
         </Section>
 
         <div className="flex justify-end gap-3">
@@ -514,7 +716,7 @@ const fetchMenuItemOptions = async ({
           <button
             type="submit"
             disabled={submitting}
-            className="h-[44px] rounded-lg bg-primary px-6 text-sm font-medium text-white disabled:opacity-60 inline-flex items-center gap-2"
+            className="inline-flex h-[44px] items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-white disabled:opacity-60"
           >
             {submitting && <Loader2 size={16} className="animate-spin" />}
             {isEditMode ? "Update Promotion" : "Create Promotion"}

@@ -12,6 +12,12 @@ import {
 } from "@/hooks/usePromotions";
 import { useAuth } from "@/hooks/useAuth";
 
+type PromotionTabValue = "overview" | "coupons" | "promotions" | "happy-hours";
+
+type PromotionsOverviewProps = {
+  onViewAll?: (tab: PromotionTabValue) => void;
+};
+
 type PromotionsOverviewData = {
   activePromotions?: number;
   scheduledPromotions?: number;
@@ -54,7 +60,7 @@ const getListFromResponse = (response: any) => {
   return [];
 };
 
-export default function PromotionsOverview() {
+export default function PromotionsOverview({ onViewAll }: PromotionsOverviewProps) {
   const { user } = useAuth();
 
   const restaurantId = user?.restaurantId ?? user?.tenantId ?? null;
@@ -77,7 +83,6 @@ export default function PromotionsOverview() {
     restaurantId,
     branchId,
     limit: 1,
-    status: "active",
   });
 
   const overview: PromotionsOverviewData = overviewResponse?.data ?? {};
@@ -96,9 +101,13 @@ export default function PromotionsOverview() {
   return (
     <div className="mt-1 space-y-14">
       {/* ================= COUPONS ================= */}
-      <PromotionSectionHeader title="Coupons" />
+      <PromotionSectionHeader
+        title="Coupons"
+        viewAllTab="coupons"
+        onViewAll={onViewAll}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <PromotionStatCard
           icon={<Tag size={18} />}
           value={overview.totalCoupons ?? 0}
@@ -127,9 +136,13 @@ export default function PromotionsOverview() {
       />
 
       {/* ================= PROMOTIONS ================= */}
-      <PromotionSectionHeader title="Promotions" />
+      <PromotionSectionHeader
+        title="Promotions"
+        viewAllTab="promotions"
+        onViewAll={onViewAll}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <PromotionStatCard
           icon={<Percent size={18} />}
           value={totalPromotions}
@@ -158,9 +171,13 @@ export default function PromotionsOverview() {
       />
 
       {/* ================= HAPPY HOURS ================= */}
-      <PromotionSectionHeader title="Happy Hours" />
+      <PromotionSectionHeader
+        title="Happy Hours"
+        viewAllTab="happy-hours"
+        onViewAll={onViewAll}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-[63%_35%] gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[63%_35%]">
         <HappyHourInfoCard
           happyHour={activeHappyHour}
           loading={happyHourLoading}
@@ -174,7 +191,7 @@ export default function PromotionsOverview() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <PromotionStatCard
           icon={<ShoppingCart size={18} />}
           value={overview.activeHappyHours ?? 0}
