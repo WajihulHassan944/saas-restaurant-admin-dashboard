@@ -17,6 +17,37 @@ import { toast } from "sonner";
 
 type EditTab = "basicInfo" | "delivery" | "workingHours";
 
+type DeliveryMode = "RADIUS" | "ZONE" | "POSTAL_CODE";
+
+type DeliveryPolygonPoint = {
+  lat: number;
+  lng: number;
+};
+
+type DeliveryZone = {
+  id?: string;
+  name: string;
+  deliveryFee: number;
+  polygon: DeliveryPolygonPoint[];
+};
+
+type PostalCodeRule = {
+  id?: string;
+  postalCode: string;
+  deliveryFee: number;
+};
+
+type DeliveryConfig = {
+  mode: DeliveryMode;
+  radiusKm: number;
+  minOrderAmount: number;
+  deliveryFee: number;
+  isFreeDelivery: boolean;
+  freeDeliveryThreshold: number;
+  zones: DeliveryZone[];
+  postalCodeRules: PostalCodeRule[];
+};
+
 const DAYS = [
   "SUNDAY",
   "MONDAY",
@@ -26,6 +57,13 @@ const DAYS = [
   "FRIDAY",
   "SATURDAY",
 ];
+
+const DELIVERY_MODES: DeliveryMode[] = ["RADIUS", "ZONE", "POSTAL_CODE"];
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 const normalizeBreakTimesForApi = (breakTimes: any) => {
   if (!Array.isArray(breakTimes)) return [];
@@ -71,6 +109,178 @@ const normalizeHolidayRangesForApi = (holidayRanges: any) => {
     .filter((item) => item.fromDate && item.toDate);
 };
 
+const normalizeDeliveryMode = (mode: any): DeliveryMode => {
+  const normalized = String(mode || "").toUpperCase();
+
+  return DELIVERY_MODES.includes(normalized as DeliveryMode)
+    ? (normalized as DeliveryMode)
+    : "RADIUS";
+};
+
+const normalizePolygonPoint = (point: any): DeliveryPolygonPoint | null => {
+  const lat = toNumber(point?.lat, Number.NaN);
+  const lng = toNumber(point?.lng, Number.NaN);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return { lat, lng };
+};
+
+const normalizeDeliveryZonesForApi = (zones: any): DeliveryZone[] => {
+  if (!Array.isArray(zones)) return [];
+
+  return zones.map((zone) => ({
+    ...(zone?.id ? { id: String(zone.id) } : {}),
+    name: String(zone?.name || "").trim(),
+    deliveryFee: toNumber(zone?.deliveryFee, 0),
+    polygon: Array.isArray(zone?.polygon)
+      ? zone.polygon
+          .map((point: any) => normalizePolygonPoint(point))
+          .filter((point: DeliveryPolygonPoint | null): point is DeliveryPolygonPoint =>
+            Boolean(point)
+          )
+      : [],
+  }));
+};
+
+const normalizePostalCodeRulesForApi = (rules: any): PostalCodeRule[] => {
+  if (!Array.isArray(rules)) return [];
+
+  return rules.map((rule) => ({
+    ...(rule?.id ? { id: String(rule.id) } : {}),
+    postalCode: String(rule?.postalCode || "").trim(),
+    deliveryFee: toNumber(rule?.deliveryFee, 0),
+  }));
+};
+
+const normalizeDeliveryConfigForApi = (deliveryConfig: any): DeliveryConfig => {
+  return {
+    mode: normalizeDeliveryMode(deliveryConfig?.mode),
+    radiusKm: toNumber(deliveryConfig?.radiusKm, 0),
+    minOrderAmount: toNumber(deliveryConfig?.minOrderAmount, 0),
+    deliveryFee: toNumber(deliveryConfig?.deliveryFee, 0),
+    isFreeDelivery: Boolean(deliveryConfig?.isFreeDelivery ?? false),
+    freeDeliveryThreshold: toNumber(deliveryConfig?.freeDeliveryThreshold, 0),
+    zones: normalizeDeliveryZonesForApi(deliveryConfig?.zones),
+    postalCodeRules: normalizePostalCodeRulesForApi(
+      deliveryConfig?.postalCodeRules
+    ),
+  };
+};
+
+const isValidCoordinate = (point: DeliveryPolygonPoint) => {
+  return (
+    Number.isFinite(point.lat) &&
+    Number.isFinite(point.lng) &&
+    point.lat >= -90 &&
+    point.lat <= 90 &&
+    point.lng >= -180 &&
+    point.lng <= 180
+  );
+};
+
+const validateDeliveryConfig = (deliveryConfig: DeliveryConfig) => {
+  if (deliveryConfig.radiusKm < 0) {
+    toast.error("Radius cannot be negative");
+    return false;
+  }
+
+  if (deliveryConfig.deliveryFee < 0) {
+    toast.error("Delivery fee cannot be negative");
+    return false;
+  }
+
+  if (deliveryConfig.minOrderAmount < 0) {
+    toast.error("Minimum order amount cannot be negative");
+    return false;
+  }
+
+  if (deliveryConfig.freeDeliveryThreshold < 0) {
+    toast.error("Free delivery threshold cannot be negative");
+    return false;
+  }
+
+  if (deliveryConfig.mode === "RADIUS" && deliveryConfig.radiusKm <= 0) {
+    toast.error("Radius must be greater than 0 for radius delivery mode");
+    return false;
+  }
+
+  if (deliveryConfig.mode === "ZONE") {
+    if (!deliveryConfig.zones.length) {
+      toast.error("Please add at least one delivery zone");
+      return false;
+    }
+
+    for (const [index, zone] of deliveryConfig.zones.entries()) {
+      const label = zone.name || `Zone ${index + 1}`;
+
+      if (!zone.name) {
+        toast.error(`Zone ${index + 1} name is required`);
+        return false;
+      }
+
+      if (zone.deliveryFee < 0) {
+        toast.error(`${label} delivery fee cannot be negative`);
+        return false;
+      }
+
+      if (!Array.isArray(zone.polygon) || zone.polygon.length < 3) {
+        toast.error(`${label} must have at least 3 polygon points`);
+        return false;
+      }
+
+      const invalidPoint = zone.polygon.find((point) => !isValidCoordinate(point));
+
+      if (invalidPoint) {
+        toast.error(`${label} has an invalid latitude/longitude point`);
+        return false;
+      }
+    }
+  }
+
+  if (deliveryConfig.mode === "POSTAL_CODE") {
+    if (!deliveryConfig.postalCodeRules.length) {
+      toast.error("Please add at least one postal code delivery rule");
+      return false;
+    }
+
+    for (const [index, rule] of deliveryConfig.postalCodeRules.entries()) {
+      if (!rule.postalCode) {
+        toast.error(`Postal code rule ${index + 1} requires a postal code`);
+        return false;
+      }
+
+      if (rule.deliveryFee < 0) {
+        toast.error(
+          `Postal code rule ${index + 1} delivery fee cannot be negative`
+        );
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+const buildBranchPatchPayload = (branchData: any, settings: any) => ({
+  restaurantId: branchData.restaurantId,
+  name: branchData.name,
+  isMain: branchData.isMain,
+  branchAdmin: branchData.branchAdmin,
+
+  street: branchData.address?.street,
+  area: branchData.address?.area,
+  city: branchData.address?.city,
+  state: branchData.address?.state,
+  country: branchData.address?.country,
+  lat: branchData.address?.lat,
+  lng: branchData.address?.lng,
+
+  description: branchData.description,
+
+  settings,
+});
+
 export default function BranchesEditPage() {
   const [activeTab, setActiveTab] = useState<EditTab>("basicInfo");
   const router = useRouter();
@@ -84,7 +294,7 @@ export default function BranchesEditPage() {
 
   // ================= FETCH =================
   useEffect(() => {
-    if (!branchId) return;
+    if (!branchId || !token) return;
 
     const fetchBranch = async () => {
       const res = await api.get(`/v1/branches/${branchId}`);
@@ -94,101 +304,91 @@ export default function BranchesEditPage() {
         return;
       }
 
-      if (res?.data) {
-        setBranchData(res.data);
+      const nextBranchData = res?.data?.data || res?.data;
+
+      if (nextBranchData) {
+        setBranchData(nextBranchData);
       }
     };
 
     fetchBranch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchId]);
+  }, [branchId, token]);
 
   // ================= STEP BASED SAVE =================
   const handleSave = async () => {
     if (!branchId || !branchData) return;
 
     try {
+      const settings = branchData.settings || {};
+      const deliveryConfig = normalizeDeliveryConfigForApi(
+        settings.deliveryConfig
+      );
+
+      if (activeTab === "delivery" && !validateDeliveryConfig(deliveryConfig)) {
+        return;
+      }
+
       const normalizedOpeningHours = normalizeOpeningHoursForApi(
-        branchData.settings?.openingHours
+        settings.openingHours
       );
 
       const normalizedHolidayRanges = normalizeHolidayRangesForApi(
-        branchData.settings?.holidayRanges
+        settings.holidayRanges
       );
 
-      // ================= BUILD FULL SETTINGS (CRITICAL FIX) =================
+      /*
+       * Keep settings payload schema-safe:
+       * - openingHours are saved through /branches/:id/opening-hours
+       * - holidayRanges are sent inside the opening-hours endpoint settings
+       */
+      const safeSettings = { ...settings };
+      delete safeSettings.openingHours;
+      delete safeSettings.holidayRanges;
+
+      // ================= BUILD FULL SETTINGS =================
       const fullSettings = {
-        allowedOrderTypes: branchData.settings?.allowedOrderTypes?.length
-          ? branchData.settings.allowedOrderTypes
+        ...safeSettings,
+
+        allowedOrderTypes: Array.isArray(settings.allowedOrderTypes)
+          ? settings.allowedOrderTypes
           : ["DELIVERY"],
 
-        allowedPaymentMethods: branchData.settings?.allowedPaymentMethods?.length
-          ? branchData.settings.allowedPaymentMethods
+        allowedPaymentMethods: Array.isArray(settings.allowedPaymentMethods)
+          ? settings.allowedPaymentMethods
           : ["COD"],
 
         tableReservationsEnabled:
-          branchData.settings?.tableReservationsEnabled ?? false,
+          settings.tableReservationsEnabled ?? false,
 
         automation: {
+          ...(settings.automation || {}),
           autoAcceptOrders: Boolean(
-            branchData.settings?.automation?.autoAcceptOrders ?? false
+            settings.automation?.autoAcceptOrders ?? false
           ),
-          estimatedPrepTime: Number(
-            branchData.settings?.automation?.estimatedPrepTime || 0
-          ),
+          estimatedPrepTime: toNumber(settings.automation?.estimatedPrepTime, 30),
         },
 
         taxation: {
-          taxPercentage: Number(
-            branchData.settings?.taxation?.taxPercentage || 0
-          ),
+          ...(settings.taxation || {}),
+          taxPercentage: toNumber(settings.taxation?.taxPercentage, 0),
         },
 
         contact: {
-          phone: branchData.settings?.contact?.phone || "",
-          whatsapp: branchData.settings?.contact?.whatsapp || "",
+          ...(settings.contact || {}),
+          phone: settings.contact?.phone || "",
+          whatsapp: settings.contact?.whatsapp || "",
         },
 
-        // ✅ IMPORTANT: INCLUDE DELIVERY ALWAYS
-        deliveryConfig: {
-          radiusKm: Number(branchData.settings?.deliveryConfig?.radiusKm || 0),
-          deliveryFee: Number(branchData.settings?.deliveryConfig?.deliveryFee || 0),
-          minOrderAmount: Number(
-            branchData.settings?.deliveryConfig?.minOrderAmount || 0
-          ),
-          isFreeDelivery: Boolean(
-            branchData.settings?.deliveryConfig?.isFreeDelivery || false
-          ),
-          freeDeliveryThreshold: Number(
-            branchData.settings?.deliveryConfig?.freeDeliveryThreshold || 0
-          ),
-        },
-
-        // Keep branch settings payload schema-safe.
-        // openingHours must only be sent to /branches/:id/opening-hours,
-        // not inside /branches/:id PATCH settings.
+        deliveryConfig,
       };
 
       // ================= STEP 1 =================
       if (activeTab === "basicInfo") {
-        const res = await api.patch(`/v1/branches/${branchId}`, {
-          restaurantId: branchData.restaurantId,
-          name: branchData.name,
-          isMain: branchData.isMain,
-          branchAdmin: branchData.branchAdmin,
-
-          street: branchData.address?.street,
-          area: branchData.address?.area,
-          city: branchData.address?.city,
-          state: branchData.address?.state,
-          country: branchData.address?.country,
-          lat: branchData.address?.lat,
-          lng: branchData.address?.lng,
-
-          description: branchData.description,
-
-          settings: fullSettings,
-        });
+        const res = await api.patch(
+          `/v1/branches/${branchId}`,
+          buildBranchPatchPayload(branchData, fullSettings)
+        );
 
         if (res?.error) {
           toast.error(res.error);
@@ -238,27 +438,13 @@ export default function BranchesEditPage() {
         }
 
         // ✅ 2. Update deliveryTime through edit branch API.
-        const branchRes = await api.patch(`/v1/branches/${branchId}`, {
-          restaurantId: branchData.restaurantId,
-          name: branchData.name,
-          isMain: branchData.isMain,
-          branchAdmin: branchData.branchAdmin,
-
-          street: branchData.address?.street,
-          area: branchData.address?.area,
-          city: branchData.address?.city,
-          state: branchData.address?.state,
-          country: branchData.address?.country,
-          lat: branchData.address?.lat,
-          lng: branchData.address?.lng,
-
-          description: branchData.description,
-
-          settings: {
+        const branchRes = await api.patch(
+          `/v1/branches/${branchId}`,
+          buildBranchPatchPayload(branchData, {
             ...fullSettings,
             deliveryTime,
-          },
-        });
+          })
+        );
 
         if (branchRes?.error) {
           toast.error(branchRes.error);
@@ -302,7 +488,8 @@ export default function BranchesEditPage() {
       key: "delivery",
       tabLabel: "Delivery Area & Charges",
       title: "Zone & Delivery Area & Charges Setup",
-      description: "Manage your branch delivery & charges information from here",
+      description:
+        "Configure delivery by radius, delivery zones, or postal code rules",
       component: (
         <EditBranchStepTwo data={branchData} setData={setBranchData} />
       ),
@@ -326,7 +513,7 @@ export default function BranchesEditPage() {
       <Header title="Default Branch" description="Branch Setup / Default Branch" />
 
       <div className="space-y-8 rounded-[14px] bg-white shadow-sm lg:p-8">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {steps.map((step) => (
             <TabButton
               key={step.key}
