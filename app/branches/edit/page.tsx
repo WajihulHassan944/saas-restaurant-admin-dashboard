@@ -342,9 +342,21 @@ export default function BranchesEditPage() {
        * - openingHours are saved through /branches/:id/opening-hours
        * - holidayRanges are sent inside the opening-hours endpoint settings
        */
-      const safeSettings = { ...settings };
-      delete safeSettings.openingHours;
-      delete safeSettings.holidayRanges;
+     const safeSettings = { ...settings };
+
+// These are not allowed inside PATCH /branches/:id settings payload.
+// They may come back from GET /branches/:id, but must not be sent back.
+delete safeSettings.openingHours;
+delete safeSettings.holidayRanges;
+delete safeSettings.temporaryClosure;
+delete safeSettings.currentTemporaryClosure;
+delete safeSettings.temporaryClosures;
+delete safeSettings.closure;
+delete safeSettings.closures;
+delete safeSettings.holidayOpeningHours;
+delete safeSettings.reservationDateRanges;
+delete safeSettings.tableReservationDateRanges;
+delete safeSettings.reservationBlackoutRanges;
 
       // ================= BUILD FULL SETTINGS =================
       const fullSettings = {

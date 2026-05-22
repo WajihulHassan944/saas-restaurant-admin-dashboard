@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Radio } from "@/components/ui/radioBtn";
 import { Switch } from "@/components/ui/switch";
@@ -457,46 +458,72 @@ function WorkingDayRow({
               No break configured for this day.
             </p>
           ) : (
-            <div className="space-y-3">
-              {breakTimes.map((breakTime: BreakTime, index: number) => (
-                <div
-                  key={`${day}-break-${index}`}
-                  className="grid grid-cols-1 gap-3 rounded-[10px] bg-white p-3 md:grid-cols-[150px_150px_1fr_36px]"
-                >
-                  <TimeInput
-                    value={breakTime.startTime}
-                    onChange={(val: string) =>
-                      onBreakChange(index, "startTime", val)
-                    }
-                  />
+          <div className="space-y-3">
+  {breakTimes.map((breakTime: BreakTime, index: number) => (
+    <div
+      key={`${day}-break-${index}`}
+      className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(220px,1fr)_44px]"
+    >
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-gray-500">
+          Break Start
+        </label>
 
-                  <TimeInput
-                    value={breakTime.endTime}
-                    onChange={(val: string) =>
-                      onBreakChange(index, "endTime", val)
-                    }
-                  />
+        <Input
+          type="time"
+          value={breakTime.startTime || ""}
+          onChange={(e) =>
+            onBreakChange(index, "startTime", e.target.value)
+          }
+          className="h-11 w-full min-w-[180px] rounded-[10px] bg-white px-3 text-sm text-gray-900 [color-scheme:light]"
+        />
+      </div>
 
-                  <Input
-                    value={breakTime.note || ""}
-                    onChange={(e) =>
-                      onBreakChange(index, "note", e.target.value)
-                    }
-                    placeholder="Break note e.g. Lunch break"
-                    className="h-[38px] rounded-[10px]"
-                  />
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-gray-500">
+          Break End
+        </label>
 
-                  <button
-                    type="button"
-                    onClick={() => onRemoveBreak(index)}
-                    className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-[10px] text-red-500 hover:bg-red-50"
-                    aria-label="Remove break time"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
+        <Input
+          type="time"
+          value={breakTime.endTime || ""}
+          onChange={(e) =>
+            onBreakChange(index, "endTime", e.target.value)
+          }
+          className="h-11 w-full min-w-[180px] rounded-[10px] bg-white px-3 text-sm text-gray-900 [color-scheme:light]"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-gray-500">
+          Note
+        </label>
+
+        <Input
+          value={breakTime.note || ""}
+          onChange={(e) =>
+            onBreakChange(index, "note", e.target.value)
+          }
+          placeholder="Break note e.g. Lunch break"
+          className="h-11 rounded-[10px] bg-white placeholder:text-gray-400"
+        />
+      </div>
+
+      <div className="flex items-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onRemoveBreak(index)}
+          className="h-11 w-11 rounded-[10px] text-red-500 hover:bg-red-50 hover:text-red-600"
+          aria-label="Remove break time"
+        >
+          <Trash2 size={16} />
+        </Button>
+      </div>
+    </div>
+  ))}
+</div>
           )}
         </div>
       )}
