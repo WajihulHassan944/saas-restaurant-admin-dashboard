@@ -67,10 +67,6 @@ const SORT_OPTIONS: Array<{
     label: "Price",
     value: "price",
   },
-  {
-    label: "Priority",
-    value: "sortOrder",
-  },
 ];
 
 const extractResponseItems = (response: any) => {
@@ -115,17 +111,6 @@ const formatPrice = (value: any) => {
 
 const formatCurrency = (value: any) => {
   return `$${formatPrice(value)}`;
-};
-
-const getPriorityLabel = (value: any) => {
-  const sortOrderValue = Number(value ?? 0);
-
-  if (sortOrderValue === 0) return "Top";
-  if (sortOrderValue === 10) return "High";
-  if (sortOrderValue === 50) return "Medium";
-  if (sortOrderValue === 100) return "Low";
-
-  return String(sortOrderValue || "-");
 };
 
 export default function VariationsTable() {
@@ -327,9 +312,8 @@ export default function VariationsTable() {
 
   const SkeletonRow = () => (
     <tr>
-      <td colSpan={7} className="px-4 py-5">
-        <div className="grid animate-pulse grid-cols-[1.2fr_1.6fr_0.7fr_0.7fr_0.7fr_0.7fr_0.6fr] gap-4">
-          <div className="h-4 rounded bg-gray-200" />
+      <td colSpan={6} className="px-5 py-5">
+        <div className="grid animate-pulse grid-cols-[24%_24%_13%_13%_13%_13%] gap-3">
           <div className="h-4 rounded bg-gray-200" />
           <div className="h-4 rounded bg-gray-200" />
           <div className="h-4 rounded bg-gray-200" />
@@ -580,13 +564,12 @@ export default function VariationsTable() {
         <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="border-b bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <th className="w-[22%] px-4 py-4">Variation</th>
-              <th className="w-[30%] px-4 py-4">Description</th>
-              <th className="w-[11%] px-4 py-4 text-center">Price</th>
-              <th className="w-[11%] px-4 py-4 text-center">Priority</th>
-              <th className="w-[10%] px-4 py-4 text-center">Default</th>
-              <th className="w-[10%] px-4 py-4 text-center">Status</th>
-              <th className="w-[6%] px-4 py-4 text-center">Actions</th>
+              <th className="w-[24%] px-5 py-4">Variation</th>
+              <th className="w-[24%] px-3 py-4">Description</th>
+              <th className="w-[13%] px-3 py-4 text-center">Price</th>
+              <th className="w-[13%] px-3 py-4 text-center">Default</th>
+              <th className="w-[13%] px-3 py-4 text-center">Status</th>
+              <th className="w-[13%] px-5 py-4 text-center">Actions</th>
             </tr>
           </thead>
 
@@ -597,7 +580,7 @@ export default function VariationsTable() {
               ))
             ) : shouldShowEmpty ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={6}>
                   <EmptyState />
                 </td>
               </tr>
@@ -607,7 +590,7 @@ export default function VariationsTable() {
                   key={item.id}
                   className="border-b border-gray-100 transition hover:bg-[#FAFAFA]"
                 >
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-gray-900">
                         {item?.name || "-"}
@@ -619,27 +602,21 @@ export default function VariationsTable() {
                     </div>
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-4 align-middle">
                     <p className="line-clamp-2 break-words text-gray-600">
                       {item?.description || "No description"}
                     </p>
                   </td>
 
-                  <td className="px-4 py-4 text-center font-semibold text-gray-900">
+                  <td className="px-3 py-4 text-center font-semibold text-gray-900">
                     <span className="block truncate">
                       {formatCurrency(item?.price)}
                     </span>
                   </td>
 
-                  <td className="px-4 py-4 text-center">
-                    <span className="inline-flex max-w-full rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                      <span className="truncate">
-                        {getPriorityLabel(item?.sortOrder)}
-                      </span>
-                    </span>
-                  </td>
+                
 
-                  <td className="px-4 py-4 text-center">
+                  <td className="px-3 py-4 text-center">
                     <span
                       className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-medium ${
                         item?.isDefault
@@ -653,7 +630,7 @@ export default function VariationsTable() {
                     </span>
                   </td>
 
-                  <td className="px-4 py-4 text-center">
+                  <td className="px-3 py-4 text-center">
                     <span
                       className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-medium ${
                         item?.isActive
@@ -667,8 +644,8 @@ export default function VariationsTable() {
                     </span>
                   </td>
 
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-center gap-2">
+                  <td className="px-5 py-4">
+                    <div className="flex min-w-[88px] items-center justify-center gap-2">
                       <button
                         type="button"
                         title="Edit"
@@ -747,12 +724,7 @@ export default function VariationsTable() {
                   </p>
                 </div>
 
-                <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
-                  <p className="text-xs text-gray-400">Priority</p>
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {getPriorityLabel(item?.sortOrder)}
-                  </p>
-                </div>
+              
 
                 <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
                   <p className="text-xs text-gray-400">Default</p>
