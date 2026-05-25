@@ -1,12 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,
   },
- 
-}
+  experimental: {
+    cpus: 1,
+    workerThreads: false,
+  },
+};
 
-export default nextConfig
+export default nextConfig;
