@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Container from "@/components/container";
 import Header from "@/components/header";
-import MenuItemsTable from "@/components/pages/menu/items/components/MenuItemsTable/MenuItemsTable";
+import MenuItemsTable from "@/components/pages/Menu/items/components/MenuItemsTable/MenuItemsTable";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import CreateMenuItemModal from "@/components/pages/menu/items/components/CreateMenuItemModal/CreateMenuItemModal";
+import CreateMenuItemModal from "@/components/pages/Menu/items/components/CreateMenuItemModal/CreateMenuItemModal";
 
 const MenuItemsPage = () => {
   const { isBranchAdmin } = useAuth();

@@ -2,7 +2,7 @@
 
 import Container from "@/components/container";
 import Header from "@/components/header";
-import ModifierGroupsTable from "@/components/pages/menu/modifier-groups/components/ModifierGroupsTable/ModifierGroupsTable";
+import ModifierGroupsTable from "@/components/pages/Menu/modifier-groups/components/ModifierGroupsTable/ModifierGroupsTable";
 
 const ModifierGroupsPage = () => {
   return (

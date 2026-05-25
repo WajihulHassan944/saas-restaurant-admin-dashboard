@@ -2,7 +2,7 @@
 
 import Container from "@/components/container";
 import Header from "@/components/header";
-import LabelsTable from "@/components/pages/menu/labels/components/LabelsTable/LabelsTable";
+import LabelsTable from "@/components/pages/Menu/labels/components/LabelsTable/LabelsTable";
 
 const LabelsPage = () => {
   return (

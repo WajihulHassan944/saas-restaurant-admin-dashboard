@@ -2,7 +2,7 @@
 
 import Container from "@/components/container";
 import Header from "@/components/header";
-import AllergenTable from "@/components/pages/menu/allergens/components/AllergenTable/AllergenTable";
+import AllergenTable from "@/components/pages/Menu/allergens/components/AllergenTable/AllergenTable";
 
 const AllergenPage = () => {
   return (

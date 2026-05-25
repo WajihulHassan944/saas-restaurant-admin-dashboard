@@ -1,4 +1,4 @@
-import VariationsPage from "@/components/pages/menu/variations/pages/VariationsPage";
+import VariationsPage from "@/components/pages/Menu/variations/pages/VariationsPage";
 
 export default function Page() {
   return <VariationsPage />;

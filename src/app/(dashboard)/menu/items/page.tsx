@@ -1,4 +1,4 @@
-import MenuItemsPage from "@/components/pages/menu/items/pages/MenuItemsPage";
+import MenuItemsPage from "@/components/pages/Menu/items/pages/MenuItemsPage";
 
 export default function Page() {
   return <MenuItemsPage />;

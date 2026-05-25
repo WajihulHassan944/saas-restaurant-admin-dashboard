@@ -1,4 +1,4 @@
-import LabelsPage from "@/components/pages/menu/labels/pages/LabelsPage";
+import LabelsPage from "@/components/pages/Menu/labels/pages/LabelsPage";
 
 export default function Page() {
   return <LabelsPage />;

@@ -1,1 +1,1 @@
-export { default } from "@/components/pages/menu/items/components/CreateMenuItemModal/CreateMenuItemModal";
+export { default } from "@/components/pages/Menu/items/components/CreateMenuItemModal/CreateMenuItemModal";

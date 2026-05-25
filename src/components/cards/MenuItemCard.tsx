@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Plus, Star, X } from "lucide-react";
+import { Pencil, Plus, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useDeleteMenuItem } from "@/hooks/useMenus";
 type Props = {
   item: any;
   editing?: boolean;
+  onEdit?: () => void;
   onDelete?: () => void;
 };
 
@@ -57,7 +58,7 @@ const formatCurrency = (value: unknown) => {
   }).format(numeric);
 };
 
-export default function MenuItemCard({ item, editing, onDelete }: Props) {
+export default function MenuItemCard({ item, editing, onEdit, onDelete }: Props) {
   const [open, setOpen] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
 
@@ -83,14 +84,25 @@ export default function MenuItemCard({ item, editing, onDelete }: Props) {
   return (
     <article className="group relative flex h-full min-h-[270px] w-full flex-col overflow-hidden rounded-[22px] border border-border/70 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/20 hover:shadow-xl">
       {editing ? (
-        <button
-          type="button"
-          onClick={() => setOpenDelete(true)}
-          className="absolute right-2.5 top-2.5 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition hover:border-destructive/30 hover:bg-destructive hover:text-destructive-foreground"
-          aria-label={`Delete ${item?.name || "menu item"}`}
-        >
-          <X size={14} />
-        </button>
+        <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit?.()}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition hover:border-primary/30 hover:bg-primary hover:text-primary-foreground"
+            aria-label={`Edit ${item?.name || "menu item"}`}
+          >
+            <Pencil size={14} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setOpenDelete(true)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition hover:border-destructive/30 hover:bg-destructive hover:text-destructive-foreground"
+            aria-label={`Delete ${item?.name || "menu item"}`}
+          >
+            <X size={14} />
+          </button>
+        </div>
       ) : null}
 
       <div className="relative h-[180px] w-full overflow-hidden bg-muted">

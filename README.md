@@ -1,30 +1,42 @@
-# Nexjs dashboard setup
+# DeliveryWay Restaurant Admin
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+Production-ready Next.js admin dashboard for restaurant, branch, menu, order, POS, promotion, report, loyalty, and settings management.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/umerwes-projects/v0-nexjs-dashboard-setup)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/twyRjkfDhJ2)
+## Tech Stack
 
-## Overview
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- Tailwind CSS
+- TanStack Query
+- ESLint 9 with Next.js Core Web Vitals rules
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+## Getting Started
 
-## Deployment
+```bash
+npm install
+npm run dev
+```
 
-Your project is live at:
+Open `http://localhost:3000`.
 
-**[https://vercel.com/umerwes-projects/v0-nexjs-dashboard-setup](https://vercel.com/umerwes-projects/v0-nexjs-dashboard-setup)**
+## Scripts
 
-## Build your app
+```bash
+npm run dev        # Start local development server
+npm run build      # Create production build
+npm run start      # Start production server
+npm run lint       # Run ESLint
+npm run typecheck  # Run TypeScript checks
+npm run check      # Run lint, typecheck, tests, and build
+```
 
-Continue building your app on:
+## Environment
 
-**[https://v0.app/chat/twyRjkfDhJ2](https://v0.app/chat/twyRjkfDhJ2)**
+Create a local `.env.local` file with the API and authentication values required by the backend. Do not commit secrets.
 
-## How It Works
+## Notes
 
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+- The dashboard is scoped for business, restaurant, and branch admin workflows.
+- Branch admin views are restricted where applicable.
+- Keep generated folders such as `.next/`, `node_modules/`, coverage output, and local env files out of git.

@@ -5,6 +5,7 @@ import { PlusCircle } from "lucide-react";
 import MenuItemCard from "@/components/cards/MenuItemCard";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import CreateMenuItemModal from "../CreateMenuItemModal/CreateMenuItemModal";
 
 interface ItemListProps {
@@ -27,9 +28,12 @@ export default function ItemList({
   refetch
 }: ItemListProps) {
   const [createMenuItem, setCreateMenuItem] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
 
   const pathname = usePathname();
   const isPOS = pathname?.includes("/pos");
+  const { isBranchAdmin } = useAuth();
+  const canManageItems = !isBranchAdmin;
 
   const gridCols = isPOS
     ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3"
@@ -105,7 +109,11 @@ export default function ItemList({
             <MenuItemCard
               key={item.id}
               item={item}
-              editing={editing}
+              editing={canManageItems}
+              onEdit={() => {
+                setSelectedItem(item);
+                setCreateMenuItem(true);
+              }}
               onDelete={refetch}
             />
           ))}
@@ -114,7 +122,15 @@ export default function ItemList({
 
       <CreateMenuItemModal
         open={createMenuItem}
-        onOpenChange={setCreateMenuItem}
+        onOpenChange={(open) => {
+          setCreateMenuItem(open);
+
+          if (!open) {
+            setSelectedItem(null);
+          }
+        }}
+        initialData={selectedItem}
+        onSuccess={refetch}
       />
     </div>
   );

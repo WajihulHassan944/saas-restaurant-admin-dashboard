@@ -6,7 +6,7 @@ import Header from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import CategoriesTable from "@/components/pages/menu/categories/components/CategoriesTable/CategoriesTable";
+import CategoriesTable from "@/components/pages/Menu/categories/components/CategoriesTable/CategoriesTable";
 import CreateCategoryModalParent from "@/components/menu/listing/CreateCategoryModalParent";
 
 const MenuCategoriesPage = () => {

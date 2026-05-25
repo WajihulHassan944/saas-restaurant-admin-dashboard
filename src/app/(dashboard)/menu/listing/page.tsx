@@ -1,4 +1,4 @@
-import MenusListingPage from "@/components/pages/menu/pages/MenusListingPage";
+import MenusListingPage from "@/components/pages/Menu/pages/MenusListingPage";
 
 export default function Page() {
   return <MenusListingPage />;

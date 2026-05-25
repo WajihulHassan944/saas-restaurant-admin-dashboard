@@ -2,7 +2,7 @@
 
 import Container from "@/components/container";
 import Header from "@/components/header";
-import ModifiersTable from "@/components/pages/menu/modifiers/components/ModifiersTable/ModifiersTable";
+import ModifiersTable from "@/components/pages/Menu/modifiers/components/ModifiersTable/ModifiersTable";
 
 const ModifiersPage = () => {
   return (
