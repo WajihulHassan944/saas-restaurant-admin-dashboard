@@ -10,17 +10,33 @@ import type { RestaurantBrandingPayload, RestaurantBrandingPatchPayload } from "
 const getRestaurantEndpoint = (restaurantId: string) =>
   `/restaurants/${encodeURIComponent(restaurantId)}`;
 
+const getCustomerHomeEndpoint = () => "/customer-app/home";
+
+export type BrandingReadSource = "restaurant" | "customer-home";
+
+type BrandingReadOptions = {
+  source?: BrandingReadSource;
+};
+
 const getDefaultBrandingSettings = (): RestaurantBrandingPayload =>
   normalizeBrandingPayload(DEFAULT_RESTAURANT_BRANDING_PAYLOAD);
 
-export const getBrandingSettings = async (restaurantId?: string | null): Promise<RestaurantBrandingPayload> => {
+export const getBrandingSettings = async (
+  restaurantId?: string | null,
+  options?: BrandingReadOptions,
+): Promise<RestaurantBrandingPayload> => {
   const normalizedRestaurantId = restaurantId?.trim();
 
   if (!normalizedRestaurantId) {
     return getDefaultBrandingSettings();
   }
 
-  const response = await httpClient.get<unknown>(getRestaurantEndpoint(normalizedRestaurantId));
+  const response = options?.source === "customer-home"
+    ? await httpClient.get<unknown>(getCustomerHomeEndpoint(), {
+      params: { restaurantId: normalizedRestaurantId },
+    })
+    : await httpClient.get<unknown>(getRestaurantEndpoint(normalizedRestaurantId));
+
   return normalizeBrandingApiResponse(response);
 };
 
@@ -50,9 +66,21 @@ export const resetBrandingSettings = async (restaurantId?: string | null): Promi
     return defaults;
   }
 
+  const currentBrandingSettings = await getBrandingSettings(normalizedRestaurantId);
+  const resetPayload = normalizeBrandingPayload({
+    restaurant: {
+      ...currentBrandingSettings.restaurant,
+      branding: {
+        ...defaults.restaurant.branding,
+        ...(currentBrandingSettings.restaurant.branding.extra
+          ? { extra: currentBrandingSettings.restaurant.branding.extra }
+          : {}),
+      },
+    },
+  });
   const response = await httpClient.patch<unknown, RestaurantBrandingPatchPayload>(
     getRestaurantEndpoint(normalizedRestaurantId),
-    buildRestaurantBrandingPatchPayload(defaults),
+    buildRestaurantBrandingPatchPayload(resetPayload),
   );
 
   return normalizeBrandingApiResponse(response);

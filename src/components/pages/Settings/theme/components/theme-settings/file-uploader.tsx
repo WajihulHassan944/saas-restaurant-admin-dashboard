@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import type { BrandingFormValues } from "@/validations/branding";
 
+import {
+  BRANDING_ERROR_COMPACT_CLASS,
+  BRANDING_INPUT_CLASS,
+  BRANDING_LABEL_COMPACT_CLASS,
+  BRANDING_SMALL_ACTION_BUTTON_CLASS,
+} from "./branding-form-classes";
+
 type AssetFieldName = FieldPath<BrandingFormValues>;
 
 type FileUploaderProps = {
@@ -20,10 +27,7 @@ type FileUploaderProps = {
   error?: string;
 };
 
-const labelClassName = "block text-base font-semibold text-dark";
-const helperClassName = "text-sm text-gray max-w-[368px]";
-const inputClassName = "h-[52px] rounded-[12px] border-gray-200 focus:ring-primary";
-const actionButtonClassName = "inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-gray-200 bg-white px-3 text-sm font-semibold text-dark transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:text-primary hover:shadow-sm disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none";
+const helperClassName = "max-w-[368px] text-sm text-gray";
 
 const isPreviewablePath = (value?: string) => Boolean(value?.trim());
 
@@ -46,6 +50,9 @@ export default function FileUploader({
   const previewValue = localPreviewUrl ?? trimmedValue;
   const fileInputId = `${id}-file`;
   const allTargetNames = [name, ...linkedNames];
+  const registeredField = register(name, {
+    onBlur: ({ target }) => updateAssetFields(target.value),
+  });
 
   useEffect(() => {
     return () => {
@@ -118,7 +125,7 @@ export default function FileUploader({
   return (
     <div className="space-y-3">
       <div className="space-y-[4px]">
-        <label htmlFor={id} className={labelClassName}>
+        <label htmlFor={id} className={BRANDING_LABEL_COMPACT_CLASS}>
           {title}
         </label>
         <p className={helperClassName}>{recommendation}</p>
@@ -142,8 +149,8 @@ export default function FileUploader({
             type="url"
             placeholder="https://example.com/brand-image.png"
             aria-invalid={Boolean(error)}
-            className={inputClassName}
-            {...register(name)}
+            className={BRANDING_INPUT_CLASS}
+            {...registeredField}
           />
           <input
             ref={fileInputRef}
@@ -157,7 +164,7 @@ export default function FileUploader({
             <button
               type="button"
               aria-label={`Upload ${title}`}
-              className={actionButtonClassName}
+              className={BRANDING_SMALL_ACTION_BUTTON_CLASS}
               disabled={uploading}
               onClick={handleUploadButtonClick}
             >
@@ -167,7 +174,7 @@ export default function FileUploader({
             <button
               type="button"
               aria-label={`Clear ${title}`}
-              className={actionButtonClassName}
+              className={BRANDING_SMALL_ACTION_BUTTON_CLASS}
               disabled={uploading || !previewValue}
               onClick={handleClear}
             >
@@ -175,7 +182,7 @@ export default function FileUploader({
               Clear
             </button>
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? <p className={BRANDING_ERROR_COMPACT_CLASS}>{error}</p> : null}
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import { useTheme } from "next-themes";
 
 import { useAuthContext } from "@/components/providers/auth-provider";
 import { DEFAULT_RESTAURANT_BRANDING_PAYLOAD } from "@/config/default-branding";
+import { isBranchAdminRole } from "@/lib/auth";
 import { applyBrandingCssVariables, normalizeBrandingPayload } from "@/lib/branding";
 import { getApiErrorMessage } from "@/lib/errors";
 import {
@@ -24,6 +25,7 @@ import type { RestaurantBrandingPayload, RestaurantBrandingProfile } from "@/typ
 
 export type BrandingContextValue = {
   branding: RestaurantBrandingPayload;
+  savedBranding: RestaurantBrandingPayload;
   restaurant: RestaurantBrandingProfile;
   updateBrandingDraft: (nextPayload: RestaurantBrandingPayload) => void;
   saveBranding: (nextPayload: RestaurantBrandingPayload) => Promise<RestaurantBrandingPayload>;
@@ -47,8 +49,10 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
   const { user } = useAuthContext();
   const { setTheme } = useTheme();
   const restaurantId = user?.restaurantId?.trim() || null;
+  const brandingReadSource = isBranchAdminRole(user?.role) ? "customer-home" : "restaurant";
   const requestIdRef = useRef(0);
   const [branding, setBranding] = useState<RestaurantBrandingPayload>(defaultBranding);
+  const [savedBranding, setSavedBranding] = useState<RestaurantBrandingPayload>(defaultBranding);
   const [isBrandingReady, setIsBrandingReady] = useState(false);
   const [isBrandingLoading, setIsBrandingLoading] = useState(false);
   const [isBrandingSaving, setIsBrandingSaving] = useState(false);
@@ -63,6 +67,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
       setIsBrandingLoading(false);
       setIsBrandingReady(true);
       setBranding(defaultBranding);
+      setSavedBranding(defaultBranding);
       return defaultBranding;
     }
 
@@ -70,10 +75,11 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
     setIsBrandingReady(false);
 
     try {
-      const nextBranding = await getBrandingSettings(restaurantId);
+      const nextBranding = await getBrandingSettings(restaurantId, { source: brandingReadSource });
 
       if (requestIdRef.current === requestId) {
         setBranding(nextBranding);
+        setSavedBranding(nextBranding);
         setBrandingError(null);
       }
 
@@ -83,6 +89,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
 
       if (requestIdRef.current === requestId) {
         setBranding(defaultBranding);
+        setSavedBranding(defaultBranding);
         setBrandingError(errorMessage);
       }
 
@@ -93,7 +100,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
         setIsBrandingReady(true);
       }
     }
-  }, [restaurantId]);
+  }, [brandingReadSource, restaurantId]);
 
   useEffect(() => {
     void reloadBranding();
@@ -117,6 +124,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
       try {
         const savedPayload = await saveBrandingSettings(nextPayload, restaurantId);
         setBranding(savedPayload);
+        setSavedBranding(savedPayload);
         return savedPayload;
       } catch (error) {
         setBrandingError(getApiErrorMessage(error, "Unable to save branding settings."));
@@ -136,6 +144,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
     try {
       const resetPayload = await resetBrandingSettings(restaurantId);
       setBranding(resetPayload);
+      setSavedBranding(resetPayload);
       return resetPayload;
     } catch (error) {
       setBrandingError(getApiErrorMessage(error, "Unable to reset branding settings."));
@@ -148,6 +157,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
   const contextValue = useMemo<BrandingContextValue>(
     () => ({
       branding,
+      savedBranding,
       restaurant: branding.restaurant,
       updateBrandingDraft,
       saveBranding,
@@ -160,6 +170,7 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
     }),
     [
       branding,
+      savedBranding,
       updateBrandingDraft,
       saveBranding,
       resetBranding,
