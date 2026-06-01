@@ -106,6 +106,3 @@ export const ordersReport = [
     taxAmount: "$0",
   },
 ];
-
-
-// sample
