@@ -29,7 +29,9 @@ export const createCustomer = async (payload: CreateCustomerValues) => {
  * search, sortOrder, withDeleted, includeInactive, restaurantId
  */
 export const getCustomersList = async (params?: CustomerListParams) => {
-  const { data } = await api.get("/admin/users/customers", { params });
+  // Backend scopes branch admins by JWT and rejects branchId on this endpoint.
+  const { branchId: _branchId, ...allowedParams } = params || {};
+  const { data } = await api.get("/admin/users/customers", { params: allowedParams });
   return data;
 };
 
@@ -93,6 +95,19 @@ export const forceDeleteCustomers = async (
 export const approveBusinessAdmin = async (id: string) => {
   const { data } = await api.patch(
     `/admin/users/business-admins/${id}/approve`
+  );
+  return data;
+};
+
+export const verifyCustomerEmail = async ({ token, otp }: { token: string; otp: string }) => {
+  const { data } = await api.post(
+    "/auth/verify-email",
+    { otp },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
   return data;
 };

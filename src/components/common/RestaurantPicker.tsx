@@ -2,28 +2,42 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Store } from "lucide-react";
+import BrandLogo from "@/components/common/BrandLogo";
 import { useAuth } from "@/hooks/useAuth";
-import { useHttpClient } from "@/hooks/useHttpClient";
 import { toast } from "sonner";
+import { useGetRestaurants } from "@/hooks/useRestaurants";
 import { useRouter } from "next/navigation";
-import { canSwitchRestaurant, saveStoredAuth, getStoredAuth } from "@/lib/auth";
+import {
+  canSwitchRestaurant,
+  getRecordValue,
+  getStoredAuth,
+  getStringValue,
+  isRecord,
+  saveStoredAuth,
+} from "@/lib/auth";
 import { useGetBranch } from "@/hooks/useBranches";
 
+type RestaurantOption = {
+  id: string;
+  name?: string;
+  tenantId?: string | null;
+  logoUrl?: string | null;
+};
+
 export default function RestaurantPicker() {
-  const { token, user, setUser, isBranchAdmin, branchId } = useAuth();
+  const { token, user, setUser, isBranchAdmin, branchId, logout } = useAuth();
   const { data: assignedBranch } = useGetBranch(isBranchAdmin && branchId ? branchId : "");
-  const { get } = useHttpClient(token);
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [restaurants, setRestaurants] = useState<any[]>([]);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null);
+  const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantOption | null>(null);
 
   const [open, setOpen] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
+  const { data: restaurantsResponse, isFetching } = useGetRestaurants(Boolean(token && user?.id && canSwitchRestaurant(user)));
 
   const handleLogout = (): void => {
-    localStorage.removeItem("auth");
+    logout();
     toast.success("Logged out successfully");
 
     setTimeout(() => {
@@ -31,28 +45,42 @@ export default function RestaurantPicker() {
     }, 500);
   };
 
-  const fetchRestaurants = async () => {
-    if (!canSwitchRestaurant(user)) return;
-
-    try {
-      setIsFetching(true);
-
-      const res = await get("/v1/restaurants");
-
-      const filtered =
-        res?.data?.filter((r: any) => r.tenantId === user?.tenantId) || [];
-
-      setRestaurants(filtered);
-    } catch {
-      toast.error("Failed to fetch restaurants");
-    } finally {
-      setIsFetching(false);
-    }
-  };
-
   useEffect(() => {
-    if (token && user?.id && canSwitchRestaurant(user)) fetchRestaurants();
-  }, [token, user?.id, user?.role]);
+    const data = isRecord(restaurantsResponse) ? restaurantsResponse.data : undefined;
+    const rows = Array.isArray(data) ? data : [];
+    const userTenantId = user?.tenantId ?? null;
+    const filtered = rows.reduce<RestaurantOption[]>((acc, row) => {
+      if (!isRecord(row)) return acc;
+
+      const id = getStringValue(row, "id");
+      if (!id) return acc;
+
+      const tenant = getRecordValue(row, "tenant");
+      const tenantId = getStringValue(row, "tenantId") ?? getStringValue(tenant, "id") ?? null;
+
+      if (userTenantId && tenantId && tenantId !== userTenantId) return acc;
+
+      const branding = getRecordValue(row, "branding");
+      const assets = getRecordValue(branding, "assets");
+      const logo = getRecordValue(branding, "logo");
+      const logoUrl =
+        getStringValue(row, "logoUrl") ??
+        getStringValue(assets, "logoUrl") ??
+        getStringValue(logo, "light") ??
+        null;
+
+      acc.push({
+        id,
+        name: getStringValue(row, "name") ?? id,
+        tenantId,
+        logoUrl,
+      });
+
+      return acc;
+    }, []);
+
+    setRestaurants(filtered);
+  }, [restaurantsResponse, user?.tenantId]);
 
   useEffect(() => {
     if (!user?.restaurantId || restaurants.length === 0) return;
@@ -76,17 +104,21 @@ export default function RestaurantPicker() {
       document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
-  const handleSelectRestaurant = (restaurant: any) => {
+  const handleSelectRestaurant = (restaurant: RestaurantOption) => {
     setSelectedRestaurant(restaurant);
     setOpen(false);
 
     const restaurantId = restaurant.id;
 
-    setUser((prev: any) => ({
-      ...prev,
-      restaurantId,
-      branchId: null,
-    }));
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            restaurantId,
+            branchId: null,
+          }
+        : prev
+    );
 
     const stored = getStoredAuth() || {};
 
@@ -116,13 +148,16 @@ export default function RestaurantPicker() {
         type="button"
         onClick={() => router.push("/branch-workspace")}
         title={branchId ? `Branch ID: ${branchId}` : branchLabel}
-        className="hidden h-[56px] max-w-[340px] items-center gap-3 rounded-xl bg-green-50 px-4 text-left text-sm text-green-700 ring-1 ring-green-200 transition hover:bg-green-100 md:flex"
+        className="hidden h-[56px] max-w-[340px] items-center gap-3 rounded-xl bg-primary/10 px-4 text-left text-sm text-primary ring-1 ring-primary/20 transition hover:bg-primary/15 md:flex"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-green-700 shadow-sm">
-          <Store size={18} />
-        </span>
+        <BrandLogo
+          className="shrink-0 gap-0"
+          imageClassName="size-9 rounded-full bg-white shadow-sm"
+          showName={false}
+          name={branchLabel}
+        />
         <span className="min-w-0">
-          <span className="block text-xs font-semibold uppercase tracking-wide text-green-600/80">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-primary/80">
             Branch scope
           </span>
           <span className="block truncate font-semibold">
@@ -137,10 +172,19 @@ export default function RestaurantPicker() {
     <div ref={containerRef} className="relative w-[280px]">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center justify-between gap-2 px-4 h-[56px] rounded-xl bg-[#F5F5F5] hover:bg-[#EEEEEE] transition-all text-sm w-full"
+        className="flex h-[56px] w-full items-center justify-between gap-2 rounded-xl bg-muted px-4 text-sm transition-all hover:bg-primary/10"
       >
-        <span className="font-medium truncate text-gray-800">
-          {renderLabel()}
+        <span className="flex min-w-0 items-center gap-3">
+          <BrandLogo
+            className="shrink-0 gap-0"
+            imageClassName="size-9 rounded-full bg-white shadow-sm"
+            showName={false}
+            logoUrl={selectedRestaurant?.logoUrl}
+            name={selectedRestaurant?.name}
+          />
+          <span className="truncate font-medium text-gray-800">
+            {renderLabel()}
+          </span>
         </span>
         <ChevronDown
           size={18}
@@ -176,7 +220,16 @@ export default function RestaurantPicker() {
                       : "hover:bg-gray-100 text-gray-700"
                   }`}
                 >
-                  <span className="truncate">{restaurant.name}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <BrandLogo
+                      className="shrink-0 gap-0"
+                      imageClassName="size-7 rounded-full bg-white shadow-sm"
+                      showName={false}
+                      logoUrl={restaurant.logoUrl}
+                      name={restaurant.name}
+                    />
+                    <span className="truncate">{restaurant.name}</span>
+                  </span>
 
                   {selectedRestaurant?.id === restaurant.id && (
                     <Check size={14} className="text-primary" />
@@ -195,7 +248,7 @@ export default function RestaurantPicker() {
 
                 <button
                   onClick={handleLogout}
-                  className="mt-2 px-3 py-1.5 text-xs rounded-md bg-red-500 text-white hover:bg-red-600"
+                  className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs text-white hover:bg-primary/90"
                 >
                   Go to Login
                 </button>

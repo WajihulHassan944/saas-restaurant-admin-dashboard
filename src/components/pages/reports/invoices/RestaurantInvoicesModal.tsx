@@ -1,1 +1,1 @@
-export { default } from "@/components/pages/legacy/reports/invoices/RestaurantInvoicesModalLegacy";
+export { default } from "@/components/pages/Reports/legacy/invoices/RestaurantInvoicesModalLegacy";

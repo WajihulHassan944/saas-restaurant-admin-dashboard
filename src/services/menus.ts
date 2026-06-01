@@ -193,10 +193,12 @@ export const deleteModifier = async (id: string) => {
 
 export const attachModifierGroupToItem = async (
   itemId: string,
-  groupId: string
+  groupId: string,
+  payload?: { sortOrder?: number }
 ) => {
   const { data } = await api.post(
-    `/menu/items/${itemId}/modifier-groups/${groupId}`
+    `/menu/items/${itemId}/modifier-groups/${groupId}`,
+    payload
   );
   return data;
 };
@@ -297,18 +299,11 @@ export const attachModifierGroupToCategory = async (
 };
 
 
-
-/* =========================
-   GET SINGLE MENU
-========================= */
 export const getMenuById = async (menuId: string) => {
   const { data } = await api.get(`/menus/${menuId}`);
   return data;
 };
 
-/* =========================
-   CREATE MENU
-========================= */
 export interface CreateMenuPayload {
   restaurantId: string;
   name: string;
@@ -324,9 +319,6 @@ export const createMenu = async (payload: CreateMenuPayload) => {
   return data;
 };
 
-/* =========================
-   UPDATE MENU
-========================= */
 export interface UpdateMenuPayload {
   name?: string;
   slug?: string;

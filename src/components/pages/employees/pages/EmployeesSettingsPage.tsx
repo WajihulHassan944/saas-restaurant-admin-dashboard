@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Container from "@/components/container";
-import StatsSection from "@/components/employee-settings/stats-section";
-import EmployeeTable from "@/components/employee-settings/table";
-import Header from "@/components/employee-settings/header";
-import BranchFilters from "@/components/branches/BranchFilters";
+import Container from "@/components/common/Container";
+import StatsSection from "@/components/pages/Employees/components/employee-settings/stats-section";
+import EmployeeTable from "@/components/pages/Employees/components/employee-settings/table";
+import Header from "@/components/pages/Employees/components/employee-settings/header";
+import BranchFilters from "@/components/pages/Branches/components/BranchFilters";
 import { Button } from "@/components/ui/button";
-import RolesTable from "@/components/employee-settings/RolesTable";
+import RolesTable from "@/components/pages/Employees/components/employee-settings/RolesTable";
 import { useAuth } from "@/hooks/useAuth";
 import { useGetEmployeesStats } from "@/hooks/useDashboard";
 

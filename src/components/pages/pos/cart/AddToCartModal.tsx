@@ -1,1 +1,1 @@
-export { default } from "@/components/pages/legacy/pos/cart/AddToCartModalLegacy";
+export { default } from "@/components/pages/Pos/legacy/cart/AddToCartModalLegacy";

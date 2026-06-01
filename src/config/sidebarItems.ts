@@ -11,6 +11,7 @@ import {
   Printer,
   BarChart3,
   Bell,
+  Palette,
   ShieldCheck,
   FileText,
   Tags,
@@ -132,13 +133,14 @@ export const menuItems: MenuItem[] = [
     section: "main",
     roles: allAdminRoles,
   },
-  {
-    title: "Inventory",
-    href: "/inventory",
-    icon: PackagePlus,
-    section: "main",
-    roles: branchAdminOnly,
-  },
+  // Inventory module is intentionally hidden for now.
+  // {
+  //   title: "Inventory",
+  //   href: "/inventory",
+  //   icon: PackagePlus,
+  //   section: "main",
+  //   roles: branchAdminOnly,
+  // },
   {
     title: "Customer Management",
     href: "/customer-settings",
@@ -227,9 +229,9 @@ export const menuItems: MenuItem[] = [
     roles: allAdminRoles,
   },
   {
-    title: "Notification Settings",
-    href: "/notification-settings",
-    icon: Bell,
+    title: "Storefront Settings",
+    href: "/theme-settings",
+    icon: Palette,
     section: "account",
     roles: restaurantAdminRoles,
   },

@@ -1,6 +1,6 @@
-import Container from "@/components/container";
-import NotificationForm from "@/components/forms/notification-form"
-import Header from "@/components/header"
+import Container from "@/components/common/Container";
+import NotificationForm from "@/components/pages/Notifications/forms/NotificationSettingsForm"
+import Header from "@/components/common/PageHeader"
 import { Button } from "@/components/ui/button";
 
 const NotificationSettingsPage = () => {

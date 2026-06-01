@@ -1,9 +1,9 @@
-import Container from "@/components/container";
-import Filters from "@/components/filter";
-import Pagination from "@/components/pagination";
-import Header from "@/components/branches/header";
+import Container from "@/components/common/Container";
+import Filters from "@/components/common/FilterPanel";
+import Pagination from "@/components/common/PaginationSection";
+import Header from "@/components/pages/Branches/components/header";
 import { Button } from "@/components/ui/button";
-import Table from "@/components/branches/list";
+import Table from "@/components/pages/Branches/components/list";
 
 export default function InvoicingPage() {
     return (

@@ -1,12 +1,12 @@
 "use client";
 
-import Container from "@/components/container";
-import AnalyticsGrid from "@/components/dashboard/order-trend-section";
-import RevenueAnalytics from "@/components/dashboard/revenue-trend-section";
+import Container from "@/components/common/Container";
+import AnalyticsGrid from "@/components/pages/Dashboard/components/dashboard/order-trend-section";
+import RevenueAnalytics from "@/components/pages/Dashboard/components/dashboard/revenue-trend-section";
 import StatsSection from "@/components/common/stats-section";
-import Header from "@/components/header";
+import Header from "@/components/common/PageHeader";
 import { managementData } from "@/config/dashboard";
-import ManagementSection from "@/components/dashboard/ManagementSection";
+import ManagementSection from "@/components/pages/Dashboard/components/dashboard/ManagementSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useGetRestaurantDashboardOverview } from "@/hooks/useDashboard";
 

@@ -1,4 +1,4 @@
-import FAQManagerPage from '@/components/faqs/FaqManagerPage'
+import FAQManagerPage from '@/components/pages/Settings/faqs/components/faqs/FaqManagerPage'
 
 const page = () => {
   return (

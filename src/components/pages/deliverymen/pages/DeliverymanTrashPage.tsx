@@ -1,6 +1,6 @@
-import Container from "@/components/container";
-import Table from "@/components/deliveryman/table";
-import Header from "@/components/header";
+import Container from "@/components/common/Container";
+import Table from "@/components/pages/Deliverymen/components/deliveryman/table";
+import Header from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 const DeliveryManTrashPage = () => {
     return (

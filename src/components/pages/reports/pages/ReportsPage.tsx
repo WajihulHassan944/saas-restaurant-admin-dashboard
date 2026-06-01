@@ -5,26 +5,26 @@ import { Download, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 
 import StatsSection from "@/components/common/stats-section";
-import Container from "@/components/container";
-import Header from "@/components/header";
-import RevenueAnalytics from "@/components/dashboard/revenue-trend-section";
+import Container from "@/components/common/Container";
+import Header from "@/components/common/PageHeader";
+import RevenueAnalytics from "@/components/pages/Dashboard/components/dashboard/revenue-trend-section";
 import TabButton from "@/components/ui/TabButton";
-import OrdersGraph from "@/components/graphs/orders-graph";
+import OrdersGraph from "@/components/pages/Reports/components/graphs/orders-graph";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useGetFinancialReport,
   useGetOrdersReport,
 } from "@/hooks/useReports";
-import RestaurantInvoicesModal from "@/components/reports/RestaurantInvoicesModal";
-import { downloadRestaurantDashboardReportPdf } from "@/components/reports/restaurant-report-pdf";
+import RestaurantInvoicesModal from "@/components/pages/Reports/components/reports/RestaurantInvoicesModal";
+import { downloadRestaurantDashboardReportPdf } from "@/components/pages/Reports/components/reports/restaurant-report-pdf";
 import {
   buildFinancialStats,
   buildOrderReportStats,
   getReportCurrency,
   getReportHeaderContent,
   type ReportTab,
-} from "@/components/pages/reports/utils/reports-page.helpers";
+} from "@/components/pages/Reports/utils/reports-page.helpers";
 
 export default function Orders() {
   const { restaurantId, branchId, isBranchAdmin, loading: authLoading } = useAuth();

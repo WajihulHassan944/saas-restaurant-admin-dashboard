@@ -1,10 +1,7 @@
-
-import AddNewCoupon from '@/components/forms/Promotions/AddCoupon/AddCoupon'
+import AddNewCoupon from "@/components/pages/Promotions/forms/AddCoupon/AddCoupon";
 
 const page = () => {
-  return (
-    <AddNewCoupon />
-  )
-}
+  return <AddNewCoupon />;
+};
 
-export default page
+export default page;

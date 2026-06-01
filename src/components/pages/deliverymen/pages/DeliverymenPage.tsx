@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Container from "@/components/container";
-import StatsSection from "@/components/deliveryman/stats-section";
-import Table from "@/components/deliveryman/table";
-import Header from "@/components/deliveryman/header";
-import BranchFilters from "@/components/branches/BranchFilters";
+import Container from "@/components/common/Container";
+import StatsSection from "@/components/pages/Deliverymen/components/deliveryman/stats-section";
+import Table from "@/components/pages/Deliverymen/components/deliveryman/table";
+import Header from "@/components/pages/Deliverymen/components/deliveryman/header";
+import BranchFilters from "@/components/pages/Branches/components/BranchFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeliverymen } from "@/hooks/useDeliverymen";
 import { useGetDeliverymenStats } from "@/hooks/useDashboard";

@@ -1,4 +1,4 @@
-import CreateFAQPage from '@/components/faqs/CreateFAQPage'
+import CreateFAQPage from '@/components/pages/Settings/faqs/components/faqs/CreateFAQPage'
 
 const page = () => {
   return (

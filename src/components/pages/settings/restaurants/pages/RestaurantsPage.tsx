@@ -1,8 +1,8 @@
-import Container from "@/components/container";
-import Header from "@/components/restaurants/header";
-import Filters from "@/components/filter";
-import RestaurantTable from "@/components/restaurants/table";
-import Pagination from "@/components/pagination";
+import Container from "@/components/common/Container";
+import Header from "@/components/pages/Settings/restaurants/components/restaurants/header";
+import Filters from "@/components/common/FilterPanel";
+import RestaurantTable from "@/components/pages/Settings/restaurants/components/restaurants/table";
+import Pagination from "@/components/common/PaginationSection";
 
 export default function RestaurantsPage() {
     return (

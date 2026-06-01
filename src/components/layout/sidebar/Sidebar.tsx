@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, ChevronDown, ChevronRight } from "lucide-react";
-import { menuItems, MenuItem } from "@/config/sidebarItems";
+import { menuItems, MenuItem, type SidebarRole } from "@/config/sidebarItems";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -140,11 +140,14 @@ export default function Sidebar({
 }): ReactElement {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, isBranchAdmin } = useAuth();
+  const { role, isBranchAdmin, logout } = useAuth();
+
+  const isSidebarRole = (value?: string | null): value is SidebarRole =>
+    value === "BUSINESS_ADMIN" || value === "RESTAURANT_ADMIN" || value === "BRANCH_ADMIN";
 
   const isItemAllowed = (item: MenuItem): boolean => {
     if (!item.roles?.length) return true;
-    return Boolean(role && item.roles.includes(role as any));
+    return isSidebarRole(role) && item.roles.includes(role);
   };
 
   const filterAllowedItems = (items: MenuItem[]): MenuItem[] => {
@@ -182,7 +185,7 @@ export default function Sidebar({
   };
 
   const handleLogout = (): void => {
-    localStorage.removeItem("auth");
+    logout();
     toast.success("Logged out successfully");
 
     setTimeout(() => {
@@ -191,8 +194,8 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="flex flex-col w-72 bg-white h-full border-r overflow-y-auto">
-      <nav className="flex flex-col px-0">
+    <aside className="flex h-full w-72 flex-col overflow-y-auto bg-white">
+      <nav className="flex flex-col px-0 pt-5">
         {mainItems.map((item) => (
           <SidebarItem
             key={item.title}
@@ -204,7 +207,7 @@ export default function Sidebar({
         ))}
 
         <div className="mt-5 px-6">
-          <p className="text-xs font-semibold tracking-wide text-[#2D3748] uppercase">
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
             Account Settings
           </p>
         </div>
@@ -256,7 +259,7 @@ export default function Sidebar({
 
           <Button
             variant="ghost"
-            className="mt-4 flex items-center gap-3 text-primary hover:bg-red-50 w-full justify-start"
+            className="mt-4 flex w-full items-center justify-start gap-3 text-primary hover:bg-primary/10"
             onClick={handleLogout}
           >
             <div className="size-10 rounded-xl bg-[#F9FAFB] flex items-center justify-center">

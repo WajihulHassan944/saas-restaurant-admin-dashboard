@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
-import ContextGate from "@/components/ContextGate";
+import ContextGate from "@/components/layout/ContextGate";
 import Navbar from "@/components/layout/navbar/navbar";
 import Sidebar from "@/components/layout/sidebar/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,7 +21,7 @@ export default function AppShell({ children }: AppShellProps) {
   if (loading && !hideLayout) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-black" />
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     );
   }

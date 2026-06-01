@@ -1,0 +1,88 @@
+import type { RestaurantBrandingPayload } from "@/types/branding";
+
+export const DEFAULT_RESTAURANT_BRANDING_PAYLOAD: RestaurantBrandingPayload = {
+  restaurant: {
+    name: "Deliveryway Restaurant",
+    slug: "deliveryway-restaurant",
+    customDomain: "",
+    logoUrl: "",
+    coverImage: "",
+    tagline: "Fast, reliable restaurant delivery",
+    bio: "Manage your restaurant storefront, menu, orders, and customer experience from Deliveryway.",
+    supportContact: {
+      email: "support@deliveryway.com",
+      phone: "",
+      whatsapp: "",
+      address: "",
+    },
+    branding: {
+      theme: {
+        mode: "light",
+        primaryColor: "#c1000a",
+        secondaryColor: "#030401",
+        accentColor: "#F59E0B",
+        backgroundColor: "#F5F5F5",
+        textColor: "#030401",
+        dark: {
+          primaryColor: "#FF4D57",
+          secondaryColor: "#F5F5F5",
+          accentColor: "#FBBF24",
+          backgroundColor: "#030401",
+          textColor: "#F5F5F5",
+        },
+        fontFamily: "var(--font-onest), 'Onest', 'Onest Fallback', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        headingFontFamily: "var(--font-onest), 'Onest', 'Onest Fallback', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        borderRadius: "12px",
+        buttonStyle: "rounded",
+        homeLayout: "hero",
+        menuCardStyle: "image-top",
+        showPopularItems: true,
+        showCategories: true,
+      },
+      app: {
+        homeLayout: "hero",
+        menuCardStyle: "image-top",
+        showTagline: true,
+        showHeroBanner: true,
+        splashColor: "#c1000a",
+        statusBarColor: "#030401",
+        bottomNavColor: "#F5F5F5",
+      },
+      checkout: {
+        showLogo: true,
+        showSupportContact: true,
+        successMessage: "Thank you for ordering with us.",
+        highlightColor: "#c1000a",
+        successColor: "#00A63E",
+        warningColor: "#F59E0B",
+        errorColor: "#c1000a",
+      },
+      assets: {
+        logoUrl: "",
+        coverImage: "",
+        heroBannerUrl: "",
+        placeholderImage: "",
+        faviconUrl: "",
+        logos: {
+          primaryLogoUrl: "",
+          compactLogoUrl: "",
+          faviconUrl: "",
+        },
+      },
+      logo: {
+        light: "",
+        dark: "",
+      },
+      admin: {
+        previewEnabled: true,
+      },
+    },
+    socialMedia: {
+      website: "",
+      facebook: "",
+      instagram: "",
+      x: "",
+      tiktok: "",
+    },
+  },
+};

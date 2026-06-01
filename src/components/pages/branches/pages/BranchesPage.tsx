@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Container from "@/components/container";
-import Header from "@/components/branches/header";
-import BranchesClient from "@/components/branches/BranchesClient";
+import Container from "@/components/common/Container";
+import Header from "@/components/pages/Branches/components/header";
+import BranchesClient from "@/components/pages/Branches/components/BranchesClient";
 import { useGetBranches } from "@/hooks/useBranches";
 import { useAuth } from "@/hooks/useAuth";
-import BranchWorkspace from "@/components/branch-admin/BranchWorkspace";
+import BranchWorkspace from "@/components/pages/BranchWorkspace/components/branch-admin/BranchWorkspace";
 
 export default function BranchesPage() {
   const { isBranchAdmin } = useAuth();

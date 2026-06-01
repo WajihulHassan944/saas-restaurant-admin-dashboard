@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import Container from "@/components/container";
-import Header from "@/components/header";
-import CouponsPage from "@/components/PromotionManagement/CouponsPage/CouponsPage";
-import PromotionsOverview from "@/components/PromotionManagement/PromotionOverview/PromotionsOverview";
-import PromotionTabs from "@/components/PromotionManagement/PromotionTabs";
-import PromotionsPage from "@/components/PromotionManagement/PromotionsPage/PromotionsPage";
-import HappyHourPage from "@/components/PromotionManagement/HappyHourPage/HappyHourPage";
+import Container from "@/components/common/Container";
+import Header from "@/components/common/PageHeader";
+import CouponsPage from "@/components/pages/Promotions/components/PromotionManagement/CouponsPage/CouponsPage";
+import PromotionsOverview from "@/components/pages/Promotions/components/PromotionManagement/PromotionOverview/PromotionsOverview";
+import PromotionTabs from "@/components/pages/Promotions/components/PromotionManagement/PromotionTabs";
+import PromotionsPage from "@/components/pages/Promotions/components/PromotionManagement/PromotionsPage/PromotionsPage";
+import HappyHourPage from "@/components/pages/Promotions/components/PromotionManagement/HappyHourPage/HappyHourPage";
 import { useAuth } from "@/hooks/useAuth";
 
 type PromotionTabValue = "overview" | "coupons" | "promotions" | "happy-hours";

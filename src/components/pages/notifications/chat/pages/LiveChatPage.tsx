@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import ChatUI from "@/components/chat/Chat";
-import Container from "@/components/container";
-import Header from "@/components/header";
+import ChatUI from "@/components/pages/Notifications/chat/components/chat/Chat";
+import Container from "@/components/common/Container";
+import Header from "@/components/common/PageHeader";
 
 const NotificationSettingsPage = () => {
   return (

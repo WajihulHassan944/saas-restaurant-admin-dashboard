@@ -1,6 +1,6 @@
-import AutoPrintingSettings from "@/components/autoPrinting/AutoPrintingSettings";
-import Container from "@/components/container";
-import Header from "@/components/header";
+import AutoPrintingSettings from "@/components/pages/Printing/components/autoPrinting/AutoPrintingSettings";
+import Container from "@/components/common/Container";
+import Header from "@/components/common/PageHeader";
 
 const CustomerSettingsPage = () => {
     return (

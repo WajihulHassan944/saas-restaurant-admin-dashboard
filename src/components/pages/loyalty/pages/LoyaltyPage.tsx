@@ -1,10 +1,10 @@
 "use client";
 
-import Container from "@/components/container";
-import Header from "@/components/header";
+import Container from "@/components/common/Container";
+import Header from "@/components/common/PageHeader";
 import { useAuth } from "@/hooks/useAuth";
-import LoyaltyProgramSettings from "@/components/loyalty/LoyaltyProgramSettings";
-import CustomerLoyaltyManager from "@/components/loyalty/CustomerLoyaltyManager";
+import LoyaltyProgramSettings from "@/components/pages/Loyalty/components/loyalty/LoyaltyProgramSettings";
+import CustomerLoyaltyManager from "@/components/pages/Loyalty/components/loyalty/CustomerLoyaltyManager";
 
 export default function LoyaltyManagementPage() {
   const { restaurantId, branchId, isBranchAdmin, loading } = useAuth();

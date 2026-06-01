@@ -1,9 +1,7 @@
-import AddHappyHour from '@/components/forms/Promotions/AddHappyHour/AddHappyHour'
+import AddHappyHour from "@/components/pages/Promotions/forms/AddHappyHour/AddHappyHour";
 
 const page = () => {
-  return (
-    <AddHappyHour />
-  )
-}
+  return <AddHappyHour />;
+};
 
-export default page
+export default page;

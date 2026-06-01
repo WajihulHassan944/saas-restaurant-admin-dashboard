@@ -1,161 +1,173 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Container from "@/components/container";
-import AddDeliveryManHeader from "@/components/deliveryman/add/AddDeliveryManHeader";
-import DeliveryManForm from "@/components/forms/deliveryman-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+
+import Container from "@/components/common/Container";
+import DeliveryManForm, { type BranchOption } from "@/components/pages/Deliverymen/forms/DeliverymanForm";
+import AddDeliveryManHeader from "@/components/pages/Deliverymen/components/deliveryman/add/AddDeliveryManHeader";
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useGetBranches } from "@/hooks/useBranches";
 import {
   useCreateDeliveryman,
-  useUpdateDeliveryman,
   useDeliveryman,
+  useUpdateDeliveryman,
 } from "@/hooks/useDeliverymen";
-import { useGetBranches } from "@/hooks/useBranches";
-import { deliverymanSchema } from "@/validations/deliverymen";
-import { validateSchema } from "@/lib/zod-errors";
+import { useSearchParams } from "next/navigation";
+import {
+  deliverymanSchema,
+  type DeliverymanFormValues,
+  type DeliverymanValues,
+} from "@/validations/deliverymen";
+
+const defaultValues: DeliverymanFormValues = {
+  firstName: "",
+  lastName: "",
+  phone: "",
+  email: "",
+  vehicleType: "",
+  vehicleNumber: "",
+  status: "OFFLINE",
+  branchId: "",
+};
+
+type BranchListResponse = {
+  data?: BranchOption[];
+  meta?: unknown;
+};
 
 const AddDeliveryMan = () => {
   const { restaurantId, branchId: authBranchId, isBranchAdmin } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
-
   const editId = searchParams.get("editId");
 
-  /* ================= DELIVERYMAN HOOKS ================= */
-  const { data: deliveryman, isLoading: isFetching } =
-    useDeliveryman(editId || undefined);
-
+  const { data: deliveryman, isLoading: isFetching } = useDeliveryman(editId || undefined);
   const createMutation = useCreateDeliveryman();
   const updateMutation = useUpdateDeliveryman();
 
-  /* ================= BRANCH STATE (FOR SEARCH/PAGINATION) ================= */
   const [branchQuery, setBranchQuery] = useState({
     search: "",
     page: 1,
   });
+  const [selectedBranch, setSelectedBranch] = useState<BranchOption | null>(null);
 
-  const { data: branchesData, isFetching: isBranchesFetching } =
-    useGetBranches({
-      search: branchQuery.search,
-      restaurantId: restaurantId ?? undefined, 
-    });
+  const { data: branchesData } = useGetBranches({
+    search: branchQuery.search,
+    restaurantId: restaurantId ?? undefined,
+  }) as { data?: BranchListResponse };
 
-  /* ================= STATE ================= */
-  const [selectedBranch, setSelectedBranch] = useState<any>(null);
-
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    email: "",
-    vehicleType: "",
-    vehicleNumber: "",
-    status: "OFFLINE" as "ONLINE" | "OFFLINE",
+  const {
+    control,
+    formState: { errors },
+    handleSubmit,
+    reset,
+    setValue,
+  } = useForm<DeliverymanFormValues>({
+    resolver: zodResolver(
+      deliverymanSchema.omit({ restaurantId: true }).extend({
+        branchId: deliverymanSchema.shape.branchId,
+      })
+    ),
+    defaultValues,
   });
 
-  /* ================= PREFILL ================= */
   useEffect(() => {
     if (isBranchAdmin && authBranchId && !selectedBranch) {
       setSelectedBranch({ id: authBranchId, name: "Assigned branch" });
+      setValue("branchId", authBranchId);
     }
-  }, [isBranchAdmin, authBranchId, selectedBranch]);
+  }, [isBranchAdmin, authBranchId, selectedBranch, setValue]);
 
   useEffect(() => {
     if (!deliveryman) return;
 
-    setFormData({
-      firstName: deliveryman.firstName || "",
-      lastName: deliveryman.lastName || "",
-      phone: deliveryman.phone || "",
-      email: deliveryman.email || "",
-      vehicleType: deliveryman.vehicleType || "",
-      vehicleNumber: deliveryman.vehicleNumber || "",
-      status: deliveryman.status || "OFFLINE",
+    const { branch: deliverymanBranch } = deliveryman;
+    const branch = deliverymanBranch
+      ? {
+          id: deliverymanBranch.id,
+          name: deliverymanBranch.name,
+        }
+      : null;
+
+    reset({
+      firstName: deliveryman.firstName ?? "",
+      lastName: deliveryman.lastName ?? "",
+      phone: deliveryman.phone ?? "",
+      email: deliveryman.email ?? "",
+      vehicleType: deliveryman.vehicleType ?? "",
+      vehicleNumber: deliveryman.vehicleNumber ?? "",
+      status: deliveryman.status ?? "OFFLINE",
+      branchId: isBranchAdmin ? authBranchId ?? "" : branch?.id ?? "",
     });
 
-    if (deliveryman.branch) {
-      setSelectedBranch(deliveryman.branch);
-    }
-  }, [deliveryman]);
+    if (branch) setSelectedBranch(branch);
+  }, [authBranchId, deliveryman, isBranchAdmin, reset]);
 
-  /* ================= BRANCH FETCH WRAPPER ================= */
-  const fetchBranches = async ({ search, page }: any) => {
-    // update query → triggers hook refetch
+  const fetchBranches = async ({ search, page }: { search: string; page: number }) => {
     setBranchQuery({
       search: search || "",
       page: page || 1,
     });
 
-    // return current cached data (React Query handles freshness)
     return {
-      data: branchesData?.data || [],
+      data: branchesData?.data ?? [],
       meta: branchesData?.meta,
     };
   };
 
-  /* ================= SUBMIT ================= */
-  const handleSubmit = async () => {
-    const branchId = isBranchAdmin ? authBranchId : selectedBranch?.id;
+  const onSubmit = async (values: DeliverymanFormValues) => {
+    const branchId = isBranchAdmin ? authBranchId : values.branchId;
 
     try {
-      const payload = {
-        ...formData,
-        restaurantId,
-        branchId,
+      const payload: DeliverymanValues = {
+        ...values,
+        restaurantId: restaurantId ?? "",
+        branchId: branchId ?? "",
       };
 
-      const parsed = validateSchema(deliverymanSchema, payload);
-
-      if (!parsed.success) {
-        toast.error(Object.values(parsed.errors)[0] || "Invalid form data");
-        return;
-      }
-
-      /* CREATE */
       if (!editId) {
         if (!restaurantId || !branchId) {
           toast.error("Restaurant or branch not found");
           return;
         }
 
-        await createMutation.mutateAsync(parsed.data);
+        await createMutation.mutateAsync(payload);
         return;
       }
 
-      /* UPDATE */
+      const { restaurantId: _restaurantId, status: _status, ...updatePayload } = payload;
       await updateMutation.mutateAsync({
-  id: editId,
-  payload: (({ restaurantId, status, ...rest }) => rest)(parsed.data), 
-});
-    } catch (err: any) {
-      void err;
-      toast.error(err?.message || "Something went wrong");
+        id: editId,
+        payload: updatePayload,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Something went wrong");
     }
   };
 
-  /* ================= LOADING ================= */
-  const isSaving =
-    createMutation.isPending || updateMutation.isPending;
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <Container>
       <AddDeliveryManHeader
         title={editId ? "Edit Delivery Man" : "Create New Delivery Man"}
         description="Manage delivery man details"
-        onConfirm={handleSubmit}
         loading={isSaving || isFetching}
+        formId="deliveryman-form"
       />
 
-      <DeliveryManForm
-        formData={formData}
-        setFormData={setFormData}
-        selectedBranch={selectedBranch}
-        setSelectedBranch={setSelectedBranch}
-        fetchBranches={fetchBranches}
-        branchLocked={isBranchAdmin}
-      />
+      <form id="deliveryman-form" noValidate onSubmit={handleSubmit(onSubmit)}>
+        <DeliveryManForm
+          control={control}
+          errors={errors}
+          selectedBranch={selectedBranch}
+          setSelectedBranch={setSelectedBranch}
+          fetchBranches={fetchBranches}
+          branchLocked={isBranchAdmin}
+        />
+      </form>
     </Container>
   );
 };

@@ -17,8 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { BranchProps } from "@/types/branch";
 import ActionDropdown from "../common/ActionDropdown";
-import OpeningHoursModal from "../branches/OpeningHoursModal";
-import AddHolidayHoursInfo from "../branches/AddHolidayHoursInfo";
+import OpeningHoursModal from "@/components/pages/Branches/components/OpeningHoursModal";
+import AddHolidayHoursInfo from "@/components/pages/Branches/components/AddHolidayHoursInfo";
 
 import {
   useDeleteBranch,
@@ -26,11 +26,11 @@ import {
   useSuspendBranch,
   useUpdateBranchTemporaryClosure,
 } from "@/hooks/useBranches";
+import { useDeleteRestaurantMenu } from "@/hooks/useMenus";
 import { useAuth } from "@/hooks/useAuth";
-import { useHttpClient } from "@/hooks/useHttpClient";
 import { toast } from "sonner";
-import DeleteDialog from "../dialogs/delete-dialog";
-import BranchCoverModal from "../branches/BranchCoverModal";
+import DeleteDialog from "@/components/common/dialogs/delete-dialog";
+import BranchCoverModal from "@/components/pages/Branches/components/BranchCoverModal";
 import TemporaryBranchClosureModal from "./TemporaryBranchClosureModal";
 
 export default function BranchCard({
@@ -62,9 +62,9 @@ export default function BranchCard({
   const activateMutation = useActivateBranch();
   const suspendMutation = useSuspendBranch();
   const temporaryClosureMutation = useUpdateBranchTemporaryClosure();
+  const deleteMenuMutation = useDeleteRestaurantMenu();
 
-  const { token, isBranchAdmin } = useAuth();
-  const { del } = useHttpClient(token);
+  const { isBranchAdmin } = useAuth();
 
   const isTemporarilyClosed = Boolean(
     availability?.isTemporarilyClosed ||
@@ -92,11 +92,7 @@ export default function BranchCard({
       if (openDialog) {
         await deleteMutation.mutateAsync(id);
       } else {
-        const res = await del(`/v1/menus/${id}`);
-
-        if (res?.error) return;
-
-        toast.success(res?.message || "Menu deleted successfully");
+        await deleteMenuMutation.mutateAsync(id);
         window.location.reload();
       }
 

@@ -685,9 +685,6 @@ export const useAttachModifierGroupToCategory = () => {
   });
 };
 
-/* =========================
-   GET SINGLE MENU
-========================= */
 export const useGetMenuById = (menuId?: string) => {
   return useQuery({
     queryKey: ["menu", menuId],
@@ -696,9 +693,6 @@ export const useGetMenuById = (menuId?: string) => {
   });
 };
 
-/* =========================
-   CREATE MENU
-========================= */
 export const useCreateMenu = () => {
   const queryClient = useQueryClient();
 
@@ -711,9 +705,6 @@ export const useCreateMenu = () => {
   });
 };
 
-/* =========================
-   UPDATE MENU
-========================= */
 export const useUpdateMenu = () => {
   const queryClient = useQueryClient();
 
@@ -792,6 +783,23 @@ export const useReorderMenuItems = () => {
       toast.error(
         error?.response?.data?.message || "Failed to reorder menu items"
       );
+    },
+  });
+};
+
+export const useAttachModifierGroupToItemWithSort = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId, groupId, sortOrder }: { itemId: string; groupId: string; sortOrder?: number }) =>
+      attachModifierGroupToItem(itemId, groupId, sortOrder !== undefined ? { sortOrder } : undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["modifier-groups"] });
+      toast.success("Modifier group attached successfully!");
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || "Failed to attach modifier group to item");
     },
   });
 };
