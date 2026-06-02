@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { SelectOption } from "@/components/pages/Promotions/utils/option-normalizers";
+import { thumbnailUrlSchema } from "@/validations/thumbnail-url";
 
 const discountTypeSchema = z.enum(["FLAT", "PERCENTAGE"]);
 const applyModeSchema = z.enum(["ORDER_TOTAL", "SCOPED_ITEMS"]);
@@ -16,6 +17,7 @@ export const promotionSchema = z
     code: optionalStringSchema,
     title: z.string().trim().min(1, "Offer title is required."),
     description: optionalStringSchema,
+    thumbnailUrl: thumbnailUrlSchema.optional().default(""),
     discountType: discountTypeSchema,
     discountValue: positiveNumberStringSchema("Discount value is required."),
     maxDiscountAmount: optionalStringSchema,
