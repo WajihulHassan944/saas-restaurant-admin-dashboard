@@ -3,6 +3,7 @@ import {
   Store,
   List,
   ShoppingBag,
+  CalendarCheck,
   Monitor,
   Truck,
   UserCog,
@@ -19,6 +20,7 @@ import {
   ClipboardList,
   AlertTriangle,
   BadgeCheck,
+  BadgePercent,
   Coins,
 } from "lucide-react";
 import { PiUsersThree } from "react-icons/pi";
@@ -97,6 +99,13 @@ export const menuItems: MenuItem[] = [
         roles: restaurantAdminRoles,
       },
       {
+        title: "Deals",
+        href: "/menu/deals",
+        icon: BadgePercent,
+        section: "main",
+        roles: allAdminRoles,
+      },
+      {
         title: "Items",
         href: "/menu/items",
         icon: PackagePlus,
@@ -123,6 +132,13 @@ export const menuItems: MenuItem[] = [
     title: "Order Management",
     href: "/orders",
     icon: ShoppingBag,
+    section: "main",
+    roles: allAdminRoles,
+  },
+  {
+    title: "Table Reservations",
+    href: "/table-reservations",
+    icon: CalendarCheck,
     section: "main",
     roles: allAdminRoles,
   },

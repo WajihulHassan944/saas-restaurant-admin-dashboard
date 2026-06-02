@@ -1,0 +1,211 @@
+"use client";
+
+import EmptyState from "@/components/common/EmptyState";
+import {
+  formatDateTime,
+  formatReservationDate,
+  formatShortId,
+  getBranchName,
+} from "@/components/pages/TableReservations/utils/table-reservations-formatters";
+import type { TableReservation } from "@/types/table-reservations";
+import TableReservationCustomerCell from "./TableReservationCustomerCell";
+import TableReservationStatusBadge from "./TableReservationStatusBadge";
+import TableReservationsEmptyState from "./TableReservationsEmptyState";
+
+type TableReservationsTableProps = {
+  reservations: TableReservation[];
+  loading: boolean;
+  error?: Error | null;
+};
+
+const desktopColumnCount = 6;
+
+export default function TableReservationsTable({
+  reservations,
+  loading,
+  error,
+}: TableReservationsTableProps) {
+  if (loading) {
+    return (
+      <>
+        <div className="lg:hidden py-10 text-center text-sm text-gray-400">
+          Loading table reservations...
+        </div>
+        <div className="hidden w-full max-w-full overflow-hidden rounded-[18px] border border-gray-100 bg-white shadow-sm md:block">
+          <table className="w-full table-fixed text-sm">
+            <tbody>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <tr key={index}>
+                  <td colSpan={desktopColumnCount} className="px-5 py-5">
+                    <div className="grid animate-pulse grid-cols-[18%_25%_17%_10%_18%_12%] gap-3">
+                      <div className="h-4 rounded bg-gray-200" />
+                      <div className="h-4 rounded bg-gray-200" />
+                      <div className="h-4 rounded bg-gray-200" />
+                      <div className="h-4 rounded bg-gray-200" />
+                      <div className="h-4 rounded bg-gray-200" />
+                      <div className="h-4 rounded bg-gray-200" />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <EmptyState
+        title="Unable to load table reservations."
+        description={error.message || "Please refresh and try again."}
+      />
+    );
+  }
+
+  if (reservations.length === 0) {
+    return <TableReservationsEmptyState />;
+  }
+
+  return (
+    <div className="w-full max-w-full overflow-hidden">
+      <div className="hidden w-full max-w-full overflow-hidden rounded-[18px] border border-gray-100 bg-white shadow-sm md:block">
+        <table className="w-full table-fixed text-sm">
+          <thead>
+            <tr className="border-b bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="w-[18%] px-5 py-4">Reservation</th>
+              <th className="w-[25%] px-3 py-4">Customer</th>
+              <th className="w-[17%] px-3 py-4">Date & Time</th>
+              <th className="w-[10%] px-3 py-4 text-center">Guests</th>
+              <th className="w-[18%] px-3 py-4">Branch / Note</th>
+              <th className="w-[12%] px-5 py-4 text-center">Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {reservations.map((reservation) => (
+              <tr
+                key={reservation.id}
+                className="border-b border-gray-100 transition hover:bg-[#FAFAFA]"
+              >
+                <td className="px-5 py-4">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-gray-900">
+                      {formatShortId(reservation.id)}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-gray-400">
+                      Created: {formatDateTime(reservation.createdAt)}
+                    </p>
+                    {reservation.cancelledAt ? (
+                      <p className="mt-0.5 truncate text-xs text-red-500">
+                        Cancelled: {formatDateTime(reservation.cancelledAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                </td>
+
+                <td className="px-3 py-4">
+                  <TableReservationCustomerCell customer={reservation.customer} />
+                </td>
+
+                <td className="px-3 py-4 text-gray-700">
+                  <span className="block truncate">
+                    {formatReservationDate(reservation.reservationDate)}
+                  </span>
+                </td>
+
+                <td className="px-3 py-4 text-center">
+                  <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    {reservation.guestCount}
+                  </span>
+                </td>
+
+                <td className="px-3 py-4">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-gray-700">
+                      {getBranchName(reservation)}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-gray-400">
+                      {reservation.branch?.address ||
+                        (reservation.branchId ? `Branch ID: ${reservation.branchId}` : "No branch")}
+                    </p>
+                    <p className="mt-1 line-clamp-1 break-words text-xs text-gray-500">
+                      {reservation.note || "No note"}
+                    </p>
+                  </div>
+                </td>
+
+                <td className="px-5 py-4 text-center">
+                  <TableReservationStatusBadge status={reservation.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="w-full max-w-full space-y-4 md:hidden">
+        {reservations.map((reservation) => (
+          <div
+            key={reservation.id}
+            className="w-full max-w-full overflow-hidden rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm"
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {formatShortId(reservation.id)}
+                </p>
+                <p className="mt-1 truncate text-xs text-gray-500">
+                  {formatReservationDate(reservation.reservationDate)}
+                </p>
+              </div>
+
+              <TableReservationStatusBadge status={reservation.status} />
+            </div>
+
+            <div className="mt-4">
+              <TableReservationCustomerCell customer={reservation.customer} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
+                <p className="text-xs text-gray-400">Guests</p>
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {reservation.guestCount}
+                </p>
+              </div>
+
+              <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
+                <p className="text-xs text-gray-400">Branch</p>
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {getBranchName(reservation)}
+                </p>
+              </div>
+
+              <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
+                <p className="text-xs text-gray-400">Created</p>
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {formatDateTime(reservation.createdAt)}
+                </p>
+              </div>
+
+              <div className="min-w-0 rounded-[12px] bg-[#FAFAFA] p-3">
+                <p className="text-xs text-gray-400">Cancelled</p>
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {reservation.cancelledAt
+                    ? formatDateTime(reservation.cancelledAt)
+                    : "—"}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 line-clamp-2 break-words text-sm text-gray-500">
+              {reservation.note || "No note"}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
