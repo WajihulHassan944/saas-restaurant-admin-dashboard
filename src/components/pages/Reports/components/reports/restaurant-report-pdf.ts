@@ -12,6 +12,8 @@ type ReportPdfStat = {
   description?: string;
 };
 
+type ReportTableRow = [string, string];
+
 type DownloadRestaurantDashboardReportPdfInput = {
   reportType: DashboardReportType;
   title: string;
@@ -37,6 +39,21 @@ const formatCurrency = (value: number, currency = "EUR") => {
       style: "currency",
       currency,
       maximumFractionDigits: 2,
+    }).format(numericValue);
+  } catch {
+    return `${currency} ${numericValue.toFixed(2)}`;
+  }
+};
+
+const formatInvoiceCurrency = (value: number, currency = "EUR") => {
+  const numericValue = Number(value || 0);
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
     }).format(numericValue);
   } catch {
     return `${currency} ${numericValue.toFixed(2)}`;
@@ -180,6 +197,49 @@ const buildTopItemsRows = (items?: any[], currency = "EUR") => {
   ]);
 };
 
+const normalizeReportCell = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/^total\s+/, "")
+    .replace(/\s+/g, " ");
+
+const areRowsCoveredByStats = (
+  rows: ReportTableRow[],
+  stats: ReportPdfStat[]
+) => {
+  if (!rows.length || !stats.length) return false;
+
+  const normalizedStats = new Set(
+    stats.map((stat) =>
+      `${normalizeReportCell(stat.title)}:${normalizeReportCell(stat.value)}`
+    )
+  );
+
+  return rows.every(([label, value]) =>
+    normalizedStats.has(
+      `${normalizeReportCell(label)}:${normalizeReportCell(value)}`
+    )
+  );
+};
+
+const buildFinancialDetailRows = (
+  data: any,
+  currency: string
+): ReportTableRow[] => [
+  ["Total Orders", String(data?.totalOrders ?? 0)],
+  ["Gross Revenue", formatCurrency(data?.grossRevenue ?? 0, currency)],
+  ["Paid Revenue", formatCurrency(data?.paidRevenue ?? 0, currency)],
+  ["Net Revenue", formatCurrency(data?.netRevenue ?? 0, currency)],
+  [
+    "Average Order Value",
+    formatCurrency(data?.averageOrderValue ?? 0, currency),
+  ],
+  ["Total Tax", formatCurrency(data?.totalTax ?? 0, currency)],
+  ["Total Delivery Fee", formatCurrency(data?.totalDeliveryFee ?? 0, currency)],
+  ["Refunded Amount", formatCurrency(data?.refundedAmount ?? 0, currency)],
+];
+
 export const downloadRestaurantDashboardReportPdf = ({
   reportType,
   title,
@@ -249,52 +309,40 @@ export const downloadRestaurantDashboardReportPdf = ({
   y = getFinalY(doc, y + 160) + 28;
 
   if (reportType === "financial") {
-    addSectionTitle(doc, "Financial Details", y);
+    const rows = buildFinancialDetailRows(data, currency);
+    const shouldRenderFinancialDetails = !areRowsCoveredByStats(rows, stats);
 
-    const rows = [
-      ["Total Orders", String(data?.totalOrders ?? 0)],
-      ["Gross Revenue", formatCurrency(data?.grossRevenue ?? 0, currency)],
-      ["Paid Revenue", formatCurrency(data?.paidRevenue ?? 0, currency)],
-      ["Net Revenue", formatCurrency(data?.netRevenue ?? 0, currency)],
-      [
-        "Average Order Value",
-        formatCurrency(data?.averageOrderValue ?? 0, currency),
-      ],
-      ["Total Tax", formatCurrency(data?.totalTax ?? 0, currency)],
-      [
-        "Total Delivery Fee",
-        formatCurrency(data?.totalDeliveryFee ?? 0, currency),
-      ],
-      ["Refunded Amount", formatCurrency(data?.refundedAmount ?? 0, currency)],
-    ];
+    if (shouldRenderFinancialDetails) {
+      addSectionTitle(doc, "Financial Details", y);
 
-    autoTable(doc, {
-      startY: y + 14,
-      head: [["Field", "Value"]],
-      body: rows,
-      margin: {
-        left: 40,
-        right: 40,
-      },
-      theme: "grid",
-      styles: {
-        font: "helvetica",
-        fontSize: 9,
-        cellPadding: 8,
-        lineColor: PDF_BORDER_COLOR,
-        lineWidth: 0.4,
-        textColor: PDF_DARK_COLOR,
-      },
-      headStyles: {
-        fillColor: PDF_LIGHT_GRAY_COLOR,
-        textColor: PDF_GRAY_COLOR,
-        fontStyle: "bold",
-      },
-      columnStyles: {
-        0: { cellWidth: 240 },
-        1: { cellWidth: 250, halign: "right" },
-      },
-    } as any);
+      autoTable(doc, {
+        startY: y + 14,
+        head: [["Field", "Value"]],
+        body: rows,
+        margin: {
+          left: 40,
+          right: 40,
+        },
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 9,
+          cellPadding: 8,
+          lineColor: PDF_BORDER_COLOR,
+          lineWidth: 0.4,
+          textColor: PDF_DARK_COLOR,
+        },
+        headStyles: {
+          fillColor: PDF_LIGHT_GRAY_COLOR,
+          textColor: PDF_GRAY_COLOR,
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { cellWidth: 240 },
+          1: { cellWidth: 250, halign: "right" },
+        },
+      } as any);
+    }
   } else {
     const statusRows = buildBreakdownRows(data?.statusBreakdown);
     const paymentRows = buildBreakdownRows(data?.paymentStatusBreakdown);
@@ -520,9 +568,9 @@ export const downloadRestaurantInvoicePdf = (invoice: AdminInvoice) => {
       invoice.items?.map((item) => [
         item.menuItemName || "-",
         item.variationName || "-",
-        formatCurrency(item.unitPrice || 0, currency),
+        formatInvoiceCurrency(item.unitPrice || 0, currency),
         String(item.quantity || 0),
-        formatCurrency(item.lineTotal || 0, currency),
+        formatInvoiceCurrency(item.lineTotal || 0, currency),
       ]) || [],
     margin: {
       left: 40,
@@ -558,19 +606,19 @@ export const downloadRestaurantInvoicePdf = (invoice: AdminInvoice) => {
   autoTable(doc, {
     startY: y + 14,
     body: [
-      ["Subtotal", formatCurrency(invoice.subtotal || 0, currency)],
-      ["Tax", formatCurrency(invoice.taxAmount || 0, currency)],
-      ["Delivery Fee", formatCurrency(invoice.deliveryFee || 0, currency)],
-      ["Discount", `-${formatCurrency(invoice.discountAmount || 0, currency)}`],
+      ["Subtotal", formatInvoiceCurrency(invoice.subtotal || 0, currency)],
+      ["Tax", formatInvoiceCurrency(invoice.taxAmount || 0, currency)],
+      ["Delivery Fee", formatInvoiceCurrency(invoice.deliveryFee || 0, currency)],
+      ["Discount", `-${formatInvoiceCurrency(invoice.discountAmount || 0, currency)}`],
       [
         "Wallet Applied",
-        `-${formatCurrency(invoice.walletAppliedAmount || 0, currency)}`,
+        `-${formatInvoiceCurrency(invoice.walletAppliedAmount || 0, currency)}`,
       ],
       [
         "Loyalty Discount",
-        `-${formatCurrency(invoice.loyaltyDiscountAmount || 0, currency)}`,
+        `-${formatInvoiceCurrency(invoice.loyaltyDiscountAmount || 0, currency)}`,
       ],
-      ["Total", formatCurrency(invoice.totalAmount || 0, currency)],
+      ["Total", formatInvoiceCurrency(invoice.totalAmount || 0, currency)],
     ],
     margin: {
       left: 300,

@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Sidebar from "@/components/layout/sidebar/Sidebar";
 import { SearchBar } from "./search-bar";
 import NotificationBell from "./notification";
 import ProfileSection from "./profile-section";
 import RestaurantPicker from "@/components/common/RestaurantPicker";
+import LanguageSelector from "@/components/layout/navbar/LanguageSelector";
 
 export function Navbar() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const t = useTranslations("navbar");
 
   return (
     <>
@@ -20,6 +23,7 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             <button
               type="button"
+              aria-label={t("openSidebar")}
               className="ml-4 inline-flex size-10 items-center justify-center rounded-[var(--brand-button-radius)] bg-primary/10 text-primary xl:hidden"
               onClick={() => setIsSidebarOpen(true)}
             >
@@ -33,6 +37,7 @@ export function Navbar() {
           <RestaurantPicker />
           {/* RIGHT */}
           <div className="flex items-center gap-0 lg:gap-2">
+            <LanguageSelector />
             <NotificationBell />
             <div className="hidden h-12 w-px bg-primary lg:block" />
             <ProfileSection />
@@ -52,6 +57,7 @@ export function Navbar() {
               <div className="absolute top-3 right-3 z-10">
                 <button
                   type="button"
+                  aria-label={t("closeSidebar")}
                   className="inline-flex size-9 items-center justify-center rounded-[var(--brand-button-radius)] bg-white/80 text-primary shadow"
                   onClick={() => setIsSidebarOpen(false)}
                 >
