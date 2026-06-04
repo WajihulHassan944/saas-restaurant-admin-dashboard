@@ -17,6 +17,7 @@ import {
   useUpdateMenuCategory,
 } from "@/hooks/useMenuCategories";
 import ImageDropzoneUpload from "@/components/ui/ImageDropzoneUpload";
+import { getApiErrorMessage } from "@/lib/errors";
 import { useTranslations } from "next-intl";
 
 interface CreateMenuModalProps {
@@ -93,10 +94,10 @@ export default function CreateCategoryModalParent({
 
 const restaurantId = authRestaurantId ?? undefined;
 
-  const { mutate: createMenuCategory, isPending: isCreating } =
+  const { mutateAsync: createMenuCategory, isPending: isCreating } =
     useCreateMenuCategory();
 
-  const { mutate: updateMenuCategory, isPending: isUpdating } =
+  const { mutateAsync: updateMenuCategory, isPending: isUpdating } =
     useUpdateMenuCategory();
 
   const isEditMode = Boolean(initialData?.id);
@@ -215,7 +216,7 @@ const restaurantId = authRestaurantId ?? undefined;
     resetForm();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (imageUploading) {
       toast.error(t("waitForImageUpload"));
       return;
@@ -234,39 +235,34 @@ const restaurantId = authRestaurantId ?? undefined;
     if (isEditMode) {
       const { restaurantId: _restaurantId, ...updatePayload } = payload;
 
-      updateMenuCategory(
-        {
+      try {
+        await updateMenuCategory({
           id: initialData.id,
           data: updatePayload,
-        },
-        {
-          onSuccess: () => {
-            onSuccess?.();
-            onOpenChange(false);
-            resetForm();
-          },
-          onError: (err: any) => {
-            toast.error(
-              err?.response?.data?.message || t("updateFailed")
-            );
-          },
-        }
-      );
+        });
+
+        onSuccess?.();
+        onOpenChange(false);
+        resetForm();
+      } catch (error: unknown) {
+        toast.error(getApiErrorMessage(error, t("updateFailed")));
+      }
 
       return;
     }
 
-    createMenuCategory(payload as any, {
-      onSuccess: () => {
-        onSuccess?.();
-        onOpenChange(false);
-        resetForm();
-        toast.success(t("createdSuccessfully"));
-      },
-      onError: (err: any) => {
-        toast.error(err?.response?.data?.message || t("createFailed"));
-      },
-    });
+    try {
+      await createMenuCategory(
+        payload as Parameters<typeof createMenuCategory>[0]
+      );
+
+      onSuccess?.();
+      onOpenChange(false);
+      resetForm();
+      toast.success(t("createdSuccessfully"));
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, t("createFailed")));
+    }
   };
 
   return (
@@ -283,7 +279,7 @@ const restaurantId = authRestaurantId ?? undefined;
         onOpenChange(value);
       }}
     >
-      <DialogContent className="max-h-[95vh] max-w-[420px] overflow-auto rounded-[20px] bg-[#F5F5F5] p-6">
+      <DialogContent className="max-h-[95vh] max-w-[520px] overflow-y-auto overflow-x-hidden rounded-[20px] bg-[#F5F5F5] p-6">
         <DialogHeader className="space-y-1">
           <DialogTitle className="text-2xl font-semibold">
             {isEditMode ? t("updateTitle") : t("createTitle")}
@@ -296,7 +292,7 @@ const restaurantId = authRestaurantId ?? undefined;
           </p>
         </DialogHeader>
 
-        <div className="mt-5 space-y-4 rounded-[16px] bg-white p-5">
+        <div className="mt-5 min-w-0 space-y-4 overflow-hidden rounded-[16px] bg-white p-4 sm:p-5">
           <FormInput
             label={t("name")}
             placeholder={t("namePlaceholder")}
@@ -388,7 +384,7 @@ const restaurantId = authRestaurantId ?? undefined;
 
           <Button
             type="button"
-            onClick={handleSubmit}
+            onClick={() => void handleSubmit()}
             className="rounded-[10px] bg-primary px-6 py-2 text-[16px] hover:bg-primary/90"
             disabled={isBusy}
           >

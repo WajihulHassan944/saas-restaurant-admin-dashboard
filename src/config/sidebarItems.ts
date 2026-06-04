@@ -22,7 +22,10 @@ import {
   BadgeCheck,
   BadgePercent,
   Coins,
+  CreditCard,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { IconType } from "react-icons";
 import { PiUsersThree } from "react-icons/pi";
 
 export type SidebarSection = "main" | "account";
@@ -32,7 +35,7 @@ export interface MenuItem {
   title: string;
   labelKey?: string;
   href?: string;
-  icon: any;
+  icon: LucideIcon | IconType;
   section: SidebarSection;
   children?: MenuItem[];
   roles?: SidebarRole[];
@@ -90,6 +93,22 @@ export const menuItems: MenuItem[] = [
         icon: ClipboardList,
         section: "main",
         roles: allAdminRoles,
+      },
+      {
+        title: "Modifier Categories",
+        labelKey: "modifierCategories",
+        href: "/menu/modifier-categories",
+        icon: ClipboardList,
+        section: "main",
+        roles: restaurantAdminRoles,
+      },
+      {
+        title: "Modifier Groups",
+        labelKey: "modifierGroups",
+        href: "/menu/modifier-groups",
+        icon: ClipboardList,
+        section: "main",
+        roles: restaurantAdminRoles,
       },
       {
         title: "Modifiers",
@@ -212,7 +231,25 @@ export const menuItems: MenuItem[] = [
     href: "/promotion-management",
     icon: Gift,
     section: "main",
-    roles: restaurantAdminRoles,
+    roles: allAdminRoles,
+    children: [
+      {
+        title: "Promotions",
+        labelKey: "promotions",
+        href: "/promotion-management",
+        icon: Gift,
+        section: "main",
+        roles: restaurantAdminRoles,
+      },
+      {
+        title: "Gift Cards",
+        labelKey: "giftCards",
+        href: "/promotion-management/gift-cards",
+        icon: CreditCard,
+        section: "main",
+        roles: allAdminRoles,
+      },
+    ],
   },
   {
     title: "Content Management",

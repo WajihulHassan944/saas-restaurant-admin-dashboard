@@ -5,9 +5,8 @@ import type { UIEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { formatDealPrice } from "@/components/pages/Menu/deals/utils/admin-deals-formatters";
-import { normalizeAdminDealMenuItem } from "@/components/pages/Menu/deals/utils/admin-deals-normalizers";
 import { Button } from "@/components/ui/button";
-import { getMenuItems } from "@/services/menu/menu.api";
+import { useAdminDealMenuItems } from "@/hooks/useAdminDealMenuItems";
 import type { AdminDealMenuItemSummary } from "@/types/admin-deals";
 import { useTranslations } from "next-intl";
 
@@ -21,34 +20,6 @@ type AdminDealMenuItemSelectorProps = {
 
 const MENU_ITEMS_PAGE_SIZE = 10;
 
-const getResponseItems = (response: unknown): AdminDealMenuItemSummary[] => {
-  const source = response && typeof response === "object" ? response : {};
-  const record = source as Record<string, unknown>;
-  const data = record.data;
-
-  const items = Array.isArray(data)
-    ? data
-    : data && typeof data === "object" && Array.isArray((data as Record<string, unknown>).data)
-      ? ((data as Record<string, unknown>).data as unknown[])
-      : [];
-
-  return items
-    .map((item) => normalizeAdminDealMenuItem(item))
-    .filter((item): item is AdminDealMenuItemSummary => item !== null);
-};
-
-const getHasNext = (itemCount: number) => itemCount > 0;
-
-const mergeItems = (
-  current: AdminDealMenuItemSummary[],
-  next: AdminDealMenuItemSummary[]
-) => {
-  const itemMap = new Map<string, AdminDealMenuItemSummary>();
-  [...current, ...next].forEach((item) => itemMap.set(item.id, item));
-
-  return Array.from(itemMap.values());
-};
-
 export default function AdminDealMenuItemSelector({
   value,
   onChange,
@@ -58,48 +29,14 @@ export default function AdminDealMenuItemSelector({
 }: AdminDealMenuItemSelectorProps) {
   const t = useTranslations("deals.menuItemSelector");
   const [search, setSearch] = useState("");
-  const [options, setOptions] = useState<AdminDealMenuItemSummary[]>(initialItems);
   const [page, setPage] = useState(1);
-  const [hasNext, setHasNext] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setOptions((current) => mergeItems(current, initialItems));
-  }, [initialItems]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadItems = async () => {
-      setLoading(true);
-      try {
-        const response: unknown = await getMenuItems({
-          page,
-          limit: MENU_ITEMS_PAGE_SIZE,
-          search,
-          restaurantId,
-        });
-        const items = getResponseItems(response);
-
-        if (mounted) {
-          setOptions((current) => {
-            if (page === 1) return mergeItems(initialItems, items);
-            return mergeItems(current, items);
-          });
-          setHasNext(getHasNext(items.length));
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    const timeoutId = window.setTimeout(loadItems, page === 1 ? 300 : 0);
-
-    return () => {
-      mounted = false;
-      window.clearTimeout(timeoutId);
-    };
-  }, [initialItems, page, restaurantId, search]);
+  const { options, hasNext, loading } = useAdminDealMenuItems({
+    page,
+    limit: MENU_ITEMS_PAGE_SIZE,
+    search,
+    restaurantId,
+    initialItems,
+  });
 
   useEffect(() => {
     setPage(1);

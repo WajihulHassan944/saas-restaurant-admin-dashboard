@@ -14,8 +14,10 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { ModifierGroupAssignmentForm } from "@/components/pages/Menu/components/ModifierGroupAssignmentForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useGetModifiers } from "@/hooks/useMenus";
+import { normalizeMenuItemModifierGroupAssignments } from "@/lib/modifier-group-assignment-utils";
 import {
   blockInvalidNumberKeys,
   blockNegativeNumberPaste,
@@ -60,6 +62,7 @@ type FlatModifierVariationOverride = {
 import { extractResponseItems } from "@/lib/response";
 
 const PAGE_LIMIT = 20;
+const SHOW_LEGACY_DIRECT_MODIFIERS = false;
 
 const normalizeArray = (value: any): any[] => {
   if (!value) return [];
@@ -479,6 +482,14 @@ const StepFour = forwardRef(({ form, setForm }: StepFourProps, ref: any) => {
     form?.modifierPriceOverrides,
     form?.variationPriceOverrides,
   ]);
+
+  const modifierGroupAssignments = useMemo(
+    () =>
+      normalizeMenuItemModifierGroupAssignments(
+        form?.modifierGroupAssignments || form?.modifierGroups
+      ),
+    [form?.modifierGroupAssignments, form?.modifierGroups]
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1217,38 +1228,56 @@ const StepFour = forwardRef(({ form, setForm }: StepFourProps, ref: any) => {
         </div>
       </div>
 
-      <ModifierSelectionSection
-        title={t("assignTitle")}
-        description={t("assignDescription")}
-        icon={<Tags size={18} />}
-        searchValue={modifierSearch}
-        onSearchChange={setModifierSearch}
-        searchPlaceholder={t("searchPlaceholder")}
-        loading={
-          (loadingModifiers || fetchingModifiers) && modifierOptions.length === 0
-        }
-        loadingMore={modifierPage > 1 && fetchingModifiers}
-        hasMore={modifierHasMore}
-        onLoadMore={loadMoreModifiers}
-        items={modifierOptions}
-        selectedIds={selectedModifierIds}
-        selectedModifiers={selectedModifiers}
-        emptyTitle={t("emptyTitle")}
-        emptyDescription={t("emptyDescription")}
-        onToggle={toggleModifier}
-        onClear={clearModifiers}
+      <ModifierGroupAssignmentForm
+        mode="item"
+        targetId={form?.id || ""}
+        restaurantId={restaurantId}
+        defaultValues={modifierGroupAssignments}
+        onAssignmentsChange={(assignments) => {
+          setForm((prev: Record<string, unknown>) => ({
+            ...prev,
+            modifierGroupAssignments: assignments,
+          }));
+        }}
       />
 
-      <ModifierPricingByVariationSection
-        selectedModifiers={selectedModifiers}
-        selectedVariations={selectedVariations}
-        getTopLevelPriceValue={getTopLevelModifierValue}
-        getTopLevelRequiredValue={getTopLevelModifierRequiredValue}
-        getNestedPriceValue={getNestedModifierValue}
-        onTopLevelPriceChange={handleTopLevelModifierChange}
-        onTopLevelRequiredChange={handleTopLevelRequiredChange}
-        onNestedPriceChange={handleNestedModifierChange}
-      />
+      {SHOW_LEGACY_DIRECT_MODIFIERS ? (
+        <>
+          <ModifierSelectionSection
+            title={t("legacyAssignTitle")}
+            description={t("legacyAssignDescription")}
+            icon={<Tags size={18} />}
+            searchValue={modifierSearch}
+            onSearchChange={setModifierSearch}
+            searchPlaceholder={t("searchPlaceholder")}
+            loading={
+              (loadingModifiers || fetchingModifiers) &&
+              modifierOptions.length === 0
+            }
+            loadingMore={modifierPage > 1 && fetchingModifiers}
+            hasMore={modifierHasMore}
+            onLoadMore={loadMoreModifiers}
+            items={modifierOptions}
+            selectedIds={selectedModifierIds}
+            selectedModifiers={selectedModifiers}
+            emptyTitle={t("emptyTitle")}
+            emptyDescription={t("emptyDescription")}
+            onToggle={toggleModifier}
+            onClear={clearModifiers}
+          />
+
+          <ModifierPricingByVariationSection
+            selectedModifiers={selectedModifiers}
+            selectedVariations={selectedVariations}
+            getTopLevelPriceValue={getTopLevelModifierValue}
+            getTopLevelRequiredValue={getTopLevelModifierRequiredValue}
+            getNestedPriceValue={getNestedModifierValue}
+            onTopLevelPriceChange={handleTopLevelModifierChange}
+            onTopLevelRequiredChange={handleTopLevelRequiredChange}
+            onNestedPriceChange={handleNestedModifierChange}
+          />
+        </>
+      ) : null}
     </div>
   );
 });

@@ -26,6 +26,7 @@ const PAYMENT_METHODS = [
   "JAZZCASH",
   "BANK_TRANSFER",
 ];
+const SHOW_ALLOWED_PAYMENT_METHODS = false;
 
 type DeliveryMode = "RADIUS" | "ZONE" | "ZONE_BANDS" | "POSTAL_CODE";
 type LatLngKey = "lat" | "lng";
@@ -154,6 +155,8 @@ const createDefaultZoneBand = (fromKm = 0, deliveryFee = 0) => ({
 const createDefaultPostalCodeRule = (deliveryFee = 0) => ({
   postalCode: "",
   deliveryFee,
+  minOrderAmount: 0,
+  freeDeliveryThreshold: 0,
 });
 
 const getValidPoint = (point: any) => {
@@ -1005,9 +1008,9 @@ export default function EditBranchStepTwo({ data, setData }: any) {
       : [];
 
     return (
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3">
-          <div>
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+        <div className="flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">
               {deliveryMode === "RADIUS" ? t("radiusMapPreview") : t("polygonZoneBuilder")}
             </p>
@@ -1022,7 +1025,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
             <select
               value={safeActiveZoneIndex}
               onChange={(event) => setActiveZoneIndex(Number(event.target.value))}
-              className="h-10 rounded-full border border-gray-200 bg-white px-4 text-sm outline-none focus:border-primary"
+              className="h-10 w-full min-w-0 rounded-full border border-gray-200 bg-white px-4 text-sm outline-none focus:border-primary lg:w-auto"
             >
               {zones.map((zone: any, index: number) => (
                 <option key={`zone-select-${index}`} value={index}>
@@ -1037,8 +1040,8 @@ export default function EditBranchStepTwo({ data, setData }: any) {
         {mapsReady ? (
           <>
             <div className="border-b border-gray-200 bg-white p-4">
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto_auto]">
-                <div>
+              <div className="grid min-w-0 grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="min-w-0">
                   <label className="mb-1 block text-xs font-medium text-gray-500">
                     {t("searchAreaAddress")}
                   </label>
@@ -1071,12 +1074,12 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                   </div>
                 </div>
 
-                <div className="flex items-end">
+                <div className="flex min-w-0 items-end">
                   <button
                     type="button"
                     onClick={handleMapSearch}
                     disabled={mapSearchLoading}
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary px-4 text-sm font-medium text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary px-4 text-sm font-medium text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60 2xl:w-auto"
                   >
                     {mapSearchLoading ? (
                       <Loader2 size={15} className="animate-spin" />
@@ -1088,11 +1091,11 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                 </div>
 
                 {deliveryMode === "ZONE" ? (
-                  <div className="flex items-end">
+                  <div className="flex min-w-0 items-end">
                     <button
                       type="button"
                       onClick={generatePolygonAroundSelectedLocation}
-                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary/90 xl:w-auto"
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary/90 2xl:w-auto"
                     >
                       <Crosshair size={15} />
                       {t("generateStarterZone")}
@@ -1109,7 +1112,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
               ) : null}
 
               {deliveryMode === "ZONE" ? (
-                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+                <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-4">
                   <button
                     type="button"
                     onClick={addMapCenterPointToActiveZone}
@@ -1159,7 +1162,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
 
             <div className="relative">
               {deliveryMode === "ZONE" ? (
-                <div className="absolute left-4 top-4 z-10 max-w-[280px] rounded-2xl bg-white/95 px-4 py-3 text-xs text-gray-600 shadow-sm ring-1 ring-gray-200">
+                <div className="absolute left-3 right-3 top-3 z-10 rounded-2xl bg-white/95 px-4 py-3 text-xs text-gray-600 shadow-sm ring-1 ring-gray-200 sm:left-4 sm:right-auto sm:top-4 sm:max-w-[280px]">
                   <p className="font-semibold text-gray-900">
                     {t("activeZone")}:{" "}
                     {activeZone?.name || t("zoneIndex", { index: safeActiveZoneIndex + 1 })}
@@ -1180,7 +1183,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                   : t("mapClicksAddPoints")}
               </span>
 
-              <span className="shrink-0 font-medium text-gray-700">
+              <span className="min-w-0 break-words font-medium text-gray-700 sm:shrink-0">
                 {branchCoordinates
                   ? `${branchCoordinates.lat}, ${branchCoordinates.lng}`
                   : t("branchCoordinatesNotSelected")}
@@ -1224,7 +1227,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
   if (!data) return null;
 
   return (
-    <div className="mt-10 space-y-8 rounded-[14px]">
+    <div className="mt-10 min-w-0 space-y-8 overflow-x-hidden rounded-[14px]">
       <Section label={t("allowedOrderTypes")}>
         <div className="flex flex-wrap gap-4">
           {ORDER_TYPES.map((type) => (
@@ -1239,30 +1242,32 @@ export default function EditBranchStepTwo({ data, setData }: any) {
         </div>
       </Section>
 
-      <Section label={t("allowedPaymentMethods")}>
-        <div className="flex flex-wrap gap-4">
-          {PAYMENT_METHODS.map((method) => (
-            <label key={method} className="flex items-center gap-2">
-              <Checkbox
-                checked={settings.allowedPaymentMethods?.includes(method)}
-                onCheckedChange={() =>
-                  toggleArrayValue("allowedPaymentMethods", method)
-                }
-              />
-              <span className="text-sm">{formatLabel(method)}</span>
-            </label>
-          ))}
-        </div>
-      </Section>
+      {SHOW_ALLOWED_PAYMENT_METHODS ? (
+        <Section label={t("allowedPaymentMethods")}>
+          <div className="flex flex-wrap gap-4">
+            {PAYMENT_METHODS.map((method) => (
+              <label key={method} className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.allowedPaymentMethods?.includes(method)}
+                  onCheckedChange={() =>
+                    toggleArrayValue("allowedPaymentMethods", method)
+                  }
+                />
+                <span className="text-sm">{formatLabel(method)}</span>
+              </label>
+            ))}
+          </div>
+        </Section>
+      ) : null}
 
       <Section label={t("deliveryConfiguration")}>
-        <div className="space-y-6">
-          <div>
+        <div className="min-w-0 space-y-6">
+          <div className="min-w-0">
             <p className="mb-3 text-sm font-medium text-gray-900">
               {t("deliveryAreaCalculationMode")}
             </p>
 
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
               {DELIVERY_MODES.map((mode) => {
                 const active = deliveryMode === mode.value;
 
@@ -1271,7 +1276,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                     key={mode.value}
                     type="button"
                     onClick={() => updateDeliveryConfig("mode", mode.value)}
-                    className={`rounded-2xl border p-4 text-left transition ${
+                    className={`min-w-0 rounded-2xl border p-4 text-left transition ${
                       active
                         ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20"
                         : "border-gray-200 bg-white text-gray-700 hover:border-primary/40"
@@ -1289,7 +1294,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             <FormInput
               label={t("baseDeliveryFee")}
               value={toInputNumber(delivery.deliveryFee)}
@@ -1350,7 +1355,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
           ) : null}
 
           {deliveryMode === "ZONE_BANDS" ? (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
@@ -1380,7 +1385,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                   {zoneBands.map((band: any, index: number) => (
                     <div
                       key={`zone-band-${index}`}
-                      className="grid grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-4 lg:grid-cols-3"
+                      className="grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-3 sm:grid-cols-2 sm:p-4 2xl:grid-cols-3"
                     >
                       <FormInput
                         label={t("fromKm")}
@@ -1434,11 +1439,11 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                         }
                       />
 
-                      <div className="flex items-end gap-2">
+                      <div className="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-end 2xl:col-span-1">
                         <button
                           type="button"
                           onClick={() => duplicateZoneBand(index)}
-                          className="inline-flex h-11 items-center gap-2 rounded-full border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
                         >
                           <Copy size={14} />
                           {t("duplicate")}
@@ -1447,7 +1452,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                         <button
                           type="button"
                           onClick={() => removeZoneBand(index)}
-                          className="inline-flex h-11 items-center justify-center rounded-full border border-red-100 bg-red-50 px-4 text-red-600 hover:bg-red-100"
+                          className="inline-flex h-11 w-full items-center justify-center rounded-full border border-red-100 bg-red-50 px-4 text-red-600 hover:bg-red-100 sm:w-auto"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1460,7 +1465,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
           ) : null}
 
           {deliveryMode === "ZONE" ? (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
@@ -1494,7 +1499,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                   return (
                     <div
                       key={`delivery-zone-${zoneIndex}`}
-                      className={`rounded-2xl border bg-white p-4 transition ${
+                      className={`min-w-0 rounded-2xl border bg-white p-3 transition sm:p-4 ${
                         zoneIndex === activeZoneIndex
                           ? "border-primary/40 ring-1 ring-primary/20"
                           : "border-gray-200"
@@ -1545,7 +1550,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
                         <FormInput
                           label={t("zoneName")}
                           value={zone?.name || ""}
@@ -1605,7 +1610,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                           </button>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="min-w-0 space-y-2">
                           {polygon.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
                               {t("noPolygonPoints")}
@@ -1614,7 +1619,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                             polygon.map((point: any, pointIndex: number) => (
                               <div
                                 key={`zone-${zoneIndex}-point-${pointIndex}`}
-                                className="grid grid-cols-1 gap-2 rounded-xl bg-gray-50 p-3 sm:grid-cols-[80px_1fr_1fr_auto]"
+                                className="grid min-w-0 grid-cols-1 gap-2 rounded-xl bg-gray-50 p-3 lg:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)_auto]"
                               >
                                 <div className="flex items-center text-xs font-medium text-gray-500">
                                   {t("pointIndex", { index: pointIndex + 1 })}
@@ -1633,7 +1638,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                                     )
                                   }
                                   placeholder={t("latitude")}
-                                  className="h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary"
+                                  className="h-10 min-w-0 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary"
                                 />
 
                                 <input
@@ -1649,7 +1654,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                                     )
                                   }
                                   placeholder={t("longitude")}
-                                  className="h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary"
+                                  className="h-10 min-w-0 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary"
                                 />
 
                                 <button
@@ -1675,7 +1680,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
           ) : null}
 
           {deliveryMode === "POSTAL_CODE" ? (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
@@ -1705,9 +1710,9 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                   {postalCodeRules.map((rule: any, index: number) => (
                     <div
                       key={`postal-rule-${index}`}
-                      className="grid grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-4 lg:grid-cols-[1fr_1fr_auto]"
+                      className="grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] 2xl:items-end"
                     >
-                      <FormInput
+                      <PostalRuleInput
                         label={t("postalCode")}
                         value={rule?.postalCode || ""}
                         onChange={(val) =>
@@ -1715,7 +1720,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                         }
                       />
 
-                      <FormInput
+                      <PostalRuleInput
                         label={t("deliveryFee")}
                         value={toInputNumber(rule?.deliveryFee)}
                         onChange={(val) =>
@@ -1727,11 +1732,35 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                         }
                       />
 
-                      <div className="flex items-end gap-2">
+                      <PostalRuleInput
+                        label={t("minimumOrderAmount")}
+                        value={toInputNumber(rule?.minOrderAmount)}
+                        onChange={(val) =>
+                          updatePostalRule(
+                            index,
+                            "minOrderAmount",
+                            val ? Number(val) : 0
+                          )
+                        }
+                      />
+
+                      <PostalRuleInput
+                        label={t("freeDeliveryThreshold")}
+                        value={toInputNumber(rule?.freeDeliveryThreshold)}
+                        onChange={(val) =>
+                          updatePostalRule(
+                            index,
+                            "freeDeliveryThreshold",
+                            val ? Number(val) : 0
+                          )
+                        }
+                      />
+
+                      <div className="flex min-w-0 flex-col gap-2 lg:col-span-2 lg:flex-row lg:items-end 2xl:col-span-1">
                         <button
                           type="button"
                           onClick={() => duplicatePostalRule(index)}
-                          className="inline-flex h-11 items-center gap-2 rounded-full border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 lg:w-auto"
                         >
                           <Copy size={14} />
                           {t("duplicate")}
@@ -1740,7 +1769,7 @@ export default function EditBranchStepTwo({ data, setData }: any) {
                         <button
                           type="button"
                           onClick={() => removePostalRule(index)}
-                          className="inline-flex h-11 items-center justify-center rounded-full border border-red-100 bg-red-50 px-4 text-red-600 hover:bg-red-100"
+                          className="inline-flex h-11 w-full items-center justify-center rounded-full border border-red-100 bg-red-50 px-4 text-red-600 hover:bg-red-100 lg:w-auto"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1793,5 +1822,28 @@ export default function EditBranchStepTwo({ data, setData }: any) {
 
       {/* Taxation is intentionally hidden for now. */}
     </div>
+  );
+}
+
+function PostalRuleInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-2 block break-words text-sm font-medium text-gray-700">
+        {label}
+      </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full min-w-0 rounded-md border border-[#BBBBBB] px-3 text-sm outline-none placeholder:text-[#BBBBBB] focus:border-primary focus:ring-1 focus:ring-primary"
+      />
+    </label>
   );
 }

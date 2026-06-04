@@ -16,7 +16,14 @@ import StepThree from "./StepThree";
 import StepFour from "./stepFour";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useAssignModifierGroupToItem } from "@/hooks/useModifierGroupAssignments";
 import { useCreateMenuItem, useUpdateMenuItem } from "@/hooks/useMenus";
+import {
+  extractEntityId,
+  normalizeMenuItemModifierGroupAssignments,
+} from "@/lib/modifier-group-assignment-utils";
+import { getApiErrorMessage } from "@/lib/errors";
+import type { MenuItemModifierGroupAssignment } from "@/types/modifier-group-assignments";
 import { useTranslations } from "next-intl";
 
 interface CreateMenuItemModalProps {
@@ -627,11 +634,6 @@ export const getInitialForm = (restaurantId?: string, initialData?: any) => {
         ? String(initialData.depositAmount)
         : "",
 
-    isRequired:
-      typeof initialData?.isRequired === "boolean"
-        ? initialData.isRequired
-        : false,
-
     minSelect:
       initialData?.minSelect !== undefined && initialData?.minSelect !== null
         ? String(initialData.minSelect)
@@ -703,6 +705,10 @@ export const getInitialForm = (restaurantId?: string, initialData?: any) => {
     ),
 
     variationPriceOverrides: normalizedVariationOverrides,
+
+    modifierGroupAssignments: normalizeMenuItemModifierGroupAssignments(
+      initialData?.modifierGroups
+    ),
 
     supportsSplitPizza:
       typeof initialData?.supportsSplitPizza === "boolean"
@@ -885,9 +891,6 @@ export const buildMenuItemPayload = ({
 
     isActive: typeof form.isActive === "boolean" ? form.isActive : true,
 
-    isRequired:
-      typeof form.isRequired === "boolean" ? form.isRequired : false,
-
     minSelect,
     maxSelect,
 
@@ -918,19 +921,24 @@ export default function CreateMenuItemModal({
 
   const isEditMode = Boolean(initialData?.id);
   const stepRef = useRef<any>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<any>(
     getInitialForm(restaurantId, initialData)
   );
 
-  const { mutate: createMenuItem, isPending: isCreating } =
+  const { mutateAsync: createMenuItem, isPending: isCreating } =
     useCreateMenuItem();
 
-  const { mutate: updateMenuItem, isPending: isUpdating } =
+  const { mutateAsync: updateMenuItem, isPending: isUpdating } =
     useUpdateMenuItem();
+  const {
+    mutateAsync: assignModifierGroupToItem,
+    isPending: isAssigningModifierGroups,
+  } = useAssignModifierGroupToItem();
 
-  const isSubmitting = isCreating || isUpdating;
+  const isSubmitting = isCreating || isUpdating || isAssigningModifierGroups;
 
   useEffect(() => {
     if (!open) return;
@@ -938,6 +946,14 @@ export default function CreateMenuItemModal({
     setCurrentStep(1);
     setForm(getInitialForm(restaurantId, initialData));
   }, [open, restaurantId, initialData]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    requestAnimationFrame(() => {
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [currentStep, open]);
 
   const buildPayload = () =>
     buildMenuItemPayload({
@@ -1000,11 +1016,6 @@ export default function CreateMenuItemModal({
       return false;
     }
 
-    if (form.isRequired && minSelect < 1) {
-      toast.error(t("requiredItemsNeedMin"));
-      return false;
-    }
-
     const minQuantity = Math.max(1, toNumberOrZero(form.minQuantity || 1));
     const maxQuantity = Math.max(0, toNumberOrZero(form.maxQuantity || 0));
 
@@ -1021,46 +1032,89 @@ export default function CreateMenuItemModal({
     return true;
   };
 
-  const handleSubmit = () => {
+  const getAssignmentsToAttach = () => {
+    const assignments = normalizeMenuItemModifierGroupAssignments(
+      form?.modifierGroupAssignments
+    );
+    const existingGroupIds = new Set(
+      normalizeMenuItemModifierGroupAssignments(
+        initialData?.modifierGroups
+      ).map((assignment) => assignment.groupId)
+    );
+
+    return isEditMode
+      ? assignments.filter(
+          (assignment) => !existingGroupIds.has(assignment.groupId)
+        )
+      : assignments;
+  };
+
+  const attachModifierGroupAssignments = async (
+    itemId: string,
+    assignments: MenuItemModifierGroupAssignment[]
+  ) => {
+    await Promise.all(
+      assignments.map((assignment) =>
+        assignModifierGroupToItem({
+          itemId,
+          groupId: assignment.groupId,
+          data: {
+            selectionType: assignment.selectionType,
+            minSelect: assignment.minSelect,
+            maxSelect: assignment.maxSelect,
+            sortOrder: assignment.sortOrder,
+          },
+        })
+      )
+    );
+  };
+
+  const handleSubmit = async () => {
     if (!validateBeforeSubmit()) return;
 
     const payload = buildPayload();
+    const assignmentsToAttach = getAssignmentsToAttach();
 
     if (isEditMode) {
       const { restaurantId: _restaurantId, ...updatePayload } = payload;
 
-      updateMenuItem(
-        {
+      try {
+        await updateMenuItem({
           id: initialData.id,
           data: updatePayload,
-        },
-        {
-          onSuccess: () => {
-            onSuccess?.();
-            closeOnly();
-          },
-          onError: (err: any) => {
-            toast.error(
-              err?.response?.data?.message || t("updateFailed")
-            );
-          },
-        }
-      );
+        });
+
+        await attachModifierGroupAssignments(
+          initialData.id,
+          assignmentsToAttach
+        );
+        onSuccess?.();
+        closeOnly();
+      } catch (error: unknown) {
+        toast.error(getApiErrorMessage(error, t("updateFailed")));
+      }
 
       return;
     }
 
-    createMenuItem(payload as any, {
-      onSuccess: () => {
-        onSuccess?.();
-        closeOnly();
-      },
-      onError: (err: any) => {
-        toast.error(
-          err?.response?.data?.message || t("createFailed")
-        );
-      },
-    });
+    try {
+      const response = await createMenuItem(
+        payload as unknown as Parameters<typeof createMenuItem>[0]
+      );
+      const itemId = extractEntityId(response);
+
+      if (itemId) {
+        await attachModifierGroupAssignments(itemId, assignmentsToAttach);
+      } else if (assignmentsToAttach.length > 0) {
+        toast.error("Menu item created but no item id was returned.");
+        return;
+      }
+
+      onSuccess?.();
+      closeOnly();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, t("createFailed")));
+    }
   };
 
   return (
@@ -1072,8 +1126,11 @@ export default function CreateMenuItemModal({
         }
       }}
     >
-      <DialogContent className="max-h-[95vh] w-[calc(100vw-24px)] max-w-[920px] overflow-hidden rounded-[24px] bg-[#F5F5F5] p-0">
-        <div className="max-h-[95vh] overflow-y-auto overflow-x-hidden p-5 sm:p-8 [scrollbar-width:thin]">
+      <DialogContent className="max-h-[95vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[24px] bg-[#F5F5F5] p-0 sm:w-full sm:max-w-[calc(100vw-2rem)] xl:max-w-[1180px]">
+        <div
+          ref={scrollContainerRef}
+          className="max-h-[95vh] overflow-y-auto overflow-x-hidden p-5 sm:p-8 [scrollbar-width:thin]"
+        >
           <DialogHeader>
             <DialogTitle className="text-[24px] font-semibold sm:text-[26px]">
               {isEditMode ? t("editTitle") : t("createTitle")}
@@ -1133,7 +1190,7 @@ export default function CreateMenuItemModal({
 
               <Button
                 className="h-[44px] rounded-[12px] bg-primary px-10 text-white hover:bg-primary/90"
-                onClick={currentStep < 4 ? nextStep : handleSubmit}
+                onClick={currentStep < 4 ? nextStep : () => void handleSubmit()}
                 disabled={isSubmitting}
               >
                 {currentStep < 4

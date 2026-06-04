@@ -16,9 +16,10 @@ import {
   EditBranchDeliveryStep,
   EditBranchSectionHeader,
   EditBranchWorkingHoursStep,
+  getBranchSettingsValidationError,
   getDeliveryConfigValidationError,
+  hydrateBranchForEdit,
   normalizeDeliveryConfigForApi,
-  normalizeHolidayRangesForApi,
   normalizeOpeningHoursForApi,
   type BranchFormData,
   type EditTab,
@@ -55,8 +56,14 @@ export default function BranchesEditPage() {
       return;
     }
 
-    if (branchQuery.data) setBranchData(branchQuery.data);
+    if (branchQuery.data) setBranchData(hydrateBranchForEdit(branchQuery.data));
   }, [authBranchId, branchQuery.data, isBranchAdmin, requestedBranchId, router]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [activeTab]);
 
   const saveBasicInfo = async (fullSettings: any) => {
     await updateBranchMutation.mutateAsync({
@@ -85,9 +92,6 @@ export default function BranchesEditPage() {
       branchId: branchId as string,
       data: {
         openingHours: normalizeOpeningHoursForApi(settings.openingHours),
-        settings: {
-          holidayRanges: normalizeHolidayRangesForApi(settings.holidayRanges),
-        },
       },
     });
 
@@ -107,7 +111,9 @@ export default function BranchesEditPage() {
       const settings = branchData.settings || {};
       const deliveryConfig = normalizeDeliveryConfigForApi(settings.deliveryConfig);
       const validationError =
-        activeTab === "delivery" ? getDeliveryConfigValidationError(deliveryConfig) : null;
+        activeTab === "delivery"
+          ? getDeliveryConfigValidationError(deliveryConfig)
+          : getBranchSettingsValidationError(settings);
 
       if (validationError) {
         toast.error(validationError);
