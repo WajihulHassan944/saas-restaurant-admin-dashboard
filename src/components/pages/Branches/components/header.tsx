@@ -10,19 +10,29 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import CreateBranchModal from "./CreateBranchModal";
+import { CreateBranchModal } from "./CreateBranchModal";
 import ImportModal from "@/components/common/ImportModal";
 import { useTranslations } from "next-intl";
 
 interface HeaderProps {
+  hasExistingBranches?: boolean;
   title: string;
   description?: string;
   onBranchCreated?: () => void;
 }
 
-export default function BranchesHeader({
+export function BranchesHeader(props: HeaderProps) {
+  return (
+    <Suspense fallback={null}>
+      <BranchesHeaderContent {...props} />
+    </Suspense>
+  );
+}
+
+function BranchesHeaderContent({
+  hasExistingBranches = false,
   title,
   description,
   onBranchCreated,
@@ -94,6 +104,7 @@ export default function BranchesHeader({
       {/* Modals (only useful in non-edit mode, but safe to keep mounted) */}
       <ImportModal open={open} onOpenChange={setOpen} />
       <CreateBranchModal
+        hasExistingBranches={hasExistingBranches}
         open={createBranch}
         onOpenChange={setCreateBranch}
         onSuccess={onBranchCreated}
@@ -101,3 +112,5 @@ export default function BranchesHeader({
     </div>
   );
 }
+
+export { BranchesHeader as default };

@@ -6,6 +6,7 @@ import {
   BulkBranchValues,
   OpeningHoursValues,
 } from "@/validations/branches";
+import type { BranchSettings } from "@/types/branch";
 
 /**
  * ==============================
@@ -38,11 +39,60 @@ export const getBranch = async (id: string) => {
   return data.data;
 };
 
+type BranchUpdatePayload = Omit<Partial<BranchValues>, "settings"> & {
+  settings?: BranchSettings;
+};
+
+const hasServiceChargeSetting = (settings: BranchSettings | undefined) =>
+  Boolean(settings) &&
+  Object.prototype.hasOwnProperty.call(settings, "serviceCharge");
+
+const branchSettingsPatchBlocklist = [
+  "openingHours",
+  "openingsHours",
+  "holidayRanges",
+  "temporaryClosure",
+  "currentTemporaryClosure",
+  "temporaryClosures",
+  "closure",
+  "closures",
+  "holidayOpeningHours",
+  "reservationDateRanges",
+  "tableReservationDateRanges",
+  "reservationBlackoutRanges",
+] as const;
+
+const sanitizeBranchSettingsForPatch = (
+  settings: BranchSettings | undefined
+): BranchSettings => {
+  const safeSettings: BranchSettings = { ...(settings ?? {}) };
+
+  branchSettingsPatchBlocklist.forEach((key) => {
+    delete safeSettings[key];
+  });
+
+  return safeSettings;
+};
+
 export const updateBranch = async (
   id: string,
-  payload: Partial<BranchValues>
+  payload: BranchUpdatePayload
 ) => {
-  const { data } = await api.patch(`/branches/${id}`, payload);
+  const nextPayload = { ...payload };
+
+  if (hasServiceChargeSetting(payload.settings)) {
+    const existingBranch = (await getBranch(id)) as { settings?: BranchSettings };
+
+    nextPayload.settings = {
+      ...sanitizeBranchSettingsForPatch(existingBranch.settings),
+      ...sanitizeBranchSettingsForPatch(payload.settings),
+      serviceCharge: payload.settings?.serviceCharge,
+    };
+  } else if (payload.settings) {
+    nextPayload.settings = sanitizeBranchSettingsForPatch(payload.settings);
+  }
+
+  const { data } = await api.patch(`/branches/${id}`, nextPayload);
   return data;
 };
 

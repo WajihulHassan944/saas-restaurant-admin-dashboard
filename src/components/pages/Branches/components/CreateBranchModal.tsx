@@ -2,15 +2,31 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { Controller, useForm, type FieldErrors, type Path } from "react-hook-form";
+import {
+  Controller,
+  useForm,
+  type FieldErrors,
+  type Path,
+} from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { CARD_PANEL_CLASS, FIELD_ERROR_CLASS, MUTED_TEXT_SM_CLASS } from "@/components/common/common-classes";
+import {
+  BranchLocationPicker,
+  type BranchLocationAddressFields,
+} from "@/components/pages/Branches/components/BranchLocationPicker";
 import { useCreateBranch } from "@/hooks/useBranches";
 import {
   createBranchSchema,
@@ -20,6 +36,7 @@ import {
 import { useTranslations } from "next-intl";
 
 interface CreateBranchModalProps {
+  hasExistingBranches?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -49,6 +66,11 @@ const defaultCreateBranchSettings: NonNullable<BranchValues["settings"]> = {
     },
     taxation: {
       taxPercentage: 0,
+    },
+    serviceCharge: {
+      isEnabled: false,
+      type: "PERCENTAGE",
+      value: 0,
     },
     tableReservationsEnabled: false,
     tableReservationAutoAccept: false,
@@ -97,6 +119,13 @@ const buildCreateBranchSettings = (
     ...defaultCreateBranchSettings.taxation,
     ...(settings?.taxation ?? {}),
   },
+  serviceCharge: {
+    isEnabled: settings?.serviceCharge?.isEnabled ?? false,
+    type: settings?.serviceCharge?.type ?? "PERCENTAGE",
+    value: settings?.serviceCharge?.isEnabled
+      ? Number(settings?.serviceCharge?.value ?? 0)
+      : 0,
+  },
   contact: {
     ...defaultCreateBranchSettings.contact,
     ...(settings?.contact ?? {}),
@@ -128,8 +157,6 @@ const branchFieldConfigs: FieldConfig[] = [
   { name: "state", labelKey: "state", placeholderKey: "statePlaceholder" },
   { name: "country", labelKey: "country", placeholderKey: "countryPlaceholder" },
   { name: "area", labelKey: "area", placeholderKey: "areaPlaceholder" },
-  { name: "lat", labelKey: "latitude", placeholderKey: "latitudePlaceholder" },
-  { name: "lng", labelKey: "longitude", placeholderKey: "longitudePlaceholder" },
 ];
 
 const adminFieldConfigs: FieldConfig[] = [
@@ -153,7 +180,8 @@ const getErrorMessage = (
   return errors[fieldName]?.message;
 };
 
-export default function CreateBranchModal({
+export function CreateBranchModal({
+  hasExistingBranches = false,
   open,
   onOpenChange,
   onSuccess,
@@ -169,10 +197,15 @@ export default function CreateBranchModal({
     handleSubmit,
     register,
     reset,
+    setValue,
+    watch,
   } = useForm<CreateBranchFormValues>({
     resolver: zodResolver(createBranchSchema),
     defaultValues,
   });
+  const serviceCharge = watch("settings.serviceCharge");
+  const serviceChargeEnabled = Boolean(serviceCharge?.isEnabled);
+  const serviceChargeType = serviceCharge?.type ?? "PERCENTAGE";
 
   useEffect(() => {
     if (!open) {
@@ -224,10 +257,47 @@ export default function CreateBranchModal({
       void error;
     }
   };
+  const [branchNameFieldConfig, ...addressFieldConfigs] = branchFieldConfigs;
+
+  const handleLocationFieldsChange = (fields: BranchLocationAddressFields) => {
+    Object.entries(fields).forEach(([fieldName, value]) => {
+      setValue(fieldName as Path<CreateBranchFormValues>, value, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+  };
+
+  const renderBranchField = (config: FieldConfig) => {
+    const { labelKey, name, placeholderKey, primary, required, type } = config;
+    const errorMessage = getErrorMessage(errors, name);
+    const fieldId = `create-branch-${name.replace(/\./g, "-")}`;
+
+    return (
+      <div key={name} className="space-y-1">
+        {labelKey ? (
+          <Label htmlFor={fieldId} className="text-sm">
+            {t(labelKey)} {required ? <span className="text-primary">*</span> : null}
+          </Label>
+        ) : null}
+        <Input
+          id={fieldId}
+          type={type}
+          placeholder={t(placeholderKey)}
+          className={primary ? PRIMARY_INPUT_CLASS : INPUT_CLASS}
+          aria-invalid={Boolean(errorMessage)}
+          {...register(name)}
+        />
+        {errorMessage ? (
+          <p className={FIELD_ERROR_CLASS}>{errorMessage}</p>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-[480px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
+      <DialogContent className="max-w-[760px] rounded-[20px] p-6 bg-[#F5F5F5] max-h-[95vh] overflow-auto">
         <DialogHeader className="space-y-1">
           <DialogTitle className="text-xl font-semibold">{t("createBranch")}</DialogTitle>
           <p className={MUTED_TEXT_SM_CLASS}>{t("createDescription")}</p>
@@ -235,49 +305,150 @@ export default function CreateBranchModal({
 
         <form noValidate onSubmit={handleSubmit(onSubmit)}>
           <div className={`mt-4 ${CARD_PANEL_CLASS} space-y-4`}>
-            {branchFieldConfigs.map((config) => {
-              const { labelKey, name, placeholderKey, primary, required, type } = config;
-              const errorMessage = getErrorMessage(errors, name);
-              const fieldId = `create-branch-${name.replace(/\./g, "-")}`;
+            {branchNameFieldConfig ? renderBranchField(branchNameFieldConfig) : null}
 
-              return (
-                <div key={name} className="space-y-1">
-                  {labelKey ? (
-                    <Label htmlFor={fieldId} className="text-sm">
-                      {t(labelKey)} {required ? <span className="text-primary">*</span> : null}
-                    </Label>
-                  ) : null}
-                  <Input
-                    id={fieldId}
-                    type={type}
-                    placeholder={t(placeholderKey)}
-                    className={primary ? PRIMARY_INPUT_CLASS : INPUT_CLASS}
-                    aria-invalid={Boolean(errorMessage)}
-                    {...register(name)}
+            <div className="space-y-2">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">
+                  {t("createBranchLocation")}
+                </h4>
+                <p className="mt-1 text-xs text-gray-500">
+                  {t("createBranchLocationDescription")}
+                </p>
+              </div>
+              <BranchLocationPicker
+                inputId="create-branch-map-search"
+                markerTitle={t("createBranchLocation")}
+                onAddressFieldsChange={handleLocationFieldsChange}
+              />
+            </div>
+
+            {addressFieldConfigs.map(renderBranchField)}
+
+            {!hasExistingBranches ? (
+              <div className="flex items-center justify-between">
+                <Label htmlFor="create-branch-is-main" className="text-sm">
+                  {t("mainBranch")}
+                </Label>
+                <Controller
+                  control={control}
+                  name="isMain"
+                  render={({ field }) => (
+                    <Switch
+                      id="create-branch-is-main"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  )}
+                />
+              </div>
+            ) : null}
+
+            <hr className="border-gray-200 my-2" />
+
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">
+                  {t("serviceCharge")}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  {t("serviceChargeDescription")}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-[12px] border p-4">
+                <div>
+                  <Label htmlFor="create-branch-service-charge-enabled" className="text-sm">
+                    {t("enableServiceCharge")}
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    {t("serviceChargeDescription")}
+                  </p>
+                </div>
+                <Controller
+                  control={control}
+                  name="settings.serviceCharge.isEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      id="create-branch-service-charge-enabled"
+                      checked={field.value ?? false}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+
+                        if (!checked) {
+                          setValue("settings.serviceCharge.type", "PERCENTAGE", {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          setValue("settings.serviceCharge.value", 0, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="create-branch-service-charge-type" className="text-sm">
+                    {t("chargeType")}
+                  </Label>
+                  <Controller
+                    control={control}
+                    name="settings.serviceCharge.type"
+                    render={({ field }) => (
+                      <Select
+                        disabled={!serviceChargeEnabled}
+                        value={field.value ?? "PERCENTAGE"}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger
+                          id="create-branch-service-charge-type"
+                          className="h-[44px] rounded-[10px] border-gray-300 text-sm"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PERCENTAGE">{t("percentage")}</SelectItem>
+                          <SelectItem value="AMOUNT">{t("fixedAmount")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   />
-                  {errorMessage ? (
-                    <p className={FIELD_ERROR_CLASS}>{errorMessage}</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="create-branch-service-charge-value" className="text-sm">
+                    {serviceChargeType === "AMOUNT" ? t("amount") : t("percentage")}
+                  </Label>
+                  <Input
+                    id="create-branch-service-charge-value"
+                    type="number"
+                    min={0}
+                    max={serviceChargeType === "PERCENTAGE" ? 100 : undefined}
+                    step="0.01"
+                    disabled={!serviceChargeEnabled}
+                    className={INPUT_CLASS}
+                    aria-invalid={Boolean(errors.settings?.serviceCharge?.value?.message)}
+                    {...register("settings.serviceCharge.value", { valueAsNumber: true })}
+                  />
+                  <p className="text-xs text-gray-500">
+                    {serviceChargeType === "AMOUNT"
+                      ? t("serviceChargeAmountHelper")
+                      : t("serviceChargePercentageHelper")}
+                  </p>
+                  {errors.settings?.serviceCharge?.value?.message ? (
+                    <p className={FIELD_ERROR_CLASS}>
+                      {errors.settings.serviceCharge.value.message}
+                    </p>
                   ) : null}
                 </div>
-              );
-            })}
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="create-branch-is-main" className="text-sm">
-                {t("mainBranch")}
-              </Label>
-              <Controller
-                control={control}
-                name="isMain"
-                render={({ field }) => (
-                  <Switch
-                    id="create-branch-is-main"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    className="data-[state=checked]:bg-primary"
-                  />
-                )}
-              />
+              </div>
             </div>
 
             <hr className="border-gray-200 my-2" />
