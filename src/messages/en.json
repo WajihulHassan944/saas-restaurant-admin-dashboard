@@ -810,6 +810,11 @@
         "attaching": "Attaching",
         "detach": "Detach",
         "detaching": "Detaching",
+        "detachAria": "Detach modifier from group",
+        "detachTitle": "Detach modifier",
+        "detachDescription": "This will remove the modifier from this group only. The modifier itself will not be deleted.",
+        "confirmDetach": "Detach",
+        "cancelDetach": "Cancel",
         "invalidModifier": "Invalid modifier.",
         "attachFailed": "Unable to attach modifier.",
         "detachFailed": "Unable to detach modifier."
@@ -969,7 +974,8 @@
         "basicDetails": "Basic details",
         "mediaExtraInfo": "Media & extra info",
         "variations": "Variations",
-        "modifiers": "Modifiers"
+        "modifiers": "Modifiers",
+        "variationModifierPrices": "Variation modifier prices"
       },
       "stepOne": {
         "selectedCategory": "Selected category",
@@ -1402,6 +1408,7 @@
     "lastName": "Last Name",
     "email": "Email",
     "password": "Password",
+    "branchAdminPasswordEditPlaceholder": "Leave blank to keep current password.",
     "phone": "Phone",
     "mainBranch": "Main Branch",
     "main": "main",
@@ -1539,9 +1546,10 @@
     "addAnotherHoliday": "Add Another Holiday",
     "saveHolidayHours": "Save Holiday Hours",
     "holidaySchedule": "Holiday Schedule",
-    "selectHolidayDate": "Select a holiday date",
+    "selectHolidayDate": "Select a holiday date or range",
     "removeHolidayRow": "Remove holiday row",
     "holidayDate": "Holiday Date",
+    "holidayDateOrRange": "Holiday Date or Range",
     "closedForHoliday": "Closed for this holiday",
     "closedForHolidayDescription": "Customers will see this branch as unavailable on this date.",
     "openTime": "Open time",

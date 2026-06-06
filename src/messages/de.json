@@ -810,6 +810,11 @@
         "attaching": "Wird hinzugefuegt",
         "detach": "Entfernen",
         "detaching": "Wird entfernt",
+        "detachAria": "Modifier aus Gruppe entfernen",
+        "detachTitle": "Modifier entfernen",
+        "detachDescription": "Dies entfernt den Modifier nur aus dieser Gruppe. Der Modifier selbst wird nicht geloescht.",
+        "confirmDetach": "Entfernen",
+        "cancelDetach": "Abbrechen",
         "invalidModifier": "Ungueltiger Modifier.",
         "attachFailed": "Modifier konnte nicht hinzugefuegt werden.",
         "detachFailed": "Modifier konnte nicht entfernt werden."
@@ -969,7 +974,8 @@
         "basicDetails": "Basisdetails",
         "mediaExtraInfo": "Medien & Zusatzinfos",
         "variations": "Variationen",
-        "modifiers": "Modifier"
+        "modifiers": "Modifier",
+        "variationModifierPrices": "Variations-Modifier-Preise"
       },
       "stepOne": {
         "selectedCategory": "Ausgewaehlte Kategorie",
@@ -1402,6 +1408,7 @@
     "lastName": "Nachname",
     "email": "E-Mail",
     "password": "Passwort",
+    "branchAdminPasswordEditPlaceholder": "Leer lassen, um das aktuelle Passwort beizubehalten.",
     "phone": "Telefon",
     "mainBranch": "Hauptfiliale",
     "main": "Hauptfiliale",
@@ -1539,9 +1546,10 @@
     "addAnotherHoliday": "Weiteren Feiertag hinzufügen",
     "saveHolidayHours": "Feiertagszeiten speichern",
     "holidaySchedule": "Feiertagsplan",
-    "selectHolidayDate": "Feiertagsdatum auswählen",
+    "selectHolidayDate": "Feiertagsdatum oder Zeitraum auswählen",
     "removeHolidayRow": "Feiertagszeile entfernen",
     "holidayDate": "Feiertagsdatum",
+    "holidayDateOrRange": "Feiertagsdatum oder Zeitraum",
     "closedForHoliday": "An diesem Feiertag geschlossen",
     "closedForHolidayDescription": "Kunden sehen diese Filiale an diesem Datum als nicht verfügbar.",
     "openTime": "Öffnungszeit",

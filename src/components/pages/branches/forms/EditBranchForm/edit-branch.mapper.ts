@@ -4,6 +4,7 @@ import {
 } from "./edit-branch.defaults";
 import type {
   BranchFormData,
+  BranchAdmin,
   BranchServiceChargeSettings,
   BranchSettings,
   DeliveryConfig,
@@ -55,6 +56,52 @@ const toRecord = (value: unknown): Record<string, unknown> =>
 
 const toStringValue = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
+
+const normalizeBranchAdminForEdit = (
+  branchAdmin: unknown,
+  manager: unknown
+): BranchAdmin => {
+  const adminRecord = toRecord(branchAdmin);
+  const adminProfileRecord = toRecord(adminRecord.profile);
+  const managerRecord = toRecord(manager);
+  const profileRecord = toRecord(managerRecord.profile);
+
+  return {
+    email: toStringValue(adminRecord.email, toStringValue(managerRecord.email)),
+    password: toStringValue(adminRecord.password),
+    firstName: toStringValue(
+      adminRecord.firstName,
+      toStringValue(adminProfileRecord.firstName, toStringValue(profileRecord.firstName))
+    ),
+    lastName: toStringValue(
+      adminRecord.lastName,
+      toStringValue(adminProfileRecord.lastName, toStringValue(profileRecord.lastName))
+    ),
+    phone: toStringValue(
+      adminRecord.phone,
+      toStringValue(adminProfileRecord.phone, toStringValue(profileRecord.phone))
+    ),
+  };
+};
+
+export const normalizeBranchAdminForPatch = (
+  branchAdmin: unknown
+): BranchAdmin | undefined => {
+  const adminRecord = toRecord(branchAdmin);
+  const admin: BranchAdmin = {
+    email: toStringValue(adminRecord.email).trim(),
+    firstName: toStringValue(adminRecord.firstName).trim(),
+    lastName: toStringValue(adminRecord.lastName).trim(),
+    phone: toStringValue(adminRecord.phone).trim(),
+  };
+  const password = toStringValue(adminRecord.password).trim();
+
+  if (password) {
+    admin.password = password;
+  }
+
+  return Object.values(admin).some(Boolean) ? admin : undefined;
+};
 
 export const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -361,24 +408,28 @@ export const getServiceChargeValidationError = (
 export const buildBranchPatchPayload = (
   branchData: BranchFormData,
   settings: BranchSettings
-) => ({
-  restaurantId: branchData.restaurantId,
-  name: branchData.name,
-  isMain: branchData.isMain,
-  branchAdmin: branchData.branchAdmin,
-  street: branchData.address?.street ?? branchData.street,
-  area: branchData.address?.area ?? branchData.area,
-  postalCode: branchData.address?.postalCode ?? branchData.postalCode,
-  city: branchData.address?.city ?? branchData.city,
-  state: branchData.address?.state ?? branchData.state,
-  country: branchData.address?.country ?? branchData.country,
-  lat: branchData.address?.lat ?? branchData.lat,
-  lng: branchData.address?.lng ?? branchData.lng,
-  logoUrl: branchData.logoUrl,
-  coverImage: branchData.coverImage,
-  description: branchData.description,
-  settings,
-});
+): BranchFormData => {
+  const branchAdmin = normalizeBranchAdminForPatch(branchData.branchAdmin);
+
+  return {
+    restaurantId: branchData.restaurantId,
+    name: branchData.name,
+    isMain: branchData.isMain,
+    ...(branchAdmin ? { branchAdmin } : {}),
+    street: branchData.address?.street ?? branchData.street,
+    area: branchData.address?.area ?? branchData.area,
+    postalCode: branchData.address?.postalCode ?? branchData.postalCode,
+    city: branchData.address?.city ?? branchData.city,
+    state: branchData.address?.state ?? branchData.state,
+    country: branchData.address?.country ?? branchData.country,
+    lat: branchData.address?.lat ?? branchData.lat,
+    lng: branchData.address?.lng ?? branchData.lng,
+    logoUrl: branchData.logoUrl,
+    coverImage: branchData.coverImage,
+    description: branchData.description,
+    settings,
+  };
+};
 
 export const buildSafeBranchSettings = (
   settings: unknown,
@@ -427,9 +478,18 @@ export const buildSafeBranchSettings = (
 export const hydrateBranchForEdit = (branchData: BranchFormData): BranchFormData => {
   const settings = branchData.settings || {};
   const deliveryConfig = normalizeDeliveryConfigForApi(settings.deliveryConfig);
+  const users = Array.isArray(branchData.users) ? branchData.users : [];
+  const branchAdminUser =
+    users.find((user) => toRecord(user).role === "BRANCH_ADMIN") ?? users[0];
+  const manager =
+    branchData.manager ?? branchData.assignedManager ?? branchAdminUser;
 
   return {
     ...branchData,
+    branchAdmin: normalizeBranchAdminForEdit(
+      branchData.branchAdmin,
+      manager
+    ),
     settings: {
       ...settings,
       tableReservationsEnabled: Boolean(settings?.tableReservationsEnabled ?? false),
