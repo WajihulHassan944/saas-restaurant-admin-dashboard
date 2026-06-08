@@ -17,7 +17,10 @@ import StepFour from "./stepFour";
 import StepFive from "./StepFive";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useAssignModifierGroupToItem } from "@/hooks/useModifierGroupAssignments";
+import {
+  useAssignModifierGroupToItem,
+  useDetachModifierGroupFromItem,
+} from "@/hooks/useModifierGroupAssignments";
 import { useCreateMenuItem, useUpdateMenuItem } from "@/hooks/useMenus";
 import {
   extractEntityId,
@@ -551,6 +554,22 @@ const getNestedModifierOverridesFromVariations = (variationOverrides: any[]) => 
   );
 };
 
+const getSelectedVariationIdsFromForm = (form: Record<string, unknown>) => {
+  if (Array.isArray(form.variationIds)) {
+    return normalizeIds([form.variationIds], "variation");
+  }
+
+  return normalizeIds(
+    [
+      form.variations,
+      form.itemVariations,
+      form.variationLinks,
+      form.variationPriceOverrides,
+    ],
+    "variation"
+  );
+};
+
 export const getInitialForm = (restaurantId?: string, initialData?: any) => {
   const rawVariationOverrides = getRawVariationOverrideSource(initialData);
   const rawFlatModifierOverrides = normalizeArray(
@@ -752,16 +771,7 @@ export const buildMenuItemPayload = ({
     toNumberOrZero(form.maxQuantity || minQuantity)
   );
 
-  const selectedVariationIds = normalizeIds(
-    [
-      form.variationIds,
-      form.variations,
-      form.itemVariations,
-      form.variationLinks,
-      form.variationPriceOverrides,
-    ],
-    "variation"
-  );
+  const selectedVariationIds = getSelectedVariationIdsFromForm(form);
 
   const selectedModifierIds = normalizeIds(
     [
@@ -782,7 +792,6 @@ export const buildMenuItemPayload = ({
     rawFlatModifierOverrides: [],
     menuItemId: initialDataId,
   });
-
   const modifierPriceOverrideMap = new Map<string, ModifierPriceOverride>();
 
   selectedModifierPriceOverrides.forEach((item) => {
@@ -929,8 +938,16 @@ export default function CreateMenuItemModal({
     mutateAsync: assignModifierGroupToItem,
     isPending: isAssigningModifierGroups,
   } = useAssignModifierGroupToItem();
+  const {
+    mutateAsync: detachModifierGroupFromItem,
+    isPending: isDetachingModifierGroups,
+  } = useDetachModifierGroupFromItem();
 
-  const isSubmitting = isCreating || isUpdating || isAssigningModifierGroups;
+  const isSubmitting =
+    isCreating ||
+    isUpdating ||
+    isAssigningModifierGroups ||
+    isDetachingModifierGroups;
 
   useEffect(() => {
     if (!open) return;
@@ -1024,21 +1041,21 @@ export default function CreateMenuItemModal({
     return true;
   };
 
-  const getAssignmentsToAttach = () => {
-    const assignments = normalizeMenuItemModifierGroupAssignments(
-      form?.modifierGroupAssignments
-    );
-    const existingGroupIds = new Set(
-      normalizeMenuItemModifierGroupAssignments(
-        initialData?.modifierGroups
-      ).map((assignment) => assignment.groupId)
+  const getModifierGroupAssignments = () =>
+    normalizeMenuItemModifierGroupAssignments(form?.modifierGroupAssignments);
+
+  const getModifierGroupIdsToDetach = (
+    assignments: MenuItemModifierGroupAssignment[]
+  ) => {
+    const currentGroupIds = new Set(
+      assignments.map((assignment) => assignment.groupId)
     );
 
-    return isEditMode
-      ? assignments.filter(
-          (assignment) => !existingGroupIds.has(assignment.groupId)
-        )
-      : assignments;
+    return normalizeMenuItemModifierGroupAssignments(
+      initialData?.modifierGroups
+    )
+      .map((assignment) => assignment.groupId)
+      .filter((groupId) => !currentGroupIds.has(groupId));
   };
 
   const attachModifierGroupAssignments = async (
@@ -1061,11 +1078,28 @@ export default function CreateMenuItemModal({
     );
   };
 
+  const detachModifierGroupAssignments = async (
+    itemId: string,
+    groupIds: string[]
+  ) => {
+    await Promise.all(
+      groupIds.map((groupId) =>
+        detachModifierGroupFromItem({
+          itemId,
+          groupId,
+        })
+      )
+    );
+  };
+
   const handleSubmit = async () => {
     if (!validateBeforeSubmit()) return;
 
     const payload = buildPayload();
-    const assignmentsToAttach = getAssignmentsToAttach();
+    const modifierGroupAssignments = getModifierGroupAssignments();
+    const modifierGroupIdsToDetach = getModifierGroupIdsToDetach(
+      modifierGroupAssignments
+    );
 
     if (isEditMode) {
       const { restaurantId: _restaurantId, ...updatePayload } = payload;
@@ -1076,10 +1110,10 @@ export default function CreateMenuItemModal({
           data: updatePayload,
         });
 
-        await attachModifierGroupAssignments(
-          initialData.id,
-          assignmentsToAttach
-        );
+        await Promise.all([
+          detachModifierGroupAssignments(initialData.id, modifierGroupIdsToDetach),
+          attachModifierGroupAssignments(initialData.id, modifierGroupAssignments),
+        ]);
         onSuccess?.();
         closeOnly();
       } catch (error: unknown) {
@@ -1096,8 +1130,8 @@ export default function CreateMenuItemModal({
       const itemId = extractEntityId(response);
 
       if (itemId) {
-        await attachModifierGroupAssignments(itemId, assignmentsToAttach);
-      } else if (assignmentsToAttach.length > 0) {
+        await attachModifierGroupAssignments(itemId, modifierGroupAssignments);
+      } else if (modifierGroupAssignments.length > 0) {
         toast.error("Menu item created but no item id was returned.");
         return;
       }
