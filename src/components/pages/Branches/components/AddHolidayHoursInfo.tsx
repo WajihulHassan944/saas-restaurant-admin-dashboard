@@ -509,8 +509,9 @@ function HolidayHourItem({
         </div>
       </div>
 
-      <div className="grid gap-4 p-4 lg:grid-cols-2">
-        <FieldGroup label={labels.holidayDateOrRange} required>
+      <div className="grid gap-4 p-4 md:grid-cols-12">
+        <div className="md:col-span-12">
+          <FieldGroup label={labels.holidayDateOrRange} required>
           <div className={`relative ${calendarOpen ? "z-30" : ""}`}>
             <button
               type="button"
@@ -561,11 +562,12 @@ function HolidayHourItem({
               </div>
             ) : null}
           </div>
-        </FieldGroup>
+          </FieldGroup>
+        </div>
 
         <div
-          className={`grid gap-4 ${
-            row.isClosed ? "sm:grid-cols-1" : "sm:grid-cols-2"
+          className={`grid gap-4 md:col-span-12 ${
+            row.isClosed ? "grid-cols-1" : "sm:grid-cols-2"
           }`}
         >
           {row.isClosed ? (
@@ -623,7 +625,7 @@ function HolidayHourItem({
           )}
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="md:col-span-12">
           <FieldGroup label={labels.note}>
             <input
               type="text"
