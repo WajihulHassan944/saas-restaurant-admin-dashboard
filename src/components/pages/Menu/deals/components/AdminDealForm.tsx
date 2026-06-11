@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -11,18 +11,26 @@ import FormInput from "@/components/forms/common/FormInput";
 import { ImageUploadField } from "@/components/forms/common/ImageUploadField";
 import AdminDealCategorySelector from "@/components/pages/Menu/deals/components/AdminDealCategorySelector";
 import AdminDealMenuItemSelector from "@/components/pages/Menu/deals/components/AdminDealMenuItemSelector";
-import { toDateTimeLocalValue } from "@/components/pages/Menu/deals/utils/admin-deals-formatters";
+import {
+  toDateTimeLocalValue,
+  toDealStartsAtInputValue,
+} from "@/components/pages/Menu/deals/utils/admin-deals-formatters";
 import PageWrapper from "@/components/pages/Promotions/forms/PageWrapper";
 import Section from "@/components/pages/Promotions/forms/Section";
+import AsyncSelect from "@/components/ui/AsyncSelect";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getMenuVariations } from "@/services/menus";
+import { extractResponseItems } from "@/lib/response";
 import type {
   AdminDeal,
   AdminDealCategorySummary,
+  AdminDealCategoryRuleFormValues,
   AdminDealFormValues,
   AdminDealMenuItemSummary,
+  AdminDealVariationSummary,
 } from "@/types/admin-deals";
 import { adminDealFormSchema } from "@/validations/admin-deals";
 import { useTranslations } from "next-intl";
@@ -63,17 +71,27 @@ const getDefaultValues = ({
   restaurantId: initialDeal?.restaurantId ?? restaurantId ?? "",
   branchId: initialDeal?.branchId ?? (isBranchAdmin ? branchId ?? "" : ""),
   discountValue: initialDeal?.discountValue ?? 0,
-  startsAt: toDateTimeLocalValue(initialDeal?.startsAt),
+  startsAt: initialDeal ? toDealStartsAtInputValue(initialDeal) : "",
   expiresAt: toDateTimeLocalValue(initialDeal?.expiresAt),
   dealSelectionMode: initialDeal?.dealSelectionMode ?? "FIXED_ITEMS",
   dealSourceType:
+    (initialDeal?.scopeCategoryRules?.length ?? 0) > 0 ||
     (initialDeal?.scopeCategoryIds?.length ?? 0) > 0 ||
     (initialDeal?.scopeCategories?.length ?? 0) > 0
       ? "CATEGORIES"
       : "ITEMS",
   dealRequiredQuantity: initialDeal?.dealRequiredQuantity ?? null,
   scopeMenuItemIds: initialDeal?.scopeMenuItemIds ?? [],
-  scopeCategoryIds: initialDeal?.scopeCategoryIds ?? [],
+  scopeCategoryIds:
+    initialDeal?.scopeCategoryIds ??
+    initialDeal?.scopeCategoryRules?.map((rule) => rule.menuCategoryId) ??
+    [],
+  scopeCategoryRules:
+    initialDeal?.scopeCategoryRules?.map((rule) => ({
+      menuCategoryId: rule.menuCategoryId,
+      itemLimit: rule.itemLimit,
+      variationId: rule.variationId ?? "",
+    })) ?? [],
   isActive: initialDeal?.isActive ?? true,
 });
 
@@ -104,6 +122,21 @@ export default function AdminDealForm({
     () => initialDeal?.scopeCategories ?? [],
     [initialDeal?.scopeCategories]
   );
+  const [selectedCategoryOptions, setSelectedCategoryOptions] =
+    useState<AdminDealCategorySummary[]>(initialCategories);
+  const initialVariationOptions: AdminDealVariationSummary[] = useMemo(() => {
+    const variationMap = new Map<string, AdminDealVariationSummary>();
+    initialDeal?.scopeCategoryRules?.forEach((rule) => {
+      if (rule.variation?.id && rule.variation?.name) {
+        variationMap.set(String(rule.variation.id), {
+          id: String(rule.variation.id),
+          name: String(rule.variation.name),
+        });
+      }
+    });
+
+    return Array.from(variationMap.values());
+  }, [initialDeal?.scopeCategoryRules]);
 
   const { control, handleSubmit, setValue } = useForm<AdminDealFormValues>({
     resolver: zodResolver(adminDealFormSchema),
@@ -118,9 +151,82 @@ export default function AdminDealForm({
   const dealSourceType = useWatch({ control, name: "dealSourceType" });
   const startsAt = useWatch({ control, name: "startsAt" });
   const expiresAt = useWatch({ control, name: "expiresAt" });
+  const scopeCategoryIds = useWatch({ control, name: "scopeCategoryIds" });
+  const scopeCategoryRules = useWatch({ control, name: "scopeCategoryRules" });
   const isFlexibleDeal = dealSelectionMode === "FLEXIBLE_ITEMS";
   const isCategorySource = isFlexibleDeal && dealSourceType === "CATEGORIES";
   const hasCustomDealWindow = Boolean(startsAt || expiresAt);
+  const categoryRuleTotal = useMemo(() => {
+    return scopeCategoryRules
+      .filter((rule) => scopeCategoryIds.includes(rule.menuCategoryId))
+      .reduce((total, rule) => total + Number(rule.itemLimit ?? 0), 0);
+  }, [scopeCategoryIds, scopeCategoryRules]);
+  const fetchVariationOptions = useCallback(async ({
+    categoryId,
+    search,
+    page,
+  }: {
+    categoryId: string;
+    search: string;
+    page: number;
+  }) => {
+    if (!restaurantId) return { data: [] };
+
+    const response = await getMenuVariations({
+      restaurantId,
+      categoryId,
+      search,
+      page,
+      limit: 50,
+      sortBy: "name",
+      sortOrder: "ASC",
+      isActive: true,
+    });
+
+    return {
+      data: extractResponseItems<{ id?: string; name?: string }>(response)
+        .filter((variation) => variation.id && variation.name)
+        .map((variation) => ({
+          id: String(variation.id),
+          name: String(variation.name),
+        })),
+    };
+  }, [restaurantId]);
+
+  useEffect(() => {
+    setSelectedCategoryOptions(initialCategories);
+  }, [initialCategories]);
+
+  useEffect(() => {
+    if (!isCategorySource) return;
+
+    const currentRuleMap = new Map(
+      scopeCategoryRules.map((rule) => [rule.menuCategoryId, rule])
+    );
+    const nextRules = scopeCategoryIds.map((categoryId) => {
+      return (
+        currentRuleMap.get(categoryId) ?? {
+          menuCategoryId: categoryId,
+          itemLimit: 1,
+          variationId: "",
+        }
+      );
+    });
+    const rulesChanged =
+      nextRules.length !== scopeCategoryRules.length ||
+      nextRules.some((rule, index) => {
+        const currentRule = scopeCategoryRules[index];
+        return (
+          currentRule?.menuCategoryId !== rule.menuCategoryId ||
+          currentRule?.itemLimit !== rule.itemLimit ||
+          (currentRule?.variationId ?? "") !== (rule.variationId ?? "")
+        );
+      });
+
+    if (rulesChanged) {
+      setValue("scopeCategoryRules", nextRules, { shouldValidate: true });
+    }
+  }, [isCategorySource, scopeCategoryIds, scopeCategoryRules, setValue]);
 
   const handleDealTypeChange = (value: AdminDealFormValues["dealSelectionMode"]) => {
     setValue("dealSelectionMode", value, { shouldValidate: true });
@@ -128,6 +234,7 @@ export default function AdminDealForm({
       setValue("dealSourceType", "ITEMS", { shouldValidate: true });
       setValue("dealRequiredQuantity", null, { shouldValidate: true });
       setValue("scopeCategoryIds", [], { shouldValidate: true });
+      setValue("scopeCategoryRules", [], { shouldValidate: true });
     }
   };
 
@@ -135,8 +242,10 @@ export default function AdminDealForm({
     setValue("dealSourceType", value, { shouldValidate: true });
     if (value === "CATEGORIES") {
       setValue("scopeMenuItemIds", [], { shouldValidate: true });
+      setValue("dealRequiredQuantity", null, { shouldValidate: true });
     } else {
       setValue("scopeCategoryIds", [], { shouldValidate: true });
+      setValue("scopeCategoryRules", [], { shouldValidate: true });
     }
   };
 
@@ -266,7 +375,7 @@ export default function AdminDealForm({
             ) : null}
           </div>
 
-          {isFlexibleDeal ? (
+          {isFlexibleDeal && !isCategorySource ? (
             <Controller
               control={control}
               name="dealRequiredQuantity"
@@ -282,6 +391,14 @@ export default function AdminDealForm({
                 />
               )}
             />
+          ) : null}
+
+          {isCategorySource ? (
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+              {t("categoryRulesRequiredQuantity", {
+                count: categoryRuleTotal,
+              })}
+            </div>
           ) : null}
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -383,26 +500,53 @@ export default function AdminDealForm({
 
         <Section label={isCategorySource ? t("selectedCategories") : t("selectedMenuItems")}>
           {isCategorySource ? (
-            <Controller
-              control={control}
-              name="scopeCategoryIds"
-              render={({ field, fieldState }) => (
-                <div className="space-y-2">
-                  <Label className="text-[16px]">{t("selectCategories")}</Label>
-                  <p className={MUTED_TEXT_SM_CLASS}>
-                    {t("flexibleCategoryHelp")}
-                  </p>
-                  <AdminDealCategorySelector
-                    value={field.value}
-                    onChange={field.onChange}
-                    restaurantId={restaurantId}
-                    branchId={branchId}
-                    initialCategories={initialCategories}
+            <>
+              <Controller
+                control={control}
+                name="scopeCategoryIds"
+                render={({ field, fieldState }) => (
+                  <div className="space-y-2">
+                    <Label className="text-[16px]">{t("selectCategories")}</Label>
+                    <p className={MUTED_TEXT_SM_CLASS}>
+                      {t("flexibleCategoryHelp")}
+                    </p>
+                    <AdminDealCategorySelector
+                      value={field.value}
+                      onChange={field.onChange}
+                      restaurantId={restaurantId}
+                      branchId={branchId}
+                      initialCategories={initialCategories}
+                      onSelectionOptionsChange={setSelectedCategoryOptions}
+                      error={fieldState.error?.message}
+                    />
+                  </div>
+                )}
+              />
+              <Controller
+                control={control}
+                name="scopeCategoryRules"
+                render={({ field, fieldState }) => (
+                  <CategoryRulesEditor
+                    categoryIds={scopeCategoryIds}
+                    categories={selectedCategoryOptions}
+                    rules={field.value}
+                    initialVariationOptions={initialVariationOptions}
+                    fetchVariationOptions={fetchVariationOptions}
                     error={fieldState.error?.message}
+                    labels={{
+                      title: t("categoryRulesTitle"),
+                      description: t("categoryRulesDescription"),
+                      itemLimit: t("itemLimit"),
+                      itemLimitPlaceholder: t("itemLimitPlaceholder"),
+                      forcedVariation: t("forcedVariation"),
+                      noForcedVariation: t("noForcedVariation"),
+                      categoryFallback: t("categoryFallback"),
+                    }}
+                    onChange={field.onChange}
                   />
-                </div>
-              )}
-            />
+                )}
+              />
+            </>
           ) : (
             <Controller
               control={control}
@@ -447,6 +591,268 @@ export default function AdminDealForm({
         </div>
       </form>
     </PageWrapper>
+  );
+}
+
+type VariationOption = {
+  id: string;
+  name: string;
+};
+
+type CategoryRulesEditorProps = {
+  categoryIds: string[];
+  categories: AdminDealCategorySummary[];
+  rules: AdminDealCategoryRuleFormValues[];
+  initialVariationOptions: VariationOption[];
+  fetchVariationOptions: (params: {
+    categoryId: string;
+    search: string;
+    page: number;
+  }) => Promise<{ data: VariationOption[] }>;
+  error?: string;
+  labels: {
+    title: string;
+    description: string;
+    itemLimit: string;
+    itemLimitPlaceholder: string;
+    forcedVariation: string;
+    noForcedVariation: string;
+    categoryFallback: string;
+  };
+  onChange: (rules: AdminDealCategoryRuleFormValues[]) => void;
+};
+
+function CategoryRulesEditor({
+  categoryIds,
+  categories,
+  rules,
+  initialVariationOptions,
+  fetchVariationOptions,
+  error,
+  labels,
+  onChange,
+}: CategoryRulesEditorProps) {
+  if (categoryIds.length === 0) return null;
+
+  const getCategoryName = (categoryId: string) => {
+    return (
+      categories.find((category) => category.id === categoryId)?.name ||
+      `${labels.categoryFallback} ${categoryId}`
+    );
+  };
+
+  const updateRule = (
+    categoryId: string,
+    patch: Partial<AdminDealCategoryRuleFormValues>
+  ) => {
+    const nextRules = rules.map((rule) =>
+      rule.menuCategoryId === categoryId ? { ...rule, ...patch } : rule
+    );
+    onChange(nextRules);
+  };
+
+  return (
+    <div className="space-y-3 rounded-[14px] border border-gray-200 bg-white p-4">
+      <div>
+        <p className="text-sm font-semibold text-gray-900">{labels.title}</p>
+        <p className="mt-1 text-xs leading-5 text-gray-500">
+          {labels.description}
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {categoryIds.map((categoryId) => {
+          const rule =
+            rules.find((item) => item.menuCategoryId === categoryId) ?? {
+              menuCategoryId: categoryId,
+              itemLimit: 1,
+              variationId: "",
+            };
+
+          return (
+            <div
+              key={categoryId}
+              className="grid gap-3 rounded-[12px] border border-gray-100 bg-[#FAFAFA] p-3 md:grid-cols-[minmax(0,1fr)_140px_minmax(180px,220px)] md:items-end"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {getCategoryName(categoryId)}
+                </p>
+                <p className="mt-1 truncate text-xs text-gray-400">
+                  {categoryId}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">{labels.itemLimit}</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={rule.itemLimit ?? ""}
+                  placeholder={labels.itemLimitPlaceholder}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    updateRule(categoryId, {
+                      itemLimit: nextValue === "" ? null : Number(nextValue),
+                    });
+                  }}
+                  className={INPUT_BASE_CLASS}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">{labels.forcedVariation}</Label>
+                <CategoryVariationSelect
+                  categoryId={categoryId}
+                  value={rule.variationId ?? ""}
+                  initialVariationOptions={initialVariationOptions}
+                  fetchVariationOptions={fetchVariationOptions}
+                  labels={{
+                    forcedVariation: labels.forcedVariation,
+                    noForcedVariation: labels.noForcedVariation,
+                  }}
+                  onChange={(variationId) =>
+                    updateRule(categoryId, {
+                      variationId,
+                    })
+                  }
+                />
+                {rule.variationId ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-gray-500 hover:text-gray-800"
+                    onClick={() =>
+                      updateRule(categoryId, {
+                        variationId: "",
+                      })
+                    }
+                  >
+                    {labels.noForcedVariation}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {error ? <p className={FIELD_ERROR_CLASS}>{error}</p> : null}
+    </div>
+  );
+}
+
+type CategoryVariationSelectProps = {
+  categoryId: string;
+  value: string;
+  initialVariationOptions: VariationOption[];
+  fetchVariationOptions: (params: {
+    categoryId: string;
+    search: string;
+    page: number;
+  }) => Promise<{ data: VariationOption[] }>;
+  labels: {
+    forcedVariation: string;
+    noForcedVariation: string;
+  };
+  onChange: (variationId: string) => void;
+};
+
+function CategoryVariationSelect({
+  categoryId,
+  value,
+  initialVariationOptions,
+  fetchVariationOptions,
+  labels,
+  onChange,
+}: CategoryVariationSelectProps) {
+  const onChangeRef = useRef(onChange);
+  const [selectedVariationOption, setSelectedVariationOption] =
+    useState<VariationOption | null>(() => {
+      if (!value) return null;
+
+      return (
+        initialVariationOptions.find((variation) => variation.id === value) ?? {
+          id: value,
+          name: value,
+        }
+      );
+    });
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedVariationOption(null);
+      return;
+    }
+
+    const initialOption = initialVariationOptions.find(
+      (variation) => variation.id === value
+    );
+    if (initialOption) {
+      setSelectedVariationOption(initialOption);
+    }
+  }, [initialVariationOptions, value]);
+
+  useEffect(() => {
+    if (!value) return;
+
+    let cancelled = false;
+
+    const validateSelectedVariation = async () => {
+      let response: { data: VariationOption[] };
+      try {
+        response = await fetchVariationOptions({
+          categoryId,
+          search: "",
+          page: 1,
+        });
+      } catch {
+        return;
+      }
+
+      if (cancelled) return;
+      const categoryVariation = response.data.find(
+        (variation) => variation.id === value
+      );
+
+      if (categoryVariation) {
+        setSelectedVariationOption(categoryVariation);
+        return;
+      }
+
+      setSelectedVariationOption(null);
+      onChangeRef.current("");
+    };
+
+    validateSelectedVariation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId, fetchVariationOptions, value]);
+
+  return (
+    <AsyncSelect
+      value={selectedVariationOption}
+      placeholder={labels.noForcedVariation}
+      searchPlaceholder={labels.forcedVariation}
+      noResultsText={labels.noForcedVariation}
+      fetchOptions={({ search, page }) =>
+        fetchVariationOptions({
+          categoryId,
+          search,
+          page,
+        })
+      }
+      onChange={(variation: VariationOption | null) => {
+        setSelectedVariationOption(variation);
+        onChange(variation?.id ?? "");
+      }}
+    />
   );
 }
 

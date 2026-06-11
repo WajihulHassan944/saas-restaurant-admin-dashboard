@@ -25,17 +25,37 @@ const requiredQuantitySchema = z.preprocess(
   z.number().int().min(1).nullable().optional()
 );
 
+const categoryRuleSchema = z.object({
+  menuCategoryId: z.string().trim().min(1, "Category is required."),
+  itemLimit: z.preprocess(
+    (value) => {
+      if (value === "" || value === null || value === undefined) return null;
+      return Number(value);
+    },
+    z.number().int().min(1, "Item limit must be at least 1.")
+  ),
+  variationId: optionalText,
+});
+
 const optionalImageUrlSchema = thumbnailUrlSchema.optional().default("");
 
 const getTrimmedUrl = (value: string | null | undefined) => {
   return getOptionalThumbnailUrl(value);
 };
 
-const optionalDateTimeLocalSchema = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value ? value : undefined));
+const optionalDateTimeLocalSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value !== "string") return undefined;
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return undefined;
+
+    const date = new Date(trimmedValue);
+    return Number.isNaN(date.getTime()) ? undefined : trimmedValue;
+  },
+  z.string().optional()
+);
 
 const getDateFromOptionalDateTime = (value: string | undefined) => {
   if (!value) return null;
@@ -63,27 +83,12 @@ export const adminDealFormSchema = z
     dealRequiredQuantity: requiredQuantitySchema,
     scopeMenuItemIds: z.array(z.string()).default([]),
     scopeCategoryIds: z.array(z.string()).default([]),
+    scopeCategoryRules: z.array(categoryRuleSchema).default([]),
     isActive: z.boolean().default(true),
   })
   .superRefine((values, context) => {
     const startsAt = getDateFromOptionalDateTime(values.startsAt);
     const expiresAt = getDateFromOptionalDateTime(values.expiresAt);
-
-    if (values.startsAt && !startsAt) {
-      context.addIssue({
-        code: "custom",
-        path: ["startsAt"],
-        message: "Starts At must be a valid date and time.",
-      });
-    }
-
-    if (values.expiresAt && !expiresAt) {
-      context.addIssue({
-        code: "custom",
-        path: ["expiresAt"],
-        message: "Expires At must be a valid date and time.",
-      });
-    }
 
     if (startsAt && expiresAt && expiresAt <= startsAt) {
       context.addIssue({
@@ -121,15 +126,15 @@ export const adminDealFormSchema = z
       return;
     }
 
-    if (!values.dealRequiredQuantity) {
-      context.addIssue({
-        code: "custom",
-        path: ["dealRequiredQuantity"],
-        message: "Required quantity is required for flexible deals.",
-      });
-    }
-
     if (values.dealSourceType === "ITEMS") {
+      if (!values.dealRequiredQuantity) {
+        context.addIssue({
+          code: "custom",
+          path: ["dealRequiredQuantity"],
+          message: "Required quantity is required for flexible item deals.",
+        });
+      }
+
       if (
         values.dealRequiredQuantity &&
         values.scopeMenuItemIds.length < values.dealRequiredQuantity
@@ -157,6 +162,19 @@ export const adminDealFormSchema = z
         code: "custom",
         path: ["scopeCategoryIds"],
         message: "Select at least 1 category for a flexible category deal.",
+      });
+    }
+
+    const selectedCategoryIds = new Set(values.scopeCategoryIds);
+    const selectedRules = values.scopeCategoryRules.filter((rule) =>
+      selectedCategoryIds.has(rule.menuCategoryId)
+    );
+
+    if (selectedRules.length !== values.scopeCategoryIds.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["scopeCategoryRules"],
+        message: "Each selected category needs an item limit rule.",
       });
     }
 
@@ -197,13 +215,27 @@ const buildBasePayload = (values: AdminDealFormValues): AdminDealCreatePayload =
     return payload;
   }
 
-  if (typeof values.dealRequiredQuantity === "number") {
-    payload.dealRequiredQuantity = values.dealRequiredQuantity;
+  if (values.dealSourceType === "CATEGORIES") {
+    const selectedCategoryIds = new Set(values.scopeCategoryIds);
+    const scopeCategories = values.scopeCategoryRules
+      .filter((rule) => selectedCategoryIds.has(rule.menuCategoryId))
+      .map((rule) => ({
+        menuCategoryId: rule.menuCategoryId,
+        itemLimit: Number(rule.itemLimit ?? 1),
+        ...(rule.variationId ? { variationId: rule.variationId } : {}),
+      }));
+    const dealRequiredQuantity = scopeCategories.reduce(
+      (total, rule) => total + rule.itemLimit,
+      0
+    );
+
+    payload.dealRequiredQuantity = dealRequiredQuantity;
+    payload.scopeCategories = scopeCategories;
+    return payload;
   }
 
-  if (values.dealSourceType === "CATEGORIES") {
-    payload.scopeCategoryIds = values.scopeCategoryIds;
-    return payload;
+  if (typeof values.dealRequiredQuantity === "number") {
+    payload.dealRequiredQuantity = values.dealRequiredQuantity;
   }
 
   payload.scopeMenuItemIds = values.scopeMenuItemIds;
@@ -220,8 +252,12 @@ export const buildAdminDealUpdatePayload = (
 ): AdminDealUpdatePayload => {
   const payload: AdminDealUpdatePayload = buildBasePayload(values);
 
+  payload.startsAt = payload.startsAt ?? null;
+  payload.expiresAt = payload.expiresAt ?? null;
+
   if (values.dealSelectionMode === "FIXED_ITEMS" || values.dealSourceType === "ITEMS") {
     payload.scopeCategoryIds = [];
+    payload.scopeCategories = [];
   } else {
     payload.scopeMenuItemIds = [];
   }

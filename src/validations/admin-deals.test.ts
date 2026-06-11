@@ -22,6 +22,7 @@ const validValues: AdminDealFormValues = {
   dealRequiredQuantity: null,
   scopeMenuItemIds: ["item-1", "item-2"],
   scopeCategoryIds: [],
+  scopeCategoryRules: [],
   isActive: true,
 };
 
@@ -60,14 +61,24 @@ describe("admin deal validation", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects invalid start and expiry dates when provided", () => {
+  it("allows null start and expiry dates", () => {
+    const result = adminDealFormSchema.safeParse({
+      ...validValues,
+      startsAt: null,
+      expiresAt: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("ignores invalid optional start and expiry dates", () => {
     const result = adminDealFormSchema.safeParse({
       ...validValues,
       startsAt: "invalid",
       expiresAt: "also-invalid",
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("fixed item deal requires at least 2 items", () => {
@@ -118,6 +129,7 @@ describe("admin deal validation", () => {
       dealRequiredQuantity: 2,
       scopeMenuItemIds: [],
       scopeCategoryIds: [],
+      scopeCategoryRules: [],
     });
 
     expect(result.success).toBe(false);
@@ -131,6 +143,27 @@ describe("admin deal validation", () => {
       dealRequiredQuantity: null,
       scopeMenuItemIds: [],
       scopeCategoryIds: ["category-1"],
+      scopeCategoryRules: [],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("flexible category deal requires one rule per selected category", () => {
+    const result = adminDealFormSchema.safeParse({
+      ...validValues,
+      dealSelectionMode: "FLEXIBLE_ITEMS",
+      dealSourceType: "CATEGORIES",
+      dealRequiredQuantity: null,
+      scopeMenuItemIds: [],
+      scopeCategoryIds: ["category-1", "category-2"],
+      scopeCategoryRules: [
+        {
+          menuCategoryId: "category-1",
+          itemLimit: 2,
+          variationId: "variation-1",
+        },
+      ],
     });
 
     expect(result.success).toBe(false);
@@ -176,6 +209,49 @@ describe("admin deal validation", () => {
     expect(payload).not.toHaveProperty("expiresAt");
   });
 
+  it("update payload clears start and expiry dates when blank", () => {
+    const payload = buildAdminDealUpdatePayload({
+      ...validValues,
+      startsAt: "",
+      expiresAt: "",
+    });
+
+    expect(payload.startsAt).toBeNull();
+    expect(payload.expiresAt).toBeNull();
+  });
+
+  it("payload omits start and expiry dates when optional values are invalid", () => {
+    const result = adminDealFormSchema.safeParse({
+      ...validValues,
+      startsAt: "invalid",
+      expiresAt: "also-invalid",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const payload = buildAdminDealCreatePayload(result.data);
+
+    expect(payload).not.toHaveProperty("startsAt");
+    expect(payload).not.toHaveProperty("expiresAt");
+  });
+
+  it("update payload clears start and expiry dates when optional values are invalid", () => {
+    const result = adminDealFormSchema.safeParse({
+      ...validValues,
+      startsAt: "invalid",
+      expiresAt: "also-invalid",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const payload = buildAdminDealUpdatePayload(result.data);
+
+    expect(payload.startsAt).toBeNull();
+    expect(payload.expiresAt).toBeNull();
+  });
+
   it("payload includes dealRequiredQuantity only for flexible deals", () => {
     const fixedPayload = buildAdminDealCreatePayload(validValues);
     const flexiblePayload = buildAdminDealCreatePayload({
@@ -202,12 +278,26 @@ describe("admin deal validation", () => {
       ...validValues,
       dealSelectionMode: "FLEXIBLE_ITEMS",
       dealSourceType: "CATEGORIES",
-      dealRequiredQuantity: 3,
+      dealRequiredQuantity: null,
       scopeMenuItemIds: [],
       scopeCategoryIds: ["category-1"],
+      scopeCategoryRules: [
+        {
+          menuCategoryId: "category-1",
+          itemLimit: 3,
+          variationId: "variation-1",
+        },
+      ],
     });
 
-    expect(payload.scopeCategoryIds).toEqual(["category-1"]);
+    expect(payload.scopeCategories).toEqual([
+      {
+        menuCategoryId: "category-1",
+        itemLimit: 3,
+        variationId: "variation-1",
+      },
+    ]);
+    expect(payload.dealRequiredQuantity).toBe(3);
     expect(payload.scopeMenuItemIds).toEqual([]);
   });
 });

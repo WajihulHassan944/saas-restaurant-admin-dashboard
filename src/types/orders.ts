@@ -6,9 +6,11 @@ export type Order = {
   totalAmount?: number;
   createdAt: string;
   orderTime?: string;
+  deliveryOtp?: string;
+  deliverymanId?: string | null;
   branchId?: string | null;
   branch?: { id?: string; name?: string } | null;
-  customer?: { fullName?: string; name?: string } | null;
+  customer?: { fullName?: string; name?: string; phone?: string } | null;
   isGroupOrder?: boolean;
 };
 
