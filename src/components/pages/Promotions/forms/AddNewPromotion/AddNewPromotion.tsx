@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { Controller, useForm, useWatch, type FieldErrors } from "react-hook-form";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import {
 import { getMenuItems } from "@/services/menu/menu.api";
 import { getMenuCategories } from "@/services/menu/categories/menu-categories.api";
 import { getApiErrorMessage } from "@/lib/errors";
+import { getLocalTodayDateTimeInputValue } from "@/lib/date-input";
 import {
   getIds,
   getOptionId,
@@ -87,11 +88,15 @@ const toNumber = (value: string) => {
   return Number.isFinite(number) ? number : 0;
 };
 
-export default function AddNewPromotion() {
+type AddNewPromotionProps = {
+  promotionId?: string | null;
+};
+
+export function AddNewPromotion({ promotionId }: AddNewPromotionProps) {
   const t = useTranslations("promotions");
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const id = searchParams.get("id");
+  const minimumDateTime = useMemo(() => getLocalTodayDateTimeInputValue(), []);
+  const id = promotionId ?? null;
   const isEditMode = Boolean(id);
 
   const { user, restaurantId, isBranchAdmin } = useAuth();
@@ -164,7 +169,7 @@ export default function AddNewPromotion() {
       applyMode: detailApplyMode,
       autoApply: detailAutoApply,
       isActive: Boolean(detail.isActive),
-      assignPermanently: !detail.expiresAt,
+      assignPermanently: false,
       branchId,
       selectedBranch:
         normalizeSelectedOptions({
@@ -228,9 +233,14 @@ export default function AddNewPromotion() {
     const scopeCategoryIds = values.applyMode === "SCOPED_ITEMS" ? getIds(values.selectedCategories) : [];
     const trimmedCode = values.code.trim();
     const thumbnailUrl = getOptionalThumbnailUrl(values.thumbnailUrl);
+    const shouldAutoApply = values.autoApply || !trimmedCode;
 
     return {
-      ...(values.autoApply || !trimmedCode ? {} : { code: trimmedCode }),
+      ...(isEditMode
+        ? { code: shouldAutoApply ? "" : trimmedCode }
+        : shouldAutoApply
+          ? {}
+          : { code: trimmedCode }),
       title: values.title.trim(),
       description: values.description.trim(),
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
@@ -243,16 +253,16 @@ export default function AddNewPromotion() {
       maxUses: toNumber(values.maxUses),
       maxUsesPerCustomer: toNumber(values.maxUsesPerCustomer),
       startsAt: toISOStringOrNull(values.startsAt),
-      expiresAt: values.assignPermanently ? null : toISOStringOrNull(values.expiresAt),
+      expiresAt: toISOStringOrNull(values.expiresAt),
       scopeMenuItemId: scopeMenuItemIds[0] ?? null,
       scopeCategoryId: scopeCategoryIds[0] ?? null,
       scopeMenuItemIds,
       scopeCategoryIds,
       applyMode: values.applyMode,
-      autoApply: values.autoApply,
+      autoApply: shouldAutoApply,
       isActive: values.isActive,
     };
-  }, [restaurantId, selectedBranchId, values]);
+  }, [isEditMode, restaurantId, selectedBranchId, values]);
 
   const onSubmit = async () => {
     if (!restaurantId) {
@@ -526,6 +536,7 @@ export default function AddNewPromotion() {
                   <Label>{t("forms.startsAt")}</Label>
                   <Input
                     type="datetime-local"
+                    min={minimumDateTime}
                     value={field.value}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
@@ -544,28 +555,17 @@ export default function AddNewPromotion() {
                   <Label>{t("forms.expiresAt")}</Label>
                   <Input
                     type="datetime-local"
+                    min={minimumDateTime}
                     value={field.value}
-                    disabled={values.assignPermanently}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
-                    className={`${INPUT_BASE_CLASS} disabled:cursor-not-allowed disabled:bg-gray-100`}
+                    className={INPUT_BASE_CLASS}
                   />
                   {fieldState.error?.message ? <p className={FIELD_ERROR_CLASS}>{translateValidation(fieldState.error.message)}</p> : null}
                 </div>
               )}
             />
           </div>
-
-          <Controller
-            control={control}
-            name="assignPermanently"
-            render={({ field }) => (
-              <label className="flex items-center gap-2 text-sm text-gray-600">
-                <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(Boolean(checked))} />
-                {t("forms.assignPermanently")}
-              </label>
-            )}
-          />
 
           <Controller
             control={control}

@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, type FormEvent } from "react";
+import { Suspense, useEffect, type FormEvent } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { Building2, Store } from "lucide-react";
 
 import FormInput from "@/components/forms/common/FormInput";
 import AuthPageShell from "@/components/pages/Auth/components/AuthPageShell";
@@ -21,8 +22,26 @@ import {
   loginSchema,
   type LoginFormValues,
 } from "@/validations/auth";
+import { cn } from "@/lib/utils";
 
-const LoginForm = () => {
+const loginRoles: Array<{
+  value: NonNullable<LoginFormValues["role"]>;
+  icon: typeof Building2;
+  labelKey: "businessAdminRole" | "branchAdminRole";
+}> = [
+  {
+    value: "BUSINESS_ADMIN",
+    icon: Building2,
+    labelKey: "businessAdminRole",
+  },
+  {
+    value: "BRANCH_ADMIN",
+    icon: Store,
+    labelKey: "branchAdminRole",
+  },
+];
+
+function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuthContext();
@@ -38,6 +57,7 @@ const LoginForm = () => {
     defaultValues: {
       email: "",
       password: "",
+      role: "BUSINESS_ADMIN",
     },
   });
 
@@ -90,7 +110,7 @@ const LoginForm = () => {
 
   return (
     <AuthPageShell>
-      <div className="w-full max-w-[420px]">
+      <div className="w-full max-w-[420px] py-8 sm:py-10">
         <h1 className="text-center text-[26px] font-semibold">
           {t("try")} <br />
           <span className="text-primary">{t("saasTitle")}</span>
@@ -102,7 +122,7 @@ const LoginForm = () => {
           {t("loginSubtitle")}
         </p>
 
-        <form className="mt-10 space-y-6" noValidate onSubmit={handleFormSubmit}>
+        <form className="mt-8 space-y-5" noValidate onSubmit={handleFormSubmit}>
           <Controller
             control={control}
             name="email"
@@ -137,6 +157,56 @@ const LoginForm = () => {
             )}
           />
 
+          <Controller
+            control={control}
+            name="role"
+            render={({ field }) => (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {t("loginAs")}
+                  </p>
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    {t("roleRequired")}
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {loginRoles.map(({ value, icon: Icon, labelKey }) => {
+                    const selected = field.value === value;
+
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => field.onChange(value)}
+                        className={cn(
+                          "group flex min-h-[58px] items-center gap-3 rounded-2xl border px-4 py-3 text-left transition",
+                          selected
+                            ? "border-primary bg-primary/5 shadow-[0_10px_28px_rgba(193,18,31,0.12)]"
+                            : "border-gray-200 bg-white hover:border-primary/40 hover:bg-gray-50"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "inline-flex size-9 items-center justify-center rounded-full transition",
+                            selected
+                              ? "bg-primary text-white"
+                              : "bg-gray-100 text-gray-500 group-hover:text-primary"
+                          )}
+                        >
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="min-w-0 text-sm font-semibold text-gray-900">
+                          {t(labelKey)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          />
+
           <div className="flex items-center justify-between text-sm">
             <label className="flex cursor-pointer items-center gap-2 text-gray-500">
               <Checkbox checked />
@@ -148,32 +218,40 @@ const LoginForm = () => {
             </Link>
           </div>
 
-          <Button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleLoginClick}
-            className="h-[48px] w-full rounded-[12px] text-base"
-          >
-            {isSubmitting ? t("signingIn") : t("signIn")}
-          </Button>
+          <div className="space-y-3 pt-1">
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleLoginClick}
+              className="h-[48px] w-full rounded-[12px] text-base"
+            >
+              {isSubmitting ? t("signingIn") : t("signIn")}
+            </Button>
 
-          <div className="my-6 flex items-center gap-4">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-900">{t("or")}</span>
-            <div className="h-px flex-1 bg-gray-200" />
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-xs text-gray-900">{t("or")}</span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+
+            <button
+              type="button"
+              className="flex h-[48px] w-full items-center justify-center gap-3 rounded-[12px] border border-[#BBBBBB] text-sm font-medium transition hover:bg-gray-50"
+            >
+              <Image src="/google_icon.png" alt={t("googleAlt")} width={18} height={18} />
+              {t("signInWithGoogle")}
+            </button>
           </div>
-
-          <button
-            type="button"
-            className="flex h-[48px] w-full items-center justify-center gap-3 rounded-[12px] border border-[#BBBBBB] text-sm font-medium transition hover:bg-gray-50"
-          >
-            <Image src="/google_icon.png" alt={t("googleAlt")} width={18} height={18} />
-            {t("signInWithGoogle")}
-          </button>
         </form>
       </div>
     </AuthPageShell>
   );
-};
+}
 
-export default LoginForm;
+export function LoginForm() {
+  return (
+    <Suspense fallback={<div className="py-10 text-center">Loading login...</div>}>
+      <LoginFormContent />
+    </Suspense>
+  );
+}

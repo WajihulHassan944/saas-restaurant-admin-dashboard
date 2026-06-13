@@ -17,13 +17,13 @@ import {
   Undo2,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import {
+  PAYMENT_METHOD_CODES,
+  PAYMENT_METHOD_LABELS,
+} from "@/types/payment-methods";
 
 const ORDER_TYPES = ["DELIVERY", "TAKEAWAY", "DINE_IN"];
-const PAYMENT_METHODS = [
-  "COD",
-  "STRIPE",
-  "PAYPAL",
-];
+const PAYMENT_METHODS = [...PAYMENT_METHOD_CODES];
 const SHOW_ALLOWED_PAYMENT_METHODS = false;
 
 type DeliveryMode = "RADIUS" | "ZONE" | "ZONE_BANDS" | "POSTAL_CODE";
@@ -1242,16 +1242,21 @@ export default function EditBranchStepTwo({ data, setData }: any) {
 
       {SHOW_ALLOWED_PAYMENT_METHODS ? (
         <Section label={t("allowedPaymentMethods")}>
-          <div className="flex flex-wrap gap-4">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {PAYMENT_METHODS.map((method) => (
-              <label key={method} className="flex items-center gap-2">
+              <label
+                key={method}
+                className="flex min-w-0 cursor-pointer items-center gap-3 rounded-[12px] border border-gray-200 bg-white px-3 py-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
+              >
                 <Checkbox
                   checked={settings.allowedPaymentMethods?.includes(method)}
                   onCheckedChange={() =>
                     toggleArrayValue("allowedPaymentMethods", method)
                   }
                 />
-                <span className="text-sm">{formatLabel(method)}</span>
+                <span className="min-w-0 break-words text-sm font-medium leading-5 text-gray-700">
+                  {PAYMENT_METHOD_LABELS[method] ?? formatLabel(method)}
+                </span>
               </label>
             ))}
           </div>

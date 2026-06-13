@@ -1,14 +1,4 @@
-type DeliveryAddress = {
-  address?: string | null;
-  street?: string | null;
-  area?: string | null;
-  postalCode?: string | null;
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
-  lat?: number | null;
-  lng?: number | null;
-};
+import type { DeliveryAddress } from "@/types/orders";
 
 type PaymentOptions = {
   selected?: string | null;
@@ -21,14 +11,34 @@ type OrderPaymentSource = {
 
 const paymentMethodLabels: Record<string, string> = {
   COD: "Cash on delivery",
+  CARD_ON_DELIVERY: "Card on delivery",
   PAYPAL: "PayPal",
-  STRIPE: "Online card",
+  STRIPE: "Stripe online payment",
+  EASYPAISA: "Easypaisa",
+  JAZZCASH: "JazzCash",
+  BANK_TRANSFER: "Bank transfer",
+  WALLET: "Customer wallet",
 };
 
 const cleanParts = (parts: Array<string | null | undefined>) =>
   parts
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part));
+
+const getUniqueParts = (parts: string[]) => {
+  const seen = new Set<string>();
+
+  return parts.filter((part) => {
+    const normalizedPart = part.toLowerCase();
+
+    if (seen.has(normalizedPart)) {
+      return false;
+    }
+
+    seen.add(normalizedPart);
+    return true;
+  });
+};
 
 export const formatPaymentMethod = (method?: string | null) => {
   if (!method) return null;
@@ -53,16 +63,24 @@ export const formatDeliveryAddress = (address?: DeliveryAddress | null) => {
     return address.address.trim();
   }
 
-  const lineOne = address.street?.trim() ?? "";
-  const lineOneSearch = lineOne.toLowerCase();
-  const secondaryParts = cleanParts([
-    address.area,
-    address.city,
-    address.state,
-    address.postalCode,
-    address.country,
-  ]).filter((part) => !lineOneSearch.includes(part.toLowerCase()));
-  const lineTwo = secondaryParts.join(", ");
+  const orderedParts = getUniqueParts(
+    cleanParts([
+      address.street,
+      address.houseNumber,
+      address.area,
+      address.postalCode,
+      address.city,
+      address.state,
+      address.country,
+    ])
+  );
+  const street = orderedParts[0] ?? "";
+  const streetSearch = street.toLowerCase();
+  const remainingParts = orderedParts.slice(1).filter(
+    (part) => !streetSearch.includes(part.toLowerCase())
+  );
+  const lineOne = cleanParts([street, ...remainingParts.slice(0, 3)]).join(", ");
+  const lineTwo = remainingParts.slice(3).join(", ");
 
   return cleanParts([lineOne, lineTwo]).join("\n") || null;
 };

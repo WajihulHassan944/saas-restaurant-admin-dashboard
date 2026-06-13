@@ -330,6 +330,73 @@ describe("edit branch delivery and settings mapper", () => {
     });
   });
 
+  it("hydrates nullable backend edit fields into safe strings", () => {
+    const hydrated = hydrateBranchForEdit({
+      id: "branch-1",
+      name: null,
+      restaurantId: null,
+      description: null,
+      street: null,
+      shopNumber: null,
+      area: null,
+      postalCode: null,
+      city: null,
+      state: null,
+      country: null,
+      logoUrl: null,
+      coverImage: null,
+      address: {
+        street: null,
+        shopNumber: null,
+        area: null,
+        postalCode: null,
+        city: null,
+        state: null,
+        country: null,
+        lat: null,
+        lng: null,
+      },
+      branchAdmin: {
+        email: null,
+        firstName: null,
+        lastName: null,
+        phone: null,
+        password: null,
+      },
+    } as unknown as BranchFormData);
+
+    expect(hydrated.name).toBe("");
+    expect(hydrated.restaurantId).toBe("");
+    expect(hydrated.description).toBe("");
+    expect(hydrated.street).toBe("");
+    expect(hydrated.shopNumber).toBe("");
+    expect(hydrated.area).toBe("");
+    expect(hydrated.postalCode).toBe("");
+    expect(hydrated.city).toBe("");
+    expect(hydrated.state).toBe("");
+    expect(hydrated.country).toBe("");
+    expect(hydrated.logoUrl).toBe("");
+    expect(hydrated.coverImage).toBe("");
+    expect(hydrated.address).toMatchObject({
+      street: "",
+      shopNumber: "",
+      area: "",
+      postalCode: "",
+      city: "",
+      state: "",
+      country: "",
+      lat: undefined,
+      lng: undefined,
+    });
+    expect(hydrated.branchAdmin).toEqual({
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+    });
+  });
+
   it("includes edited branch admin info without sending a blank password", () => {
     const payload = buildBranchPatchPayload(
       {
@@ -351,6 +418,49 @@ describe("edit branch delivery and settings mapper", () => {
       firstName: "Wajih ul",
       lastName: "Hassan",
       phone: "12345678",
+    });
+  });
+
+  it("sends editable branch identity fields as flat backend patch fields", () => {
+    const payload = buildBranchPatchPayload(
+      {
+        restaurantId: "restaurant-1",
+        name: "Blue Area",
+        street: "Main Road",
+        shopNumber: "Shop 42",
+        postalCode: "54000",
+        city: "Lahore",
+        area: "DHA",
+        state: "Punjab",
+        country: "Pakistan",
+        lat: "31.5204",
+        lng: "74.3587",
+        logoUrl: "https://cdn.example.com/logo.png",
+        coverImage: "https://cdn.example.com/cover.png",
+        description: "Branch description",
+        address: {
+          street: "Old nested street",
+          postalCode: "00000",
+          lat: "0",
+          lng: "0",
+        },
+      },
+      {}
+    );
+
+    expect(payload).toMatchObject({
+      street: "Main Road",
+      shopNumber: "Shop 42",
+      postalCode: "54000",
+      city: "Lahore",
+      area: "DHA",
+      state: "Punjab",
+      country: "Pakistan",
+      lat: "31.5204",
+      lng: "74.3587",
+      logoUrl: "https://cdn.example.com/logo.png",
+      coverImage: "https://cdn.example.com/cover.png",
+      description: "Branch description",
     });
   });
 

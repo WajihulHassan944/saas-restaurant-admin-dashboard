@@ -19,15 +19,16 @@ describe("order details utils", () => {
 
   it("formats known and unknown payment methods", () => {
     expect(formatPaymentMethod("PAYPAL")).toBe("PayPal");
-    expect(formatPaymentMethod("STRIPE")).toBe("Online card");
+    expect(formatPaymentMethod("STRIPE")).toBe("Stripe online payment");
+    expect(formatPaymentMethod("CARD_ON_DELIVERY")).toBe("Card on delivery");
+    expect(formatPaymentMethod("BANK_TRANSFER")).toBe("Bank transfer");
     expect(formatPaymentMethod("CUSTOM_GATEWAY")).toBe("Custom Gateway");
   });
 
-  it("formats the structured delivery address from the order API", () => {
+  it("formats the structured delivery address in customer-entered order", () => {
     expect(
       formatDeliveryAddress({
-        street:
-          "Ghauri Town Phase 5, Zone IV, Islamabad Capital Territory, 46330, Pakistan",
+        street: "Ghauri Town Phase 5",
         area: "Ghauri Town Phase 5",
         postalCode: "46330",
         city: "Zone IV",
@@ -35,7 +36,22 @@ describe("order details utils", () => {
         country: "Pakistan",
       })
     ).toBe(
-      "Ghauri Town Phase 5, Zone IV, Islamabad Capital Territory, 46330, Pakistan"
+      "Ghauri Town Phase 5, 46330, Zone IV, Islamabad Capital Territory\nPakistan"
+    );
+  });
+
+  it("places house number between street and postal code", () => {
+    expect(
+      formatDeliveryAddress({
+        street: "Ghauri Town",
+        houseNumber: "House 12",
+        postalCode: "46330",
+        city: "Islamabad",
+        state: "Islamabad",
+        country: "Pakistan",
+      })
+    ).toBe(
+      "Ghauri Town, House 12, 46330, Islamabad\nPakistan"
     );
   });
 
