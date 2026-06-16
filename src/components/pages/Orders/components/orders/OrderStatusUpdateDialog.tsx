@@ -32,9 +32,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUpdateOrderStatus } from "@/hooks/useOrders";
+import {
+  getNextOrderStatus,
+  ORDER_STATUS_ACTION_LABEL_KEYS,
+  requiresDeliveryOtpForStatusTransition,
+} from "@/lib/order-status-transitions";
 import { cn } from "@/lib/utils";
 import { ORDER_STATUS_LABEL_KEYS } from "@/lib/status-labels";
-import { ORDER_STATUS_OPTIONS } from "@/types/orders";
 import {
   orderStatusUpdateSchema,
   type OrderStatusUpdateValues,
@@ -43,8 +47,19 @@ import { useTranslations } from "next-intl";
 
 type OrderStatusUpdateDialogProps = {
   open: boolean;
-  order: { id: string; status?: string; orderTime?: string; deliveryOtp?: string } | null;
+  order: {
+    id: string;
+    orderType?: string | null;
+    status?: string;
+    orderTime?: string;
+    deliveryOtp?: string;
+  } | null;
   onOpenChange: (open: boolean) => void;
+  onStatusUpdated?: (order: {
+    orderType?: string | null;
+    previousStatus?: string | null;
+    status?: string | null;
+  }) => void;
 };
 
 type DurationOption = {
@@ -95,10 +110,18 @@ export function OrderStatusUpdateDialog({
   open,
   order,
   onOpenChange,
+  onStatusUpdated,
 }: OrderStatusUpdateDialogProps) {
   const updateStatusMutation = useUpdateOrderStatus();
   const common = useTranslations("common");
   const t = useTranslations("orders");
+  const nextStatus = getNextOrderStatus(order);
+  const nextStatusLabel = nextStatus && ORDER_STATUS_LABEL_KEYS[nextStatus]
+    ? t(ORDER_STATUS_LABEL_KEYS[nextStatus])
+    : nextStatus;
+  const actionLabel = nextStatus && ORDER_STATUS_ACTION_LABEL_KEYS[nextStatus]
+    ? t(ORDER_STATUS_ACTION_LABEL_KEYS[nextStatus])
+    : common("updateStatus");
   const [durationKey, setDurationKey] = useState<DurationOption["key"]>("20min");
   const [customDateTime, setCustomDateTime] = useState(() =>
     buildFutureOrderTime(20)
@@ -112,17 +135,22 @@ export function OrderStatusUpdateDialog({
     handleSubmit,
     register,
     reset,
+    setError,
   } = useForm<OrderStatusUpdateValues>({
     resolver: zodResolver(orderStatusUpdateSchema),
     defaultValues,
     values: {
-      status: order?.status || "",
+      status: nextStatus || "",
       deliveryOtp: order?.deliveryOtp || "",
     },
   });
   const selectedStatus = useWatch({ control, name: "status" });
   const isConfirmingPlacedOrder = order?.status === "PLACED" && selectedStatus === "CONFIRMED";
   const isConfirmedOrder = order?.status === "CONFIRMED" && selectedStatus === "CONFIRMED";
+  const requiresDeliveryOtp = requiresDeliveryOtpForStatusTransition(
+    order,
+    selectedStatus
+  );
   const savedDeliveryTime = parseOrderTime(order?.orderTime);
   const canEditDeliveryTime = isConfirmingPlacedOrder || deliveryTimeEditing;
 
@@ -175,19 +203,32 @@ export function OrderStatusUpdateDialog({
   const onSubmit = async (values: OrderStatusUpdateValues) => {
     if (!order) return;
 
+    const deliveryOtp = values.deliveryOtp?.trim();
+
+    if (requiresDeliveryOtp && !deliveryOtp) {
+      setError("deliveryOtp", {
+        type: "required",
+        message: t("deliveryOtpRequired"),
+      });
+      return;
+    }
+
     const orderTimeIso = canEditDeliveryTime
       ? computedDeliveryTime.toISOString()
       : undefined;
 
-    await updateStatusMutation.mutateAsync({
+    const updatedOrder = await updateStatusMutation.mutateAsync({
       orderId: order.id,
       payload: {
         status: values.status,
-        ...(values.deliveryOtp?.trim()
-          ? { deliveryOtp: values.deliveryOtp.trim() }
-          : {}),
+        ...(deliveryOtp ? { deliveryOtp } : {}),
         ...(orderTimeIso ? { orderTime: orderTimeIso } : {}),
       },
+    });
+    onStatusUpdated?.({
+      orderType: updatedOrder.orderType ?? order.orderType,
+      previousStatus: order.status,
+      status: updatedOrder.status ?? values.status,
     });
     handleOpenChange(false);
   };
@@ -217,24 +258,28 @@ export function OrderStatusUpdateDialog({
                   control={control}
                   name="status"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={!nextStatus}
+                    >
                       <SelectTrigger id="order-status" className="h-[48px] rounded-[14px]">
                         <SelectValue placeholder={common("selectStatus")} />
                       </SelectTrigger>
                       <SelectContent>
-                        {ORDER_STATUS_OPTIONS.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {ORDER_STATUS_LABEL_KEYS[status.value]
-                              ? t(ORDER_STATUS_LABEL_KEYS[status.value])
-                              : status.label}
+                        {nextStatus ? (
+                          <SelectItem value={nextStatus}>
+                            {nextStatusLabel}
                           </SelectItem>
-                        ))}
+                        ) : null}
                       </SelectContent>
                     </Select>
                   )}
                 />
                 {errors.status?.message ? (
                   <p className="text-sm text-red-500">{errors.status.message}</p>
+                ) : !nextStatus ? (
+                  <p className="text-sm text-gray-500">{t("noStatusTransition")}</p>
                 ) : null}
               </div>
 
@@ -332,18 +377,20 @@ export function OrderStatusUpdateDialog({
                 </div>
               ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="order-delivery-otp">{t("deliveryOtp")}</Label>
-                <Input
-                  id="order-delivery-otp"
-                  placeholder={common("optional")}
-                  className="h-[48px] rounded-[14px]"
-                  {...register("deliveryOtp")}
-                />
-                {errors.deliveryOtp?.message ? (
-                  <p className="text-sm text-red-500">{errors.deliveryOtp.message}</p>
-                ) : null}
-              </div>
+              {requiresDeliveryOtp ? (
+                <div className="space-y-2">
+                  <Label htmlFor="order-delivery-otp">{t("deliveryOtp")}</Label>
+                  <Input
+                    id="order-delivery-otp"
+                    placeholder={t("deliveryOtp")}
+                    className="h-[48px] rounded-[14px]"
+                    {...register("deliveryOtp")}
+                  />
+                  {errors.deliveryOtp?.message ? (
+                    <p className="text-sm text-red-500">{errors.deliveryOtp.message}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <DialogFooter className="mt-6 flex-col-reverse gap-3 sm:flex-row">
@@ -358,10 +405,10 @@ export function OrderStatusUpdateDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !nextStatus}
                 className="h-[48px] flex-1 rounded-full bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90"
               >
-                {isLoading ? <Loader2 size={18} className="animate-spin" /> : common("updateStatus")}
+                {isLoading ? <Loader2 size={18} className="animate-spin" /> : actionLabel}
               </Button>
             </DialogFooter>
           </form>

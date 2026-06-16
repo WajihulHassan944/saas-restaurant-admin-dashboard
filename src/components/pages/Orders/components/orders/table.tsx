@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Ban, Eye, MoreHorizontal, RefreshCw, XCircle } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import { useRouter } from "next/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClickTooltip } from "@/components/common/ClickTooltip";
@@ -24,6 +25,15 @@ import TableSkeleton from "@/components/common/TableSkeleton";
 import SortHeader from "@/components/common/sort-header";
 import { formatDeliveryAddress } from "@/components/pages/Orders/components/orders/details/order-details-utils";
 import { OrderStatusUpdateDialog } from "@/components/pages/Orders/components/orders/OrderStatusUpdateDialog";
+import { OrderStatusProgressDialog } from "@/components/pages/Orders/components/orders/OrderStatusProgressDialog";
+import { useUpdateOrderStatus } from "@/hooks/useOrders";
+import {
+  canDirectlyUpdateOrderStatus,
+  canTerminateOrderStatus,
+  getNextOrderStatus,
+  ORDER_STATUS_ACTION_LABEL_KEYS,
+  ORDER_TERMINAL_ACTION_LABEL_KEYS,
+} from "@/lib/order-status-transitions";
 import { ORDER_STATUS_LABEL_KEYS } from "@/lib/status-labels";
 import type { Order } from "@/types/orders";
 import { useTranslations } from "next-intl";
@@ -32,6 +42,12 @@ export type OrdersTableRow = Order & {
   customerName?: string;
   guestCount?: number;
   reservationDate?: string;
+};
+
+type OrderStatusProgressState = {
+  orderType?: string | null;
+  previousStatus?: string | null;
+  status?: string | null;
 };
 
 interface OrdersTableProps {
@@ -55,6 +71,8 @@ export function OrdersTable({
   const common = useTranslations("common");
   const t = useTranslations("orders");
   const [statusOrder, setStatusOrder] = useState<OrdersTableRow | null>(null);
+  const [progressOrder, setProgressOrder] = useState<OrderStatusProgressState | null>(null);
+  const updateStatusMutation = useUpdateOrderStatus();
   const getStatusLabel = (status?: string) =>
     status && ORDER_STATUS_LABEL_KEYS[status]
       ? t(ORDER_STATUS_LABEL_KEYS[status])
@@ -87,6 +105,54 @@ export function OrdersTable({
       secondary: secondaryAddress.join(", ") || order.branch?.name || t("noBranch"),
       full: formattedAddress || t("addressPending"),
     };
+  };
+  const getStatusActionLabel = (order: OrdersTableRow) => {
+    const nextStatus = getNextOrderStatus(order);
+
+    return nextStatus && ORDER_STATUS_ACTION_LABEL_KEYS[nextStatus]
+      ? t(ORDER_STATUS_ACTION_LABEL_KEYS[nextStatus])
+      : common("updateStatus");
+  };
+  const handleStatusAction = async (order: OrdersTableRow) => {
+    const nextStatus = getNextOrderStatus(order);
+
+    if (!nextStatus) {
+      return;
+    }
+
+    if (!canDirectlyUpdateOrderStatus(order)) {
+      setStatusOrder(order);
+      return;
+    }
+
+    const updatedOrder = await updateStatusMutation.mutateAsync({
+      orderId: order.id,
+      payload: {
+        status: nextStatus,
+        ...(order.deliveryOtp?.trim()
+          ? { deliveryOtp: order.deliveryOtp.trim() }
+          : {}),
+      },
+    });
+    setProgressOrder({
+      orderType: updatedOrder.orderType ?? order.orderType,
+      previousStatus: order.status,
+      status: updatedOrder.status ?? nextStatus,
+    });
+  };
+  const handleTerminalStatusAction = async (
+    order: OrdersTableRow,
+    status: "CANCELLED" | "REJECTED"
+  ) => {
+    const updatedOrder = await updateStatusMutation.mutateAsync({
+      orderId: order.id,
+      payload: { status },
+    });
+    setProgressOrder({
+      orderType: updatedOrder.orderType ?? order.orderType,
+      previousStatus: order.status,
+      status: updatedOrder.status ?? status,
+    });
   };
 
   if (loading) {
@@ -175,6 +241,8 @@ export function OrdersTable({
     const customerNameValue = getCustomerName(order);
     const customerDetail = getCustomerDetail(order);
     const addressPreview = getAddressPreview(order);
+    const canUpdateStatus = Boolean(getNextOrderStatus(order));
+    const canUseTerminalActions = canTerminateOrderStatus(order);
 
     return (
     <TableRow key={id} className="border-none h-[70px]">
@@ -288,10 +356,42 @@ export function OrdersTable({
                 <Eye size={16} />
                 {common("viewDetails")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusOrder(order)}>
-                <RefreshCw size={16} />
-                {common("updateStatus")}
-              </DropdownMenuItem>
+              {canUpdateStatus ? (
+                <DropdownMenuItem
+                  disabled={updateStatusMutation.isPending}
+                  onClick={() => {
+                    void handleStatusAction(order);
+                  }}
+                >
+                  <RefreshCw size={16} />
+                  {getStatusActionLabel(order)}
+                </DropdownMenuItem>
+              ) : null}
+              {canUseTerminalActions ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={updateStatusMutation.isPending}
+                    variant="destructive"
+                    onClick={() => {
+                      void handleTerminalStatusAction(order, "CANCELLED");
+                    }}
+                  >
+                    <XCircle size={16} />
+                    {t(ORDER_TERMINAL_ACTION_LABEL_KEYS.CANCELLED)}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={updateStatusMutation.isPending}
+                    variant="destructive"
+                    onClick={() => {
+                      void handleTerminalStatusAction(order, "REJECTED");
+                    }}
+                  >
+                    <Ban size={16} />
+                    {t(ORDER_TERMINAL_ACTION_LABEL_KEYS.REJECTED)}
+                  </DropdownMenuItem>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -308,6 +408,14 @@ export function OrdersTable({
         order={statusOrder}
         onOpenChange={(open) => {
           if (!open) setStatusOrder(null);
+        }}
+        onStatusUpdated={setProgressOrder}
+      />
+      <OrderStatusProgressDialog
+        open={Boolean(progressOrder)}
+        order={progressOrder}
+        onOpenChange={(open) => {
+          if (!open) setProgressOrder(null);
         }}
       />
     </div>
