@@ -77,6 +77,9 @@ const hasServiceChargeSetting = (settings: BranchSettings | undefined) =>
 const defaultAllowedPaymentMethods = [...PAYMENT_METHOD_CODES];
 
 const branchSettingsPatchBlocklist = [
+  "deliveryIntervalMinutes",
+  "pickupIntervalMinutes",
+  "printing",
   "openingHours",
   "openingsHours",
   "deliveryHours",
