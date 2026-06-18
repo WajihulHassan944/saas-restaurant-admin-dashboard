@@ -1,6 +1,8 @@
 export type DeliveryAddress = {
   address?: string | null;
   street?: string | null;
+  shopNumber?: string | null;
+  shopNo?: string | null;
   houseNumber?: string | null;
   area?: string | null;
   postalCode?: string | null;
@@ -21,6 +23,7 @@ export type Order = {
   totalAmount?: number;
   createdAt: string;
   orderTime?: string;
+  isScheduled?: boolean;
   deliveryOtp?: string;
   deliverymanId?: string | null;
   branchId?: string | null;
@@ -37,6 +40,20 @@ export type Order = {
   } | null;
   deliveryAddress?: DeliveryAddress | null;
   isGroupOrder?: boolean;
+  transactions?: PaymentTransaction[] | null;
+};
+
+export type PaymentTransaction = {
+  id?: string | null;
+  paymentMethod?: string | null;
+  type?: "CHARGE" | "REFUND" | string | null;
+  status?: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED" | string | null;
+  amount?: number | null;
+  currency?: string | null;
+  providerRef?: string | null;
+  note?: string | null;
+  processedAt?: string | null;
+  createdAt?: string | null;
 };
 
 export type OrderStatusUpdatePayload = {

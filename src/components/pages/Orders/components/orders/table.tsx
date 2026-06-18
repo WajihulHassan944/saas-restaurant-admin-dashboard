@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Ban, Eye, MoreHorizontal, RefreshCw, XCircle } from "lucide-react";
+import { Ban, CalendarClock, CreditCard, Eye, MoreHorizontal, RefreshCw, XCircle } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -26,7 +28,14 @@ import SortHeader from "@/components/common/sort-header";
 import { formatDeliveryAddress } from "@/components/pages/Orders/components/orders/details/order-details-utils";
 import { OrderStatusUpdateDialog } from "@/components/pages/Orders/components/orders/OrderStatusUpdateDialog";
 import { OrderStatusProgressDialog } from "@/components/pages/Orders/components/orders/OrderStatusProgressDialog";
+import { PaymentStatusUpdateDialog } from "@/components/pages/Orders/components/orders/PaymentStatusUpdateDialog";
+import {
+  getOrderTimeDate,
+  isFutureOrder,
+} from "@/components/pages/orders/utils/orders-schedule-filters";
+import { useAuth } from "@/hooks/useAuth";
 import { useUpdateOrderStatus } from "@/hooks/useOrders";
+import { getOrderById } from "@/services/orders/orders.api";
 import {
   canDirectlyUpdateOrderStatus,
   canTerminateOrderStatus,
@@ -35,7 +44,7 @@ import {
   ORDER_TERMINAL_ACTION_LABEL_KEYS,
 } from "@/lib/order-status-transitions";
 import { ORDER_STATUS_LABEL_KEYS } from "@/lib/status-labels";
-import type { Order } from "@/types/orders";
+import type { Order, PaymentTransaction } from "@/types/orders";
 import { useTranslations } from "next-intl";
 
 export type OrdersTableRow = Order & {
@@ -48,6 +57,34 @@ type OrderStatusProgressState = {
   orderType?: string | null;
   previousStatus?: string | null;
   status?: string | null;
+};
+
+type PaymentStatusDialogState = {
+  order: OrdersTableRow;
+  transaction: PaymentTransaction;
+};
+
+const formatShortDate = (value?: string) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return date.toLocaleDateString();
+};
+
+const formatOrderTime = (value?: string) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 };
 
 interface OrdersTableProps {
@@ -68,11 +105,18 @@ export function OrdersTable({
   activeTab
 }: OrdersTableProps) {
   const router = useRouter();
+  const { role } = useAuth();
   const common = useTranslations("common");
   const t = useTranslations("orders");
   const [statusOrder, setStatusOrder] = useState<OrdersTableRow | null>(null);
   const [progressOrder, setProgressOrder] = useState<OrderStatusProgressState | null>(null);
+  const [paymentStatusOrder, setPaymentStatusOrder] =
+    useState<PaymentStatusDialogState | null>(null);
+  const [loadingPaymentStatusOrderId, setLoadingPaymentStatusOrderId] =
+    useState<string | null>(null);
   const updateStatusMutation = useUpdateOrderStatus();
+  const canUpdatePaymentStatusRole =
+    role === "BUSINESS_ADMIN" || role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
   const getStatusLabel = (status?: string) =>
     status && ORDER_STATUS_LABEL_KEYS[status]
       ? t(ORDER_STATUS_LABEL_KEYS[status])
@@ -113,6 +157,8 @@ export function OrdersTable({
       ? t(ORDER_STATUS_ACTION_LABEL_KEYS[nextStatus])
       : common("updateStatus");
   };
+  const getPaymentStatusTransaction = (order: Pick<OrdersTableRow, "transactions">) =>
+    order.transactions?.find((transaction) => transaction.type === "CHARGE" && transaction.id);
   const handleStatusAction = async (order: OrdersTableRow) => {
     const nextStatus = getNextOrderStatus(order);
 
@@ -154,6 +200,41 @@ export function OrdersTable({
       status: updatedOrder.status ?? status,
     });
   };
+  const handlePaymentStatusAction = async (order: OrdersTableRow) => {
+    if (!canUpdatePaymentStatusRole || loadingPaymentStatusOrderId) return;
+
+    const rowTransaction = getPaymentStatusTransaction(order);
+    if (rowTransaction?.id) {
+      setPaymentStatusOrder({ order, transaction: rowTransaction });
+      return;
+    }
+
+    setLoadingPaymentStatusOrderId(order.id);
+
+    try {
+      const detailedOrder = await getOrderById(order.id);
+      const transaction = getPaymentStatusTransaction(detailedOrder);
+
+      if (!transaction?.id) {
+        toast.error(t("paymentStatusTransactionMissing"));
+        return;
+      }
+
+      setPaymentStatusOrder({
+        order: {
+          ...order,
+          paymentMethod: detailedOrder?.paymentMethod ?? order.paymentMethod,
+          paymentStatus: detailedOrder?.paymentStatus ?? order.paymentStatus,
+          transactions: detailedOrder?.transactions ?? order.transactions,
+        },
+        transaction,
+      });
+    } catch {
+      toast.error(t("paymentStatusLoadFailed"));
+    } finally {
+      setLoadingPaymentStatusOrderId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -164,12 +245,12 @@ export function OrdersTable({
 
         <TableSkeleton
           headers={[
-            t("orderId"),
             t("date"),
             t("customerInfo"),
             t("address"),
             t("amount"),
             t("statusLabel"),
+            t("paymentStatus"),
           ]}
           rows={6}
           showCheckbox
@@ -196,11 +277,11 @@ export function OrdersTable({
   return (
     <div className="space-y-4">
 
-      <div className="hidden lg:block">
-        <Table>
+      <div className="hidden max-w-full overflow-hidden lg:block">
+        <Table className="table-fixed">
          <TableHeader>
   <TableRow className="border-none">
-    <TableHead className="w-[50px]">
+    <TableHead className="w-10">
       <Checkbox />
     </TableHead>
 
@@ -214,16 +295,16 @@ export function OrdersTable({
       </>
     ) : (
       <>
-        <SortHeader label={t("orderId")} sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-        <SortHeader label={t("date")} sortKey="createdAt" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-        <SortHeader label={t("customerInfo")} sortKey="customerName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-        <TableHead>{t("address")}</TableHead>
-        <SortHeader label={t("amount")} sortKey="totalAmount" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-        <SortHeader label={t("statusLabel")} sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+        <SortHeader label={t("date")} sortKey="createdAt" activeKey={sortKey} direction={sortDir} onSort={onSort} className="w-[20%]" />
+        <SortHeader label={t("customerInfo")} sortKey="customerName" activeKey={sortKey} direction={sortDir} onSort={onSort} className="w-[22%]" />
+        <TableHead className="w-[16%]">{t("address")}</TableHead>
+        <SortHeader label={t("amount")} sortKey="totalAmount" activeKey={sortKey} direction={sortDir} onSort={onSort} className="w-[11%]" />
+        <SortHeader label={t("statusLabel")} sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} className="w-[11%]" />
+        <SortHeader label={t("paymentStatus")} sortKey="paymentStatus" activeKey={sortKey} direction={sortDir} onSort={onSort} className="w-[12%]" />
       </>
     )}
 
-    <TableHead className="text-center">{common("actions")}</TableHead>
+    <TableHead className="w-20 text-center">{common("actions")}</TableHead>
   </TableRow>
 </TableHeader>
 
@@ -237,12 +318,19 @@ export function OrdersTable({
       status,
       createdAt,
       totalAmount,
+      paymentStatus,
     } = order;
     const customerNameValue = getCustomerName(order);
     const customerDetail = getCustomerDetail(order);
     const addressPreview = getAddressPreview(order);
     const canUpdateStatus = Boolean(getNextOrderStatus(order));
     const canUseTerminalActions = canTerminateOrderStatus(order);
+    const orderTime = getOrderTimeDate(order);
+    const orderTimeLabel = formatOrderTime(order.orderTime);
+    const isPreorder = isFutureOrder(order);
+    const canUpdatePaymentStatus =
+      canUpdatePaymentStatusRole && paymentStatus !== "REFUNDED";
+    const paymentStatusLoading = loadingPaymentStatusOrderId === id;
 
     return (
     <TableRow key={id} className="border-none h-[70px]">
@@ -252,7 +340,11 @@ export function OrdersTable({
 
       {activeTab === "reservations" ? (
         <>
-          <TableCell className="px-4 text-gray-500">{id}</TableCell>
+          <TableCell className="px-4 text-gray-500">
+            <span className="block max-w-full truncate" title={id}>
+              {id}
+            </span>
+          </TableCell>
 
           <TableCell className="px-4 text-gray-600">
             {customerName?.trim() || "-"}
@@ -276,15 +368,34 @@ export function OrdersTable({
         </>
       ) : (
         <>
-          <TableCell className="px-4 text-gray-500">{id}</TableCell>
-
-          <TableCell className="px-4 text-gray-500">
-            {createdAt
-              ? new Date(createdAt).toLocaleDateString()
-              : "-"}
+          <TableCell className="px-4 text-gray-500 whitespace-normal">
+            <div className="space-y-2">
+              <p>{formatShortDate(createdAt)}</p>
+              {orderTimeLabel ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {isPreorder ? (
+                    <Badge className="border-primary/20 bg-primary/10 text-primary">
+                      <CalendarClock size={12} />
+                      {t("preorder")}
+                    </Badge>
+                  ) : null}
+                  <span
+                    className="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600"
+                    title={orderTime?.toLocaleString()}
+                  >
+                    <CalendarClock size={12} />
+                    <span className="truncate">{orderTimeLabel}</span>
+                  </span>
+                </div>
+              ) : (
+                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500">
+                  {t("asap")}
+                </span>
+              )}
+            </div>
           </TableCell>
 
-          <TableCell className="max-w-[260px] px-4 whitespace-normal">
+          <TableCell className="px-4 whitespace-normal">
             <div className="min-w-0 space-y-1">
               <p className="truncate font-medium text-gray-700" title={customerNameValue}>
                 {customerNameValue}
@@ -295,7 +406,7 @@ export function OrdersTable({
             </div>
           </TableCell>
 
-          <TableCell className="max-w-[260px] px-4">
+          <TableCell className="px-4 whitespace-normal">
             <ClickTooltip
               content={
                 <div className="space-y-2">
@@ -324,13 +435,19 @@ export function OrdersTable({
           </TableCell>
 
           <TableCell className="px-4 font-medium text-green-600">
-            ${totalAmount ?? 0}
+            <span className="block truncate">${totalAmount ?? 0}</span>
           </TableCell>
 
           <TableCell className="px-4">
-            <span className="text-sm font-medium text-yellow-600">
+            <span className="block truncate text-sm font-medium text-yellow-600">
               {getStatusLabel(status)}
             </span>
+          </TableCell>
+
+          <TableCell className="px-4">
+            <Badge className="max-w-full border-gray-200 bg-gray-100 text-gray-700">
+              <span className="truncate">{paymentStatus ? paymentStatus.replaceAll("_", " ") : "-"}</span>
+            </Badge>
           </TableCell>
         </>
       )}
@@ -365,6 +482,17 @@ export function OrdersTable({
                 >
                   <RefreshCw size={16} />
                   {getStatusActionLabel(order)}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdatePaymentStatus ? (
+                <DropdownMenuItem
+                  disabled={paymentStatusLoading}
+                  onClick={() => {
+                    void handlePaymentStatusAction(order);
+                  }}
+                >
+                  <CreditCard size={16} />
+                  {paymentStatusLoading ? t("loadingPaymentStatus") : t("updatePaymentStatus")}
                 </DropdownMenuItem>
               ) : null}
               {canUseTerminalActions ? (
@@ -416,6 +544,16 @@ export function OrdersTable({
         order={progressOrder}
         onOpenChange={(open) => {
           if (!open) setProgressOrder(null);
+        }}
+      />
+      <PaymentStatusUpdateDialog
+        open={Boolean(paymentStatusOrder)}
+        orderId={paymentStatusOrder?.order.id}
+        orderPaymentStatus={paymentStatusOrder?.order.paymentStatus}
+        paymentMethod={paymentStatusOrder?.order.paymentMethod}
+        transaction={paymentStatusOrder?.transaction}
+        onOpenChange={(open) => {
+          if (!open) setPaymentStatusOrder(null);
         }}
       />
     </div>

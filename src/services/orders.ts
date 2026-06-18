@@ -1,6 +1,6 @@
 import api, { httpClient } from "@/lib/axios";
 import { cleanParams } from "@/lib/params";
-import type { Order, OrderStatusUpdatePayload } from "@/types/orders";
+import type { Order, OrderStatusUpdatePayload, PaymentTransaction } from "@/types/orders";
 
 export interface GetOrdersParams {
   restaurantId: string;
@@ -30,6 +30,16 @@ export interface GetOrdersResponse {
   meta?: OrdersMeta | null;
   message?: string;
 }
+
+export type RefundPaymentPayload = {
+  amount?: number;
+  note?: string;
+};
+
+export type PaymentStatusUpdatePayload = {
+  status: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
+  note?: string;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -90,6 +100,9 @@ const normalizeDeliveryAddress = (value: unknown): Order["deliveryAddress"] => {
   return {
     address: getNullableString(value, "address"),
     street: getNullableString(value, "street"),
+    shopNumber: getNullableString(value, "shopNumber"),
+    shopNo: getNullableString(value, "shopNo"),
+    houseNumber: getNullableString(value, "houseNumber"),
     area: getNullableString(value, "area"),
     postalCode: getNullableString(value, "postalCode"),
     city: getNullableString(value, "city"),
@@ -98,6 +111,31 @@ const normalizeDeliveryAddress = (value: unknown): Order["deliveryAddress"] => {
     lat: getNullableNumber(value, "lat"),
     lng: getNullableNumber(value, "lng"),
   };
+};
+
+const normalizePaymentTransaction = (value: unknown): PaymentTransaction | null => {
+  if (!isRecord(value)) return null;
+
+  return {
+    id: getNullableString(value, "id"),
+    paymentMethod: getNullableString(value, "paymentMethod"),
+    type: getNullableString(value, "type"),
+    status: getNullableString(value, "status"),
+    amount: getNullableNumber(value, "amount"),
+    currency: getNullableString(value, "currency"),
+    providerRef: getNullableString(value, "providerRef"),
+    note: getNullableString(value, "note"),
+    processedAt: getNullableString(value, "processedAt"),
+    createdAt: getNullableString(value, "createdAt"),
+  };
+};
+
+const normalizePaymentTransactions = (value: unknown): PaymentTransaction[] | null => {
+  if (!Array.isArray(value)) return null;
+
+  return value
+    .map(normalizePaymentTransaction)
+    .filter((transaction): transaction is PaymentTransaction => Boolean(transaction));
 };
 
 export const normalizeOrder = (value: unknown): Order | null => {
@@ -116,6 +154,8 @@ export const normalizeOrder = (value: unknown): Order | null => {
     totalAmount: getNumber(value, "totalAmount"),
     createdAt: getString(value, "createdAt"),
     orderTime: getOptionalString(value, "orderTime"),
+    isScheduled:
+      typeof value.isScheduled === "boolean" ? value.isScheduled : undefined,
     deliveryOtp: getOptionalString(value, "deliveryOtp"),
     deliverymanId: getNullableString(value, "deliverymanId"),
     branchId: getNullableString(value, "branchId"),
@@ -124,6 +164,7 @@ export const normalizeOrder = (value: unknown): Order | null => {
     deliveryAddress: normalizeDeliveryAddress(value.deliveryAddress),
     isGroupOrder:
       typeof value.isGroupOrder === "boolean" ? value.isGroupOrder : undefined,
+    transactions: normalizePaymentTransactions(value.transactions),
   };
 };
 
@@ -183,4 +224,52 @@ export const updateOrderStatus = async (
   );
 
   return unwrapOrder(response);
+};
+
+export const refundPaymentTransaction = async (
+  paymentId: string,
+  payload: RefundPaymentPayload = {}
+) => {
+  const response = await httpClient.post<unknown, RefundPaymentPayload>(
+    `/payments/${paymentId}/refund`,
+    cleanParams(payload)
+  );
+
+  return response;
+};
+
+export const markPaymentTransactionPaid = async (
+  paymentId: string,
+  payload: Pick<PaymentStatusUpdatePayload, "note"> = {}
+) => {
+  const response = await httpClient.post<
+    unknown,
+    Pick<PaymentStatusUpdatePayload, "note">
+  >(`/payments/${paymentId}/mark-paid`, cleanParams(payload));
+
+  return response;
+};
+
+export const failPaymentTransaction = async (
+  paymentId: string,
+  payload: Pick<PaymentStatusUpdatePayload, "note"> = {}
+) => {
+  const response = await httpClient.post<
+    unknown,
+    Pick<PaymentStatusUpdatePayload, "note">
+  >(`/payments/${paymentId}/fail`, cleanParams(payload));
+
+  return response;
+};
+
+export const updatePaymentTransactionStatus = async (
+  paymentId: string,
+  payload: PaymentStatusUpdatePayload
+) => {
+  const response = await httpClient.patch<unknown, Partial<PaymentStatusUpdatePayload>>(
+    `/payments/${paymentId}/status`,
+    cleanParams(payload)
+  );
+
+  return response;
 };

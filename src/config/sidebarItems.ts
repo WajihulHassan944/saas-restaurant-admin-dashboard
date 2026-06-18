@@ -277,6 +277,14 @@ export const menuItems: MenuItem[] = [
         roles: allAdminRoles,
       },
       {
+        title: "About Us",
+        labelKey: "aboutUs",
+        href: "/content-management/about",
+        icon: FileText,
+        section: "main",
+        roles: restaurantAdminRoles,
+      },
+      {
         title: "Privacy Policy",
         labelKey: "privacyPolicy",
         href: "/privacy-policy",

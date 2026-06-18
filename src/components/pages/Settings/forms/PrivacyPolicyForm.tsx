@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ComponentType,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import { useTranslations } from "next-intl";
 import {
   AlignCenter,
@@ -14,11 +23,13 @@ import {
   Globe2,
   Heading2,
   Heading3,
+  ImageIcon,
   Italic,
   Link,
   List,
   ListOrdered,
   Loader2,
+  MousePointerClick,
   Paintbrush,
   Pilcrow,
   RefreshCw,
@@ -26,21 +37,33 @@ import {
   RemoveFormatting,
   Save,
   ShieldCheck,
+  Target,
   Type,
   Underline,
   Undo2,
+  Trash2,
+  UploadCloud,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import Header from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useCustomerAppContent,
+  usePublicAboutUs,
   usePublicPrivacyPolicy,
+  useUpdateCustomerAppAboutUs,
   useUpdateCustomerAppPrivacyPolicy,
 } from "@/hooks/useCustomerAppContent";
-import { buildPrivacyPolicyPageLink } from "@/services/customer-app-content";
+import {
+  buildAboutUsPageLink,
+  buildPrivacyPolicyPageLink,
+} from "@/services/customer-app-content";
+import { useFileUpload } from "@/hooks/useFileUpload";
 import { cn } from "@/lib/utils";
 
 const emptyPolicyTemplate = `<h2>Privacy Policy</h2>
@@ -54,6 +77,15 @@ const emptyPolicyTemplate = `<h2>Privacy Policy</h2>
 
 <h3>Contact</h3>
 <p>Tell customers how to contact your restaurant about privacy questions.</p>`;
+
+const emptyAboutUsTemplate = `<h2>About Us</h2>
+<p>Share the story behind your restaurant, your cooking style, and what makes the customer experience special.</p>
+
+<h3>Our food</h3>
+<p>Describe your signature dishes, ingredients, sourcing, kitchen standards, or local favorites.</p>
+
+<h3>Visit us</h3>
+<p>Invite customers to order online, visit the restaurant, or follow your latest updates.</p>`;
 
 type EditorCommand =
   | { type: "command"; command: string; value?: string }
@@ -102,8 +134,8 @@ const editorButtonGroups: EditorButton[][] = [
 
 const editorSwatches = ["#101828", "#475467", "#C1121F", "#1D7FA8", "#027A48", "#B54708"];
 
-const buildPreviewDocument = (content: string) => {
-  const safeContent = content.trim() || "<p>No privacy policy content has been published yet.</p>";
+const buildPreviewDocument = (content: string, emptyPreview: string) => {
+  const safeContent = content.trim() || emptyPreview;
 
   return `<!doctype html>
 <html>
@@ -137,6 +169,175 @@ const buildPreviewDocument = (content: string) => {
 };
 
 const countWords = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
+
+type ContentField = "privacyPolicy" | "aboutUs";
+
+type CustomerAppContentPageProps = {
+  translationKey: "privacyPolicy" | "aboutUs";
+  contentField: ContentField;
+  emptyTemplate: string;
+  emptyPreview: string;
+  buildPublicLink: () => string;
+};
+
+type AboutCardField = {
+  title: string;
+  description: string;
+};
+
+type AboutPageDraft = {
+  hero: {
+    imageUrl: string;
+    title: string;
+    subtitle: string;
+    ctaLabel: string;
+    ctaHref: string;
+  };
+  story: {
+    imageUrl: string;
+    badge: string;
+    eyebrow: string;
+    title: string;
+    paragraphs: string;
+  };
+  missionVisionValues: AboutCardField[];
+  whyChooseUs: AboutCardField[];
+};
+
+const aboutPageMarkerPrefix = "deliveryway-about-page:";
+
+const defaultAboutPageDraft: AboutPageDraft = {
+  hero: {
+    imageUrl: "",
+    title: "About Us",
+    subtitle: "Fresh food, warm service, and a customer experience built around your table.",
+    ctaLabel: "Order Now",
+    ctaHref: "/",
+  },
+  story: {
+    imageUrl: "",
+    badge: "Established with passion",
+    eyebrow: "Our Story",
+    title: "Serving great food with care",
+    paragraphs:
+      "Share the story behind your restaurant, your cooking style, and what makes the customer experience special.\n\nDescribe your signature dishes, ingredients, sourcing, kitchen standards, or local favorites.",
+  },
+  missionVisionValues: [
+    {
+      title: "Mission",
+      description: "Make every order simple, fresh, and memorable.",
+    },
+    {
+      title: "Vision",
+      description: "Become the neighborhood favorite for quality food and reliable service.",
+    },
+    {
+      title: "Values",
+      description: "Hospitality, consistency, transparency, and respect for every customer.",
+    },
+  ],
+  whyChooseUs: [
+    {
+      title: "Easy ordering",
+      description: "Customers can browse, customize, and place orders quickly.",
+    },
+    {
+      title: "Fast delivery",
+      description: "Prepared and delivered with speed, accuracy, and care.",
+    },
+    {
+      title: "Quality food",
+      description: "Fresh ingredients and kitchen standards customers can trust.",
+    },
+  ],
+};
+
+const encodeAboutDraft = (draft: AboutPageDraft) =>
+  encodeURIComponent(JSON.stringify(draft));
+
+const decodeAboutDraft = (value: string): AboutPageDraft | undefined => {
+  const match = value.match(/<!--\s*deliveryway-about-page:([^]+?)\s*-->/);
+  if (!match?.[1]) return undefined;
+
+  try {
+    return JSON.parse(decodeURIComponent(match[1])) as AboutPageDraft;
+  } catch {
+    return undefined;
+  }
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+const paragraphsToHtml = (value: string) =>
+  value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replaceAll("\n", "<br />")}</p>`)
+    .join("\n");
+
+const buildCardsHtml = (items: AboutCardField[]) =>
+  items
+    .filter((item) => item.title.trim() || item.description.trim())
+    .map(
+      (item) =>
+        `<article><h3>${escapeHtml(item.title)}</h3>${paragraphsToHtml(item.description)}</article>`,
+    )
+    .join("\n");
+
+const buildAboutPageHtml = (draft: AboutPageDraft) => `<!-- ${aboutPageMarkerPrefix}${encodeAboutDraft(draft)} -->
+<section data-about-section="hero">
+  ${draft.hero.imageUrl.trim() ? `<img src="${escapeHtml(draft.hero.imageUrl)}" alt="${escapeHtml(draft.hero.title)}" />` : ""}
+  <h1>${escapeHtml(draft.hero.title)}</h1>
+  ${paragraphsToHtml(draft.hero.subtitle)}
+  <p><a href="${escapeHtml(draft.hero.ctaHref)}">${escapeHtml(draft.hero.ctaLabel)}</a></p>
+</section>
+
+<section data-about-section="story">
+  ${draft.story.imageUrl.trim() ? `<img src="${escapeHtml(draft.story.imageUrl)}" alt="${escapeHtml(draft.story.title)}" />` : ""}
+  ${draft.story.badge.trim() ? `<p><strong>${escapeHtml(draft.story.badge)}</strong></p>` : ""}
+  ${draft.story.eyebrow.trim() ? `<p>${escapeHtml(draft.story.eyebrow)}</p>` : ""}
+  <h2>${escapeHtml(draft.story.title)}</h2>
+  ${paragraphsToHtml(draft.story.paragraphs)}
+</section>
+
+<section data-about-section="mission-vision-values">
+  <h2>Mission / Vision / Values</h2>
+  ${buildCardsHtml(draft.missionVisionValues)}
+</section>
+
+<section data-about-section="why-choose-us">
+  <h2>Why Choose Us</h2>
+  ${buildCardsHtml(draft.whyChooseUs)}
+</section>`;
+
+const stripHtmlToText = (value: string) =>
+  value
+    .replace(/<!--[^]*?-->/g, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+const parseAboutPageDraft = (value: string) => {
+  const decoded = decodeAboutDraft(value);
+  if (decoded) return decoded;
+
+  return {
+    ...defaultAboutPageDraft,
+    story: {
+      ...defaultAboutPageDraft.story,
+      paragraphs: stripHtmlToText(value) || defaultAboutPageDraft.story.paragraphs,
+    },
+  };
+};
 
 function RichPolicyEditor({
   value,
@@ -291,37 +492,484 @@ function RichPolicyEditor({
   );
 }
 
-export default function PrivacyPolicyPage() {
-  const t = useTranslations("privacyPolicy");
-  const commonT = useTranslations("common");
-  const { restaurantId, loading: authLoading } = useAuth();
-  const [draftPolicy, setDraftPolicy] = useState("");
-  const [hasLoadedInitialPolicy, setHasLoadedInitialPolicy] = useState(false);
+type AboutPageSectionEditorProps = {
+  value: AboutPageDraft;
+  onChange: (value: AboutPageDraft) => void;
+};
 
-  const { data: content, isLoading, isFetching, refetch } = useCustomerAppContent(restaurantId);
-  const { data: publicPolicy } = usePublicPrivacyPolicy(restaurantId);
-  const { mutateAsync: updatePrivacyPolicy, isPending: isSaving } =
-    useUpdateCustomerAppPrivacyPolicy();
+type AboutDraftSection = keyof AboutPageDraft;
 
-  const savedPolicy = content?.privacyPolicy ?? "";
-  const publicContent = publicPolicy?.privacyPolicy ?? "";
-  const publicLink = restaurantId ? buildPrivacyPolicyPageLink() : "";
-  const isDirty = draftPolicy !== savedPolicy;
-  const loading = authLoading || isLoading;
-  const previewDocument = useMemo(() => buildPreviewDocument(draftPolicy), [draftPolicy]);
-  const wordCount = useMemo(() => countWords(draftPolicy), [draftPolicy]);
-  const characterCount = draftPolicy.length;
-  const hasPublishedContent = publicContent.trim().length > 0;
+function AboutTextInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-semibold text-[#344054]">{label}</Label>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-11 rounded-xl border-[#D0D5DD] bg-white text-sm"
+      />
+    </div>
+  );
+}
+
+function AboutTextArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-semibold text-[#344054]">{label}</Label>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="min-h-0 resize-y rounded-xl border-[#D0D5DD] bg-white text-sm leading-6"
+      />
+    </div>
+  );
+}
+
+function AboutImageUpload({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const { uploadFile, uploading } = useFileUpload();
+  const previewSrc = localPreviewUrl || value.trim();
+  const previewBackgroundImage = previewSrc ? `url(${JSON.stringify(previewSrc)})` : undefined;
 
   useEffect(() => {
-    if (hasLoadedInitialPolicy || isLoading) return;
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current);
+      }
+    };
+  }, []);
 
-    setDraftPolicy(savedPolicy || emptyPolicyTemplate);
-    setHasLoadedInitialPolicy(true);
-  }, [hasLoadedInitialPolicy, isLoading, savedPolicy]);
+  const clearLocalPreview = () => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
+
+    setLocalPreviewUrl(null);
+  };
+
+  const clearImage = () => {
+    clearLocalPreview();
+    onChange("");
+  };
+
+  const openFilePicker = () => {
+    if (uploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const uploadSelectedFile = async (file?: File) => {
+    if (!file || uploading) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file.");
+      return;
+    }
+
+    clearLocalPreview();
+
+    const objectUrl = URL.createObjectURL(file);
+    previewObjectUrlRef.current = objectUrl;
+    setLocalPreviewUrl(objectUrl);
+
+    const syntheticEvent = {
+      target: {
+        files: [file],
+      },
+    } as unknown as ChangeEvent<HTMLInputElement>;
+
+    const result = await uploadFile(syntheticEvent);
+    if (result?.fileUrl) {
+      onChange(result.fileUrl);
+    } else {
+      clearLocalPreview();
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!uploading) setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    await uploadSelectedFile(event.dataTransfer.files?.[0]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-semibold text-[#344054]">{label}</Label>
+      <div
+        onClick={openFilePicker}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          "group relative overflow-hidden rounded-xl border border-dashed bg-white transition-all duration-200",
+          uploading ? "cursor-not-allowed opacity-80" : "cursor-pointer",
+          isDragging
+            ? "border-[#C1121F] bg-[#C1121F]/5 shadow-[0_0_0_4px_rgba(193,18,31,0.10)]"
+            : "border-[#D0D5DD] hover:border-[#C1121F]/50 hover:bg-[#F8F9FB]",
+        )}
+      >
+        {previewSrc ? (
+          <div className="relative">
+            <div
+              role="img"
+              aria-label={`${label} preview`}
+              className="h-44 w-full bg-cover bg-center"
+              style={{ backgroundImage: previewBackgroundImage }}
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-4 py-3">
+              <p className="text-sm font-semibold text-white">Image selected</p>
+              <p className="text-xs text-white/80">
+                Drop another image here to replace it.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={(event) => {
+                event.stopPropagation();
+                clearImage();
+              }}
+              disabled={uploading}
+              aria-label={`Clear ${label}`}
+              className="absolute right-3 top-3 h-8 w-8 rounded-full bg-white/90 p-0 text-[#C1121F] shadow hover:bg-white"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+            {uploading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+                <Loader2 className="size-6 animate-spin text-[#C1121F]" />
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex min-h-44 flex-col items-center justify-center px-5 py-7 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C1121F]/5 text-[#C1121F] shadow-sm">
+              {uploading ? (
+                <Loader2 className="size-6 animate-spin" />
+              ) : isDragging ? (
+                <UploadCloud className="size-6" />
+              ) : (
+                <ImageIcon className="size-6" />
+              )}
+            </div>
+            <p className="mt-4 text-sm font-semibold text-[#101828]">
+              Drag & drop image here
+            </p>
+            <p className="mt-1 text-xs text-[#667085]">
+              or <span className="font-medium text-[#C1121F]">click to browse</span>
+            </p>
+            <p className="mt-1 text-[11px] text-[#98A2B3]">PNG, JPG, WEBP</p>
+          </div>
+        )}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={(event) => uploadSelectedFile(event.target.files?.[0])}
+        className="sr-only"
+      />
+    </div>
+  );
+}
+
+function AboutPageSectionEditor({ value, onChange }: AboutPageSectionEditorProps) {
+  const updateObjectSection = <TSection extends AboutDraftSection,>(
+    section: TSection,
+    nextValue: AboutPageDraft[TSection],
+  ) => {
+    onChange({ ...value, [section]: nextValue });
+  };
+
+  const updateArrayItem = <TItem,>(
+    section: "missionVisionValues" | "whyChooseUs",
+    index: number,
+    nextItem: TItem,
+  ) => {
+    onChange({
+      ...value,
+      [section]: value[section].map((item, itemIndex) =>
+        itemIndex === index ? nextItem : item,
+      ),
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <EditableSectionCard icon={ImageIcon} title="Hero / banner">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AboutImageUpload
+            label="Hero image"
+            value={value.hero.imageUrl}
+            onChange={(imageUrl) => updateObjectSection("hero", { ...value.hero, imageUrl })}
+          />
+          <AboutTextInput
+            label="Title"
+            value={value.hero.title}
+            onChange={(title) => updateObjectSection("hero", { ...value.hero, title })}
+          />
+          <AboutTextInput
+            label="Subtitle"
+            value={value.hero.subtitle}
+            onChange={(subtitle) => updateObjectSection("hero", { ...value.hero, subtitle })}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AboutTextInput
+              label="CTA label"
+              value={value.hero.ctaLabel}
+              onChange={(ctaLabel) => updateObjectSection("hero", { ...value.hero, ctaLabel })}
+            />
+            <AboutTextInput
+              label="CTA link"
+              value={value.hero.ctaHref}
+              onChange={(ctaHref) => updateObjectSection("hero", { ...value.hero, ctaHref })}
+            />
+          </div>
+        </div>
+      </EditableSectionCard>
+
+      <EditableSectionCard icon={FileText} title="Our Story">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AboutImageUpload
+            label="Story image"
+            value={value.story.imageUrl}
+            onChange={(imageUrl) => updateObjectSection("story", { ...value.story, imageUrl })}
+          />
+          <AboutTextInput
+            label="Badge"
+            value={value.story.badge}
+            onChange={(badge) => updateObjectSection("story", { ...value.story, badge })}
+          />
+          <AboutTextInput
+            label="Eyebrow"
+            value={value.story.eyebrow}
+            onChange={(eyebrow) => updateObjectSection("story", { ...value.story, eyebrow })}
+          />
+          <AboutTextInput
+            label="Title"
+            value={value.story.title}
+            onChange={(title) => updateObjectSection("story", { ...value.story, title })}
+          />
+        </div>
+        <AboutTextArea
+          label="Paragraphs"
+          value={value.story.paragraphs}
+          onChange={(paragraphs) => updateObjectSection("story", { ...value.story, paragraphs })}
+          rows={6}
+        />
+      </EditableSectionCard>
+
+      <EditableSectionCard icon={Target} title="Mission / Vision / Values">
+        <div className="grid gap-4 lg:grid-cols-3">
+          {value.missionVisionValues.map((item, index) => (
+            <CardFields
+              key={index}
+              index={index}
+              item={item}
+              onChange={(nextItem) => updateArrayItem("missionVisionValues", index, nextItem)}
+            />
+          ))}
+        </div>
+      </EditableSectionCard>
+
+      <EditableSectionCard icon={MousePointerClick} title="Why Choose Us">
+        <div className="grid gap-4 lg:grid-cols-3">
+          {value.whyChooseUs.map((item, index) => (
+            <CardFields
+              key={index}
+              index={index}
+              item={item}
+              onChange={(nextItem) => updateArrayItem("whyChooseUs", index, nextItem)}
+            />
+          ))}
+        </div>
+      </EditableSectionCard>
+    </div>
+  );
+}
+
+function EditableSectionCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-[#EAECF0] bg-[#FCFCFD] p-4">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="inline-flex size-9 items-center justify-center rounded-xl bg-white text-[#C1121F] shadow-sm">
+          <Icon className="size-4" />
+        </span>
+        <h3 className="text-sm font-semibold text-[#101828]">{title}</h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function CardFields({
+  index,
+  item,
+  onChange,
+}: {
+  index: number;
+  item: AboutCardField;
+  onChange: (value: AboutCardField) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-2xl border border-[#EAECF0] bg-white p-4">
+      <AboutTextInput
+        label={`Card ${index + 1} title`}
+        value={item.title}
+        onChange={(title) => onChange({ ...item, title })}
+      />
+      <AboutTextArea
+        label="Description"
+        value={item.description}
+        onChange={(description) => onChange({ ...item, description })}
+      />
+    </div>
+  );
+}
+
+export function AboutUsPage() {
+  return (
+    <CustomerAppContentPage
+      translationKey="aboutUs"
+      contentField="aboutUs"
+      emptyTemplate={emptyAboutUsTemplate}
+      emptyPreview="<p>No About Us content has been published yet.</p>"
+      buildPublicLink={buildAboutUsPageLink}
+    />
+  );
+}
+
+export default function PrivacyPolicyPage() {
+  return (
+    <CustomerAppContentPage
+      translationKey="privacyPolicy"
+      contentField="privacyPolicy"
+      emptyTemplate={emptyPolicyTemplate}
+      emptyPreview="<p>No privacy policy content has been published yet.</p>"
+      buildPublicLink={buildPrivacyPolicyPageLink}
+    />
+  );
+}
+
+function CustomerAppContentPage({
+  translationKey,
+  contentField,
+  emptyTemplate,
+  emptyPreview,
+  buildPublicLink,
+}: CustomerAppContentPageProps) {
+  const t = useTranslations(translationKey);
+  const commonT = useTranslations("common");
+  const { restaurantId, loading: authLoading } = useAuth();
+  const [draftContent, setDraftContent] = useState("");
+  const [draftAboutPage, setDraftAboutPage] = useState<AboutPageDraft>(defaultAboutPageDraft);
+  const [hasLoadedInitialContent, setHasLoadedInitialContent] = useState(false);
+
+  const { data: content, isLoading, isFetching, refetch } = useCustomerAppContent(restaurantId);
+  const { data: publicAboutUs } = usePublicAboutUs(restaurantId);
+  const { data: publicPolicy } = usePublicPrivacyPolicy(restaurantId);
+  const updateAboutUs = useUpdateCustomerAppAboutUs();
+  const updatePrivacyPolicy = useUpdateCustomerAppPrivacyPolicy();
+
+  const savedContent = content?.[contentField] ?? "";
+  const publishedContent =
+    contentField === "aboutUs"
+      ? publicAboutUs?.aboutUs ?? ""
+      : publicPolicy?.privacyPolicy ?? "";
+  const publicLink = restaurantId ? buildPublicLink() : "";
+  const isAboutUsPage = contentField === "aboutUs";
+  const currentDraftContent = isAboutUsPage
+    ? buildAboutPageHtml(draftAboutPage)
+    : draftContent;
+  const isDirty = currentDraftContent !== savedContent;
+  const loading = authLoading || isLoading;
+  const isSaving =
+    contentField === "aboutUs" ? updateAboutUs.isPending : updatePrivacyPolicy.isPending;
+  const previewDocument = useMemo(
+    () => buildPreviewDocument(currentDraftContent, emptyPreview),
+    [currentDraftContent, emptyPreview],
+  );
+  const wordCount = useMemo(() => countWords(stripHtmlToText(currentDraftContent)), [currentDraftContent]);
+  const characterCount = currentDraftContent.length;
+  const hasPublishedContent = publishedContent.trim().length > 0;
+
+  useEffect(() => {
+    if (hasLoadedInitialContent || isLoading) return;
+
+    if (contentField === "aboutUs") {
+      setDraftAboutPage(parseAboutPageDraft(savedContent || emptyTemplate));
+    } else {
+      setDraftContent(savedContent || emptyTemplate);
+    }
+
+    setHasLoadedInitialContent(true);
+  }, [contentField, emptyTemplate, hasLoadedInitialContent, isLoading, savedContent]);
 
   const handleReset = () => {
-    setDraftPolicy(savedPolicy || emptyPolicyTemplate);
+    if (contentField === "aboutUs") {
+      setDraftAboutPage(parseAboutPageDraft(savedContent || emptyTemplate));
+      return;
+    }
+
+    setDraftContent(savedContent || emptyTemplate);
   };
 
   const handleSave = async () => {
@@ -330,12 +978,24 @@ export default function PrivacyPolicyPage() {
       return;
     }
 
-    const nextContent = await updatePrivacyPolicy({
-      restaurantId,
-      privacyPolicy: draftPolicy.trim(),
-    });
-    setDraftPolicy(nextContent.privacyPolicy);
-    setHasLoadedInitialPolicy(true);
+    const nextContent =
+      contentField === "aboutUs"
+        ? await updateAboutUs.mutateAsync({
+            restaurantId,
+            aboutUs: currentDraftContent.trim(),
+          })
+        : await updatePrivacyPolicy.mutateAsync({
+            restaurantId,
+            privacyPolicy: currentDraftContent.trim(),
+          });
+
+    if (contentField === "aboutUs") {
+      setDraftAboutPage(parseAboutPageDraft(nextContent[contentField]));
+    } else {
+      setDraftContent(nextContent[contentField]);
+    }
+
+    setHasLoadedInitialContent(true);
   };
 
   const handleCopyPublicLink = async () => {
@@ -448,7 +1108,7 @@ export default function PrivacyPolicyPage() {
 
                 <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F8F9FB] px-3 py-1 text-xs font-semibold text-[#475467]">
                   <FileText className="size-3.5" />
-                  {t("richEditor")}
+                  {isAboutUsPage ? t("sectionEditor") : t("richEditor")}
                 </span>
               </div>
             </div>
@@ -458,10 +1118,15 @@ export default function PrivacyPolicyPage() {
                 <div className="flex min-h-[520px] items-center justify-center rounded-2xl border border-dashed border-[#D0D5DD] bg-[#FCFCFD]">
                   <Loader2 className="size-6 animate-spin text-[#98A2B3]" />
                 </div>
+              ) : isAboutUsPage ? (
+                <AboutPageSectionEditor
+                  value={draftAboutPage}
+                  onChange={setDraftAboutPage}
+                />
               ) : (
                 <RichPolicyEditor
-                  value={draftPolicy}
-                  onChange={setDraftPolicy}
+                  value={draftContent}
+                  onChange={setDraftContent}
                   placeholder={t("placeholder")}
                 />
               )}
