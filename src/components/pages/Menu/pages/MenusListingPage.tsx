@@ -22,7 +22,9 @@ import Image from "next/image";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrency } from "@/hooks/useCurrency";
 import { useGetMenuById, useGetMenuItems } from "@/hooks/useMenus";
+import { formatDateTime24 } from "@/lib/date-time-format";
 import { useTranslations } from "next-intl";
 
 type MenuCategorySummary = {
@@ -117,29 +119,17 @@ const formatDateTime = (value?: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+  return formatDateTime24({
+    value: date,
+    fallback: "—",
+    options: {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    },
   });
-};
-
-const toNumber = (value: unknown, fallback = 0) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const formatMoney = (value?: number | string | null) => {
-  const amount = toNumber(value, 0);
-
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
 };
 
 const getImageUrl = (value?: string | null) => {
@@ -166,6 +156,7 @@ export default function MenusListingPage() {
   const [editing, setEditing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { user } = useAuth();
+  const { formatMoney } = useCurrency(user?.restaurantId);
 
   const searchParams = useSearchParams();
   const menuId = searchParams.get("id");
@@ -213,6 +204,7 @@ export default function MenusListingPage() {
       <AttachedMenuItems
         items={detailItems}
         loading={isMenuLoading}
+        formatMoney={formatMoney}
         t={t}
       />
 
@@ -451,10 +443,12 @@ function AttachedCategories({
 function AttachedMenuItems({
   items,
   loading,
+  formatMoney,
   t,
 }: {
   items: MenuItemSummary[];
   loading: boolean;
+  formatMoney: (amount?: number | string | null, currency?: string | null) => string;
   t: ReturnType<typeof useTranslations>;
 }) {
   return (
@@ -478,7 +472,12 @@ function AttachedMenuItems({
       ) : items.length ? (
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => (
-            <EnrichedItemCard key={item.id} item={item} t={t} />
+            <EnrichedItemCard
+              key={item.id}
+              item={item}
+              formatMoney={formatMoney}
+              t={t}
+            />
           ))}
         </div>
       ) : (
@@ -492,9 +491,11 @@ function AttachedMenuItems({
 
 function EnrichedItemCard({
   item,
+  formatMoney,
   t,
 }: {
   item: MenuItemSummary;
+  formatMoney: (amount?: number | string | null, currency?: string | null) => string;
   t: ReturnType<typeof useTranslations>;
 }) {
   const variations = item.variations || [];

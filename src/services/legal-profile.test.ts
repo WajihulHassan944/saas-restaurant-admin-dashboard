@@ -33,8 +33,8 @@ describe("legal profile service", () => {
             businessAddress: {
               street: "Street 12",
               shopNumber: "Shop 7",
-              city: "Lahore",
               state: "Punjab",
+              city: "Lahore",
               country: "Pakistan",
             },
             contractText: "Legal terms",
@@ -48,8 +48,8 @@ describe("legal profile service", () => {
       businessAddress: {
         street: "Street 12",
         shopNumber: "Shop 7",
-        city: "Lahore",
         state: "Punjab",
+        city: "Lahore",
         country: "Pakistan",
       },
       contractText: "Legal terms",
@@ -73,8 +73,8 @@ describe("legal profile service", () => {
       businessAddress: {
         street: "Street 12",
         shopNumber: null,
-        city: "Lahore",
         state: "Punjab",
+        city: "Lahore",
         country: "Pakistan",
       },
       contractText: "Legal terms",

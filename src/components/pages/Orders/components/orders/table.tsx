@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Ban, CalendarClock, CreditCard, Eye, MoreHorizontal, RefreshCw, XCircle } from "lucide-react";
+import { Ban, CalendarClock, CreditCard, Eye, MoreHorizontal, RefreshCw, Truck, XCircle } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -34,10 +34,12 @@ import {
   isFutureOrder,
 } from "@/components/pages/Orders/utils/orders-schedule-filters";
 import { useAuth } from "@/hooks/useAuth";
-import { useUpdateOrderStatus } from "@/hooks/useOrders";
+import { useSendOrderOutForDelivery, useUpdateOrderStatus } from "@/hooks/useOrders";
+import { formatDateTime24 } from "@/lib/date-time-format";
 import { getOrderById } from "@/services/orders/orders.api";
 import {
   canDirectlyUpdateOrderStatus,
+  canSendDeliveryOrderOutDirectly,
   canTerminateOrderStatus,
   getNextOrderStatus,
   ORDER_STATUS_ACTION_LABEL_KEYS,
@@ -79,11 +81,14 @@ const formatOrderTime = (value?: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
 
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+  return formatDateTime24({
+    value: date,
+    options: {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    },
   });
 };
 
@@ -115,6 +120,7 @@ export function OrdersTable({
   const [loadingPaymentStatusOrderId, setLoadingPaymentStatusOrderId] =
     useState<string | null>(null);
   const updateStatusMutation = useUpdateOrderStatus();
+  const sendOutForDeliveryMutation = useSendOrderOutForDelivery();
   const canUpdatePaymentStatusRole =
     role === "BUSINESS_ADMIN" || role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
   const getStatusLabel = (status?: string) =>
@@ -198,6 +204,16 @@ export function OrdersTable({
       orderType: updatedOrder.orderType ?? order.orderType,
       previousStatus: order.status,
       status: updatedOrder.status ?? status,
+    });
+  };
+  const handleSendOutForDeliveryAction = async (order: OrdersTableRow) => {
+    const updatedOrder = await sendOutForDeliveryMutation.mutateAsync({
+      orderId: order.id,
+    });
+    setProgressOrder({
+      orderType: updatedOrder.orderType ?? order.orderType,
+      previousStatus: order.status,
+      status: updatedOrder.status ?? "OUT_FOR_DELIVERY",
     });
   };
   const handlePaymentStatusAction = async (order: OrdersTableRow) => {
@@ -324,6 +340,7 @@ export function OrdersTable({
     const customerDetail = getCustomerDetail(order);
     const addressPreview = getAddressPreview(order);
     const canUpdateStatus = Boolean(getNextOrderStatus(order));
+    const canSendOutForDelivery = canSendDeliveryOrderOutDirectly(order);
     const canUseTerminalActions = canTerminateOrderStatus(order);
     const orderTime = getOrderTimeDate(order);
     const orderTimeLabel = formatOrderTime(order.orderTime);
@@ -355,9 +372,7 @@ export function OrdersTable({
           </TableCell>
 
           <TableCell className="px-4 text-gray-500">
-            {reservationDate
-              ? new Date(reservationDate).toLocaleString()
-              : "-"}
+            {formatDateTime24({ value: reservationDate })}
           </TableCell>
 
           <TableCell className="px-4">
@@ -381,7 +396,7 @@ export function OrdersTable({
                   ) : null}
                   <span
                     className="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600"
-                    title={orderTime?.toLocaleString()}
+                    title={formatDateTime24({ value: orderTime })}
                   >
                     <CalendarClock size={12} />
                     <span className="truncate">{orderTimeLabel}</span>
@@ -458,13 +473,18 @@ export function OrdersTable({
             type="button"
             className="p-2 hover:text-primary"
             onClick={() => router.push(getOrderRoute(order))}
+            aria-label={t("viewOrderDetails")}
           >
             <Eye size={18} />
           </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className="p-2 hover:text-primary">
+              <button
+                type="button"
+                className="p-2 hover:text-primary"
+                aria-label={t("orderActions")}
+              >
                 <MoreHorizontal size={18} />
               </button>
             </DropdownMenuTrigger>
@@ -482,6 +502,17 @@ export function OrdersTable({
                 >
                   <RefreshCw size={16} />
                   {getStatusActionLabel(order)}
+                </DropdownMenuItem>
+              ) : null}
+              {canSendOutForDelivery ? (
+                <DropdownMenuItem
+                  disabled={sendOutForDeliveryMutation.isPending}
+                  onClick={() => {
+                    void handleSendOutForDeliveryAction(order);
+                  }}
+                >
+                  <Truck size={16} />
+                  {t("sendOutForDeliveryDirect")}
                 </DropdownMenuItem>
               ) : null}
               {canUpdatePaymentStatus ? (

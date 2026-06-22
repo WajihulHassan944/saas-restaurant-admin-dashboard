@@ -44,8 +44,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatDateTime24 } from "@/lib/date-time-format";
+import { formatMoney as formatCurrencyAmount } from "@/lib/currency";
 import { ORDER_STATUS_LABEL_KEYS } from "@/lib/status-labels";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrency } from "@/hooks/useCurrency";
 import {
   useRefundPaymentTransaction,
   useUpdatePaymentTransactionStatus,
@@ -127,6 +130,7 @@ type OrderDetails = {
   isScheduled?: boolean | null;
   status?: string | null;
   paymentStatus?: string | null;
+  currency?: string | null;
   subtotal?: number | null;
   taxAmount?: number | null;
   deliveryFee?: number | null;
@@ -163,17 +167,15 @@ type OrderDetails = {
 const formatDate = (date?: string | null) => {
   if (!date) return "-";
   const parsed = new Date(date);
-  return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime())
+    ? "-"
+    : formatDateTime24({ value: parsed });
 };
 
-const formatMoney = (amount?: number | null, currency = "USD") => {
+const formatMoney = (amount?: number | null, currency?: string | null) => {
   if (typeof amount !== "number" || !Number.isFinite(amount)) return "-";
 
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  return formatCurrencyAmount(amount, currency);
 };
 
 const getTransactionAmount = (transaction: Transaction) => {
@@ -264,6 +266,7 @@ function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
 const OrderDetailsMain = ({ order }: { order: OrderDetails }) => {
   const t = useTranslations("orders");
   const { role } = useAuth();
+  const { resolveCurrency: resolveDisplayCurrency } = useCurrency(order.restaurantId);
   const refundMutation = useRefundPaymentTransaction(order.id);
   const paymentStatusMutation = useUpdatePaymentTransactionStatus(order.id);
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
@@ -306,7 +309,10 @@ const OrderDetailsMain = ({ order }: { order: OrderDetails }) => {
     ? t(ORDER_STATUS_LABEL_KEYS[order.status])
     : formatStatus(order.status);
   const paymentMethods = order.paymentOptions?.available || order.availablePaymentMethods || [];
-  const primaryCurrency = latestTransaction?.currency || "USD";
+  const primaryCurrency = resolveDisplayCurrency(
+    order.currency,
+    latestTransaction?.currency
+  );
   const parsedRefundAmount = Number(refundAmount);
   const partialAmountInvalid =
     refundMode === "partial" &&

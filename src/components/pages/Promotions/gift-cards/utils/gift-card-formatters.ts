@@ -1,21 +1,16 @@
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
+import { formatDateTime24 } from "@/lib/date-time-format";
+import { formatMoney } from "@/lib/currency";
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-export const formatGiftCardAmount = (value: number | string | null | undefined) => {
+export const formatGiftCardAmount = (
+  value: number | string | null | undefined,
+  currency?: string | null
+) => {
   if (value === null || value === undefined || value === "") return "—";
 
   const amount = Number(value);
   if (!Number.isFinite(amount)) return "—";
 
-  return currencyFormatter.format(amount);
+  return formatMoney(amount, currency);
 };
 
 export const formatGiftCardDate = (value: string | null | undefined) => {
@@ -24,7 +19,7 @@ export const formatGiftCardDate = (value: string | null | undefined) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  return dateTimeFormatter.format(date);
+  return formatDateTime24({ value: date, fallback: "—" });
 };
 
 export const formatShortGiftCardId = (id: string | null | undefined) => {

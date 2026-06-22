@@ -2,6 +2,8 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatDateTime24 } from "@/lib/date-time-format";
+import { formatMoney, resolveCurrency } from "@/lib/currency";
 import type { AdminInvoice } from "@/services/reports/reports.api";
 
 type DashboardReportType = "financial" | "order";
@@ -24,40 +26,21 @@ type DownloadRestaurantDashboardReportPdfInput = {
   data: any;
 };
 
-const PDF_PRIMARY_COLOR: [number, number, number] = [206, 24, 27];
 const PDF_GREEN_COLOR: [number, number, number] = [16, 185, 129];
 const PDF_DARK_COLOR: [number, number, number] = [17, 24, 39];
 const PDF_GRAY_COLOR: [number, number, number] = [107, 114, 128];
 const PDF_LIGHT_GRAY_COLOR: [number, number, number] = [249, 250, 251];
 const PDF_BORDER_COLOR: [number, number, number] = [229, 231, 235];
 
-const formatCurrency = (value: number, currency = "EUR") => {
-  const numericValue = Number(value || 0);
-
-  try {
-    return new Intl.NumberFormat("de-DE", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(numericValue);
-  } catch {
-    return `${currency} ${numericValue.toFixed(2)}`;
-  }
+const formatCurrency = (value: number, currency?: string | null) => {
+  return formatMoney(value, currency);
 };
 
-const formatInvoiceCurrency = (value: number, currency = "EUR") => {
-  const numericValue = Number(value || 0);
-
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    }).format(numericValue);
-  } catch {
-    return `${currency} ${numericValue.toFixed(2)}`;
-  }
+const formatInvoiceCurrency = (value: number, currency?: string | null) => {
+  return formatMoney(value, currency, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -67,12 +50,16 @@ const formatDateTime = (value?: string | null) => {
 
   if (Number.isNaN(date.getTime())) return "-";
 
-  return date.toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return formatDateTime24({
+    value: date,
+    locale: "de-DE",
+    options: {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
   });
 };
 
@@ -95,7 +82,10 @@ const sanitizeFileName = (value: string) => {
 };
 
 const getInvoiceCurrency = (invoice?: AdminInvoice | null) => {
-  return invoice?.transactions?.[0]?.currency || "EUR";
+  return resolveCurrency(
+    invoice?.currency,
+    invoice?.transactions?.[0]?.currency
+  );
 };
 
 const getCustomerName = (invoice: AdminInvoice) => {
@@ -141,7 +131,7 @@ const drawHeader = ({
   }
 
   doc.setFontSize(9);
-  doc.text(new Date().toLocaleString("de-DE"), pageWidth - 40, 58, {
+  doc.text(formatDateTime24({ value: new Date(), locale: "de-DE" }), pageWidth - 40, 58, {
     align: "right",
   });
 
@@ -187,7 +177,7 @@ const buildBreakdownRows = (items?: Array<{ key: string; count: number }>) => {
   return items.map((item) => [prettyLabel(item.key), String(item.count ?? 0)]);
 };
 
-const buildTopItemsRows = (items?: any[], currency = "EUR") => {
+const buildTopItemsRows = (items?: any[], currency?: string | null) => {
   if (!items?.length) return [];
 
   return items.map((item) => [
@@ -225,7 +215,7 @@ const areRowsCoveredByStats = (
 
 const buildFinancialDetailRows = (
   data: any,
-  currency: string
+  currency?: string | null
 ): ReportTableRow[] => [
   ["Total Orders", String(data?.totalOrders ?? 0)],
   ["Gross Revenue", formatCurrency(data?.grossRevenue ?? 0, currency)],
@@ -245,7 +235,7 @@ export const downloadRestaurantDashboardReportPdf = ({
   title,
   description,
   restaurantId,
-  currency = "EUR",
+  currency,
   stats,
   data,
 }: DownloadRestaurantDashboardReportPdfInput) => {
