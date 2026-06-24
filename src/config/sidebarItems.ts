@@ -24,6 +24,7 @@ import {
   Coins,
   CreditCard,
   ReceiptText,
+  Inbox,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IconType } from "react-icons";
@@ -203,6 +204,14 @@ export const menuItems: MenuItem[] = [
     roles: allAdminRoles,
   },
   {
+    title: "Contact Submissions",
+    labelKey: "contactSubmissions",
+    href: "/contact-submissions",
+    icon: Inbox,
+    section: "main",
+    roles: allAdminRoles,
+  },
+  {
     title: "Loyalty Program",
     labelKey: "loyaltyProgram",
     href: "/loyalty",
@@ -317,6 +326,14 @@ export const menuItems: MenuItem[] = [
     icon: BarChart3,
     section: "account",
     roles: allAdminRoles,
+  },
+  {
+    title: "Payment Settings",
+    labelKey: "paymentSettings",
+    href: "/payment-settings",
+    icon: CreditCard,
+    section: "account",
+    roles: restaurantAdminRoles,
   },
 
   {
